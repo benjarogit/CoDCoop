@@ -8,7 +8,7 @@ Proton. This guide is the setup that was tested end to end:
 | Launcher | AnkerGames (also applies to similar launchers that start the game through `umu-run`/Proton) |
 | Proton | 11.0 |
 | GPU / driver | NVIDIA (proprietary) and Mesa (llvmpipe) |
-| Game | Call of Duty 1.5, mod 0.5.0 |
+| Game | Call of Duty 1.5, mod 0.5.1 (this fork) |
 
 Three things matter on Linux: the launcher has to keep the modified files, the
 driver must not report more OpenGL extensions than the 2003 engine can hold, and

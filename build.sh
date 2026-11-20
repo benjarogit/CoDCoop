@@ -35,7 +35,7 @@ if ! command -v "$CXX" >/dev/null 2>&1; then
     exit 1
 fi
 
-OPT="-std=c++17 -O2 -shared -static -static-libgcc -static-libstdc++ -Wl,--no-insert-timestamp"
+OPT="-std=c++17 -O2 -s -shared -static -static-libgcc -static-libstdc++ -Wl,--no-insert-timestamp"
 mkdir -p build
 
 echo "== ddraw.dll"
@@ -85,7 +85,7 @@ if [ "$INSTALLER" = 1 ]; then
     else
         echo "== Install CoD Coop.exe"
         "$WINDRES" -i installer/installer.rc -o build/installer_res.o
-        "$CXX" -std=c++17 -O2 -static -mwindows -municode -o "build/Install CoD Coop.exe" \
+        "$CXX" -std=c++17 -O2 -s -static -mwindows -municode -o "build/Install CoD Coop.exe" \
             installer/installer.cpp build/installer_res.o -lole32 -lshell32
         echo "BUILD OK: build/Install CoD Coop.exe"
     fi

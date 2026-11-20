@@ -2,7 +2,12 @@
 
 Play the **Call of Duty 1 (2003)** campaign, the **United Offensive** expansion and the **Call of Duty 2** campaign in co-op with friends: up to 4 players, through Steam, over the internet by IP, or on a local network.
 
-**[⬇ Download the installer](https://github.com/TheTiranix/CoDCoop/releases/latest)**
+**[⬇ Download the installer](https://github.com/benjarogit/CoDCoop/releases/latest)**
+
+> **This is a fork** of [TheTiranix/CoDCoop](https://github.com/TheTiranix/CoDCoop), maintained here.
+> It adds first-class Linux support — cross-build, native installer, the Proton/`ddraw` fixes and the
+> Steam overlay/friends-list integration — see [Linux (Proton / Wine)](#linux-proton--wine).
+> Windows works exactly as before.
 
 ## Features
 
@@ -28,7 +33,7 @@ Play the **Call of Duty 1 (2003)** campaign, the **United Offensive** expansion 
 
 ## Install
 
-1. Download `Install-CoD-Coop.exe` from the [latest release](https://github.com/TheTiranix/CoDCoop/releases/latest).
+1. Download `Install-CoD-Coop.exe` from the [latest release](https://github.com/benjarogit/CoDCoop/releases/latest).
 2. Run it and accept the game folder (the one with `CoDSP.exe`, or `CoD2SP_s.exe` for Call of Duty 2). If it can't find it, it lets you choose it.
 3. If Windows shows "Windows protected your PC", click **More info** → **Run anyway** (the installer is not signed).
 

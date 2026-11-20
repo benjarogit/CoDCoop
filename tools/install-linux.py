@@ -28,7 +28,7 @@ import zipfile
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from extract_installer import resources  # noqa: E402  (same folder)
 
-REPO = "TheTiranix/CoDCoop"
+REPO = "benjarogit/CoDCoop"
 RELEASE_URL = "https://github.com/%s/releases/download/%%s/Install-CoD-Coop.exe" % REPO
 API_URL = "https://api.github.com/repos/%s/releases" % REPO
 
