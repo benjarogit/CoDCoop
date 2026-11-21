@@ -10,8 +10,10 @@
 4 RCDATA "installer/README.txt"
 5 RCDATA "build/steam_api.dll"
 6 RCDATA "game/uo/pakz_coop.pk3"   // only if United Offensive is there
+#ifdef COOP_EXPERIMENTAL_COD2
 7 RCDATA "build/cod2coop.dll"      // Call of Duty 2
 8 RCDATA "game2/main/zz_coop2.iwd" // Call of Duty 2: Co-op button in the menu
+#endif
 9 RCDATA "game/CoDSP.exe"          // Call of Duty 1.5 (the mod needs that exe)
 
 1 24 "installer/installer.manifest"
@@ -51,6 +53,7 @@
 #define IDC_STATUS    127
 #define IDC_INSTALL   128
 #define IDC_QUIT      129
+#define IDC_CONFIGURE 130
 
 IDD_INSTALL DIALOGEX 0, 0, 340, 312
 STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX
@@ -80,7 +83,8 @@ BEGIN
     LTEXT           "", IDC_FOVNOTE, 72, 165, 60, 9
     LTEXT           "", IDC_ST_Q, 140, 165, 38, 9
     COMBOBOX        IDC_Q, 180, 163, 62, 60, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "", IDC_FIXNOTE, 15, 180, 310, 30
+    LTEXT           "", IDC_FIXNOTE, 15, 180, 310, 20
+    AUTOCHECKBOX    "", IDC_CONFIGURE, 15, 202, 290, 10, WS_TABSTOP
 
     GROUPBOX        "", IDC_ST_EXTRAS, 8, 218, 324, 44
     AUTOCHECKBOX    "", IDC_SP, 15, 229, 105, 10, WS_TABSTOP

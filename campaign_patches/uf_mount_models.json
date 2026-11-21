@@ -1,0 +1,54 @@
+{
+  "xmodel/viewmodel_hands_new": {
+    "package": "Main/pak0.pk3",
+    "sha256": "be190fa03d3e9fd9427083cdb171d7bad27a71f8467cc161691c1bcdc59575a4"
+  },
+  "xmodel/w_ge_lmg_mg34_drop": {
+    "package": "uo/pakuo04.pk3",
+    "sha256": "9948cacdbdea8f028c94dcb4ff8aad6d47ba97a3e0b2c8a54199657e24028b86"
+  },
+  "xmodel/w_ge_lmg_mg34_world": {
+    "package": "uo/pakuo04.pk3",
+    "sha256": "bdd1c12b53296672ca397bbaaa7dc2c5e807272ad523368da29fd816577dc424"
+  },
+  "xmodel/w_rs_lmg_dp28_view": {
+    "package": "uo/pakuo04.pk3",
+    "sha256": "ce0aa24f9eec90f31df870118d2a8f360706a88e59c383f8410f180b3d3177c5"
+  },
+  "xmodel/w_ru_mac_dp28_drop": {
+    "package": "uo/pakuo04.pk3",
+    "sha256": "7b8465df6613e6bda36d8fdf7c8762e8ca8edf48c6fa45be6b3cbdd24bf3f340"
+  },
+  "xmodel/w_ru_mac_dp28_game": {
+    "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+    "sha256": "37655c3b5b42fae227d92a4219b09357d16cec35164f3fe9d1ce38a0b46774f7"
+  },
+  "xmodel/w_us_mac_30cal_drop": {
+    "package": "uo/pakuo04.pk3",
+    "sha256": "eb88fe449901b79d0f5bd3efa07838470df61cca690fab87f7274d0464ee9ab5"
+  },
+  "xmodel/w_us_mac_30cal_game": {
+    "package": "uo/pakuo04.pk3",
+    "sha256": "4c2094384db10ef386c4d074a0fecf540e2f3d7886c4fa4c388bd30f7128a3ee"
+  },
+  "xmodel/viewhands_enhanced": {
+    "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+    "sha256": "8a1f034c9e77e17e401b2f6ca3740ac0808c8797accc1b89b269c4895477c28c"
+  },
+  "xmodel/viewmodel_30cal_z": {
+    "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+    "sha256": "bcc88590821bcc97cee64c163f08945910a5a6d8c956acf031cefdc0612bd433"
+  },
+  "xmodel/viewmodel_mg34_z": {
+    "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+    "sha256": "f2974bd710e31d9d1779894d9394bcbfdd489ecf18f5376b5f2b53994cfd270e"
+  },
+  "xmodel/gamemodel_mg42": {
+    "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+    "sha256": "c70587421411995c39ce902b2ee43db6fa0d499e58f634eb3a9613c994d087e9"
+  },
+  "xmodel/viewmodel_mg42s": {
+    "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+    "sha256": "0de01b987827552862b4ab1fd1b5a92482d6a41bed55f09f243ff413210517a0"
+  }
+}

@@ -7,9 +7,11 @@ if not exist build mkdir build
 set OPT=-std=c++17 -O2 -s -shared -static -static-libgcc -static-libstdc++ -Wl,--no-insert-timestamp
 g++ %OPT% -o build\ddraw.dll src\loader.cpp src\ddraw.def
 if errorlevel 1 exit /b 1
-g++ %OPT% -o build\codcoop_core.dll src\core.cpp -lws2_32
+g++ %OPT% -o build\codcoop_core.dll src\core.cpp -lws2_32 -ladvapi32
 if errorlevel 1 exit /b 1
 rem CoD2 (en prueba): modulo aparte que carga ddraw.dll en CoD2SP_s.exe; copia de desarrollo en game2\
+g++ -std=c++17 -O2 -s -static -municode -o build\suite-check.exe installer\suite_check.cpp -ladvapi32
+if errorlevel 1 exit /b 1
 g++ %OPT% -o build\cod2coop.dll src\cod2.cpp -lws2_32
 if errorlevel 1 exit /b 1
 if exist game2\CoD2SP_s.exe copy /y build\cod2coop.dll game2\ >nul && copy /y build\ddraw.dll game2\ >nul
@@ -25,5 +27,5 @@ if not exist build\steam_api.dll copy /y "C:\Program Files (x86)\Steam\steamapps
 fc /b build\steam_api.dll game\steam_api.dll >nul 2>nul || copy /y build\steam_api.dll game\ >nul 2>nul || echo AVISO: no se pudo copiar steam_api.dll a game\
 if exist game2\CoD2SP_s.exe fc /b build\steam_api.dll game2\steam_api.dll >nul 2>nul || copy /y build\steam_api.dll game2\ >nul 2>nul
 rem instalador: un solo .exe con los archivos del mod, steam_api.dll y el README.txt adentro (installer\installer.rc)
-windres -i installer\installer.rc -o build\installer_res.o && g++ -std=c++17 -O2 -s -static -mwindows -municode -o "build\Install-CoD-Coop.exe" installer\installer.cpp build\installer_res.o -lole32 -lshell32 -lurlmon -lcomctl32 -loleaut32 -luuid || echo AVISO: no se pudo armar el instalador
+windres -i installer\installer.rc -o build\installer_res.o && g++ -std=c++17 -O2 -s -static -mwindows -municode -o "build\Install-CoD-Coop.exe" installer\installer.cpp build\installer_res.o -lole32 -lshell32 -lurlmon -lcomctl32 -loleaut32 -luuid -ladvapi32 || echo AVISO: no se pudo armar el instalador
 echo BUILD OK

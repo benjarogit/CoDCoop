@@ -1,0 +1,82 @@
+{
+  "xmodel/vehicle_plane_stuka": {
+    "package": "Main/pak0.pk3",
+    "member": "xmodel/vehicle_plane_stuka",
+    "sha256": "2925508bbc61d93708cff00d2db09a20314163c8987f8ec09dc30a086019e078"
+  },
+  "xmodel/vehicle_tank_panzeriv_machinegun": {
+    "package": "Main/pak0.pk3",
+    "member": "xmodel/vehicle_tank_PanzerIV_machinegun",
+    "sha256": "fc5a6d23d4c5f289523a42a23dead56456169847e0f219515a1277c31f5523d3"
+  },
+  "weapons/sp/stuka_guns": {
+    "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+    "member": "weapons/sp/stuka_guns",
+    "sha256": "29ffe329aa960f852dbd435d3104b6bf7d2998a4683695f565e664fcf63a77f5"
+  },
+  "fx/explosions/vehicles/p47_bomb_snow_low.efx": {
+    "package": "uo/pakuo00.pk3",
+    "member": "fx/explosions/vehicles/p47_bomb_snow_low.efx",
+    "sha256": "e4354faebb1a95c6b4f672b6a54418904920e4c480e77bb82f508ef635fd9033"
+  },
+  "fx/explosions/vehicles/spitfire_complete.efx": {
+    "package": "uo/pakuo00.pk3",
+    "member": "fx/explosions/vehicles/spitfire_complete.efx",
+    "sha256": "5d0efc3d779893ac13fe40e7fd580cac7b98f6bd0c03e2dc6130814dc72bfe58"
+  },
+  "fx/explosions/vehicles/stuka_bomb.efx": {
+    "package": "uo/pakuo00.pk3",
+    "member": "fx/explosions/vehicles/stuka_bomb.efx",
+    "sha256": "925d83767faa4c975f7ef9883e20d85b93734221ed5aae37d85bf62652a5843d"
+  },
+  "fx/explosions/vehicles/stuka_bomb_low.efx": {
+    "package": "uo/pakuo00.pk3",
+    "member": "fx/explosions/vehicles/stuka_bomb_low.efx",
+    "sha256": "920e0e0ed5148efcbe9bed977923f9acdba7aede1d813bd8fc8a6a174785d274"
+  },
+  "fx/explosions/vehicles/stuka_complete.efx": {
+    "package": "uo/pakuo00.pk3",
+    "member": "fx/explosions/vehicles/stuka_complete.efx",
+    "sha256": "893a453e0d97e330cb6ce798b2f97510c6b80ed16e96cdd130ea97478ccc9495"
+  },
+  "fx/map_bomber/fire_trail_fighter.efx": {
+    "package": "uo/pakuo00.pk3",
+    "member": "fx/map_bomber/fire_trail_fighter.efx",
+    "sha256": "bcf422658019973d0bf4e20382344d776e5babedf50d48a40054a4bebc7db5c3"
+  },
+  "xmodel/o_ge_prp_stukabomb": {
+    "package": "uo/pakuo04.pk3",
+    "member": "xmodel/o_ge_prp_stukabomb",
+    "sha256": "3c7e44ffe5a3c4c47b08c466041ff9ac6b23d7e2eda216f6c9ccad5823ddcc26"
+  },
+  "xmodel/v_br_air_spitfire": {
+    "package": "uo/pakuo04.pk3",
+    "member": "xmodel/v_br_air_spitfire",
+    "sha256": "c1c9ae23d72e5b07955c8c3eb2c43c2fa6f08b1409520613478d76fd721b2fc2"
+  },
+  "xmodel/v_rs_air_il2": {
+    "package": "uo/pakuo04.pk3",
+    "member": "xmodel/v_rs_air_il2",
+    "sha256": "6dd044143a33c3efa7e3a88216662e47e73456f306c14a45b3578570a1863b93"
+  },
+  "xmodel/v_us_air_p47": {
+    "package": "uo/pakuo04.pk3",
+    "member": "xmodel/v_us_air_p47",
+    "sha256": "1a7266a0028ff3068e6af7ab98065691176e7c0ea608a494037b638acc9631ee"
+  },
+  "fx/UF/p47_bomb_snow.efx": {
+    "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+    "member": "fx/UF/p47_bomb_snow.efx",
+    "sha256": "75a305c0193564c28f86a7d479aefbad9231c916d8babab0f61e9f72df33600a"
+  },
+  "weapons/sp/binoculars": {
+    "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+    "member": "weapons/sp/binoculars",
+    "sha256": "3cb534cdfb722936e8cdf8096d81acd02e69011e39ecd0ed6fb0860409918cca"
+  },
+  "weapons/sp/smokegrenade": {
+    "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+    "member": "weapons/sp/smokegrenade",
+    "sha256": "1c17466679c3b7ee8d3ec36d1279123c27170257a004c1841fd6a1ebe45146b6"
+  }
+}

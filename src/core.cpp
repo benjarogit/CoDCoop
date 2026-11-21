@@ -15,6 +15,17 @@
 #include "game.h"
 #include "hook.h"
 #include "steam.h"
+#include "suite_identity.h"
+#include "anim_fragments.h"
+#include "packet_buffer.h"
+#include "cinematics.h"
+#include "cinematic_assets.h"
+#include "patch_ownership.h"
+#include "pregame_gate.h"
+#include "host_rules.h"
+#include "archive_rules.h"
+#include "reload_delivery.h"
+#include "qa_renderer_preload.h"
 
 static const CoreApi* g_api;
 
@@ -45,6 +56,7 @@ extern "C" {
 uintptr_t g_addrVMCall = g::A(0x44f270, 0x451570), g_addrAnimKnob = g::A(0x47d8b0, 0x4823e0),
           g_addrAnimUpdate = g::A(0x47ccd0, 0x4817c0), g_addrCgSyscalls = g::A(0x401a50, 0x401b80);
 int g_cgEntityTrap = (int)g::A(0xf8, 0xfa);  // trap del cgame que devuelve el entityState del servidor
+int g_cgRunServerTrap = (int)g::A(0xfc, 0xfe);
 }
 asm(R"(
 .intel_syntax noprefix
@@ -70,7 +82,8 @@ namespace {
 
 constexpr uint32_t CTRL = 0xFFFFFFFE;  // prefijo de nuestros paquetes; el motor usa -1 (sin conexion) o una secuencia
 enum : uint8_t { M_JOIN = 'J', M_ACCEPT = 'A', M_FULL = 'F', M_CS = 'C', M_CSDONE = 'G', M_ENTS = 'E', M_DOBJ = 'D', M_ANIM = 'N',
-                 M_DOWNED = 'W', M_RELOAD = 'R', M_MAP = 'M', M_PING = 'P', M_BYE = 'B' };
+                 M_WORLD_READY = 'r', M_DOWNED = 'W', M_RELOAD = 'R', M_MAP = 'M', M_PING = 'P', M_BYE = 'B',
+                 M_CINEMATIC = 'v', M_CINEMATIC_ACK = 'a', M_RULES = 'h', M_RULES_ACK = 'i', M_RELOAD_ACK = 't' };
 constexpr int ANIM_STATE = 22;  // estado cliente de un XAnimInfo: +0x1c(4) +0x24(2) +0x28..+0x37(16)
 constexpr int MAX_PACKET = 1400;
 
@@ -79,6 +92,7 @@ enum Role { NONE, HOST, JOINER };
 // host: por slot remoto
 struct Remote {
     bool active;
+    bool worldReady;
     sockaddr_in addr;
     uint8_t lastEnt[g::MAX_GENTITIES][g::ENTSTATE_MAX];
     DWORD lastSent[g::MAX_GENTITIES];
@@ -86,17 +100,48 @@ struct Remote {
     DWORD dobjSent[g::MAX_GENTITIES];
 };
 
+struct MovieControl {
+    uint32_t serial;
+    char name[campaign_cinematics::NAME_BYTES];
+    char map[64];
+    DWORD sent[g::MAX_CLIENTS], begun;
+    uint8_t ack[g::MAX_CLIENTS]; // 0 queued, 1 playing/played, 2 missing asset
+    bool warned;
+};
+
 // Todo lo que tiene que sobrevivir a una recarga del nucleo. La memoria la guarda ddraw.dll; si cambia
 // el tamaño o STATE_VERSION, el cargador la pone en cero (se pierde la conexion).
-constexpr uint32_t STATE_VERSION = 4;
+struct PendingReload {
+    reload_delivery::Pending delivery;
+    sockaddr_in address;
+    char map[64];
+    uint32_t movieCutoff;
+};
+constexpr uint32_t STATE_VERSION = 9;
 struct State {
     int role;
+    reload_delivery::Token reloadToken;
+    PendingReload reloadPending[g::MAX_CLIENTS];
+    MovieControl movie;
+    host_rules::Control rules;
+    uint32_t receivedMovie;
+    uint8_t receivedMovieStatus;
+    bool movieWorldSuspended;
     SOCKET sock;
     Remote remote[g::MAX_CLIENTS];  // host
     bool god[g::MAX_CLIENTS];       // prueba: vida al maximo
     sockaddr_in host;               // joiner
     DWORD lastJoinTry;
     bool joined, frozen;
+    bool compatible;
+    DWORD joinStarted;
+    bool gamestateReady;
+    uint32_t suppressedClientFrames;
+    bool waitingForMap;
+    int previousLocalWorld;
+    DWORD mapLoadStarted;
+    char pendingMap[64];
+    uint16_t qport;
     int slot;
     int frozenTime;
     char hostMap[64];
@@ -108,6 +153,20 @@ struct State {
     uint64_t steamPeer[steam::MAX_PEERS];  // amigos de Steam detras de las direcciones falsas (steam::Addr)
 };
 State* S;
+suite::Identity g_identity{};
+bool g_profileReady;
+animwire::Assembler g_animAssembler;
+bool PrepareIdentity()
+{
+    std::string error;
+    g_profileReady = suite::LoadIdentity(g::uo, g::CvarString("fs_game"), g_identity, error);
+    if (!g_profileReady) {
+        Log("suite: %s", error.c_str());
+        CoopStatus("%s", error.c_str());
+        g::Com_Printf("^1COOP: %s\n", error.c_str());
+    }
+    return g_profileReady;
+}
 
 struct ModelEntry {  // lo que recibe Com_ServerDObjCreate (0x476e00 resuelve tag -> hueso padre); CoD1 sin `extra`
     void* model;
@@ -268,6 +327,7 @@ void FlushDelayed(bool all = false)
 
 void SendTo(const sockaddr_in& to, const void* data, int len)
 {
+    if (len <= 0 || len > 65536) return;
     int lag = CvarInt("coop_simlag"), loss = CvarInt("coop_simloss");
     if (loss > 0 && rand() % 100 < loss) return;
     if (lag <= 0) {
@@ -283,8 +343,8 @@ void SendTo(const sockaddr_in& to, const void* data, int len)
 struct Writer {
     uint8_t buf[MAX_PACKET + 64];
     int len = 0;
-    explicit Writer(uint8_t type) { Put(&CTRL, 4); buf[len++] = type; }
-    void Put(const void* p, int n) { memcpy(buf + len, p, n); len += n; }
+    explicit Writer(uint8_t type) { Put(&CTRL, 4); buf[len++] = type; Put(&g_identity, sizeof g_identity); }
+    void Put(const void* p, int n) { if (!packet::Append(buf, MAX_PACKET, len, p, n)) Log("network: oversized control packet rejected"); }
     template <class T> void Put(T v) { Put(&v, sizeof v); }
 };
 
@@ -294,16 +354,458 @@ struct Reader {
     template <class T> T Get()
     {
         T v{};
-        if (p + sizeof v <= end) memcpy(&v, p, sizeof v);
+        if (!valid || p > end || (size_t)(end - p) < sizeof v) { valid = false; p = end; return v; }
+        memcpy(&v, p, sizeof v);
         p += sizeof v;
         return v;
     }
-    bool Ok() const { return p <= end; }
+    bool valid = true;
+    bool Ok() const { return valid && p <= end; }
 };
+
+using ArchiveWriter = void(__cdecl*)(int);
+ArchiveWriter g_archiveOriginal;
+archive_rules::Swap g_archiveSwap;
+bool g_archiveEnabled;
+constexpr uint8_t kArchivePrologue[] = {0x81, 0xec, 0x04, 0x04, 0x00, 0x00};
+void __cdecl Hook_ArchiveVariables(int file)
+{
+    bool outer = !g_archiveSwap.active;
+    if (outer && g_archiveEnabled && g_api && S && S->rules.saved) {
+        archive_rules::Pair fields[3]{};
+        const char* local[3];
+        for (unsigned i = 0; i < 3; ++i) {
+            uint8_t* var = g::Cvar_FindVar(host_rules::Names[i]);
+            if (var) fields[i] = {reinterpret_cast<const char**>(var + 4), reinterpret_cast<const char**>(var + 0x0c)};
+            local[i] = S->rules.local[i];
+        }
+        g_archiveSwap.Begin(fields, local);
+    }
+    if (g_archiveOriginal) g_archiveOriginal(file);
+    if (outer) g_archiveSwap.End();
+}
+bool HookArchiveVariables(bool on)
+{
+    if (!g::uo) return true;
+    uint8_t* entry = (uint8_t*)g::A(0x432750, 0x4344e0);
+    if (on) {
+        if (patch_owner::JumpTargets(entry, (uintptr_t)Hook_ArchiveVariables)) return g_archiveEnabled = true;
+        if (memcmp(entry, kArchivePrologue, sizeof kArchivePrologue)) {
+            Log("rules: native archive writer signature/ownership mismatch; cannot safely override local settings");
+            return false;
+        }
+        g_archiveOriginal = (ArchiveWriter)hook::Inline((uintptr_t)entry, (void*)Hook_ArchiveVariables, sizeof kArchivePrologue);
+        g_archiveEnabled = g_archiveOriginal != nullptr;
+        return g_archiveEnabled;
+    }
+    g_archiveEnabled = false;
+    g_archiveSwap.End();
+    if (!g_archiveOriginal) return true;
+    bool restored = !memcmp(entry, kArchivePrologue, sizeof kArchivePrologue);
+    if (patch_owner::JumpTargets(entry, (uintptr_t)Hook_ArchiveVariables))
+        restored = hook::Write((uintptr_t)entry, kArchivePrologue, sizeof kArchivePrologue);
+    if (!restored) {
+        HMODULE retained = nullptr;
+        if (GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN,
+                             reinterpret_cast<LPCSTR>(&Hook_ArchiveVariables), &retained))
+            Log("rules: retained archive-writer chain preserved; core pinned until process exit");
+        else Log("rules: ERROR could not pin retained archive-writer hook (%lu)", GetLastError());
+        return false;
+    }
+    VirtualFree((void*)g_archiveOriginal, 0, MEM_RELEASE); g_archiveOriginal = nullptr;
+    return true;
+}
+
+host_rules::Values ReadHostRules()
+{
+    host_rules::Values values;
+    if (!g::uo) return values; // CoD1 never loads YAP
+    values.sprintScale = strtof(g::CvarString(host_rules::Names[0]), nullptr);
+    values.sprintMult = strtof(g::CvarString(host_rules::Names[1]), nullptr);
+    values.jumpShot = CvarInt(host_rules::Names[2]) != 0 ? 1u : 0u;
+    return values;
+}
+void SetHostRules(const host_rules::Values& values)
+{
+    if (!g::uo || g_archiveSwap.active) return;
+    char text[64];
+    snprintf(text, sizeof text, "%.9g", values.sprintScale); g::Cvar_Set(host_rules::Names[0], text);
+    snprintf(text, sizeof text, "%.9g", values.sprintMult); g::Cvar_Set(host_rules::Names[1], text);
+    g::Cvar_Set(host_rules::Names[2], values.jumpShot ? "1" : "0");
+}
+void RestoreHostRules()
+{
+    if (!host_rules::RestoreLocal(S->rules, [](const char* name, const char* value) { g::Cvar_Set(name, value); })) return;
+    Log("rules: restored local YAP gameplay settings");
+}
+bool ApplyHostRules(uint32_t serial, const host_rules::Values& values)
+{
+    if (!serial || !host_rules::Valid(values) || (g::uo && !g_archiveEnabled)) return false;
+    if (serial == S->rules.received && !host_rules::Same(values, S->rules.accepted)) return false;
+    if (serial != S->rules.received && !host_rules::Newer(serial, S->rules.received)) return false;
+    // Save exact strings once; failure never leaves a partially saved record.
+    if (g::uo && !host_rules::SaveLocal(S->rules, [](const char* name) { return g::CvarString(name); })) return false;
+    bool changed = serial != S->rules.received;
+    S->rules.accepted = values; S->rules.received = serial;
+    SetHostRules(values);
+    Writer ack(M_RULES_ACK); ack.Put(serial); SendTo(S->host, ack.buf, ack.len);
+    if (changed) Log("rules: applied host sequence %u sprint=%.9g multiplier=%.9g jumpshot=%u", serial,
+                     values.sprintScale, values.sprintMult, values.jumpShot);
+    return true;
+}
+void RefreshHostRules()
+{
+    host_rules::Values values = ReadHostRules();
+    if (!S->rules.known || !host_rules::Same(values, S->rules.host)) {
+        S->rules.known = true; S->rules.host = values;
+        if (!++S->rules.serial) ++S->rules.serial;
+        memset(S->rules.ack, 0, sizeof S->rules.ack);
+        memset(S->rules.sent, 0, sizeof S->rules.sent);
+        Log("rules: host sequence %u sprint=%.9g multiplier=%.9g jumpshot=%u", S->rules.serial,
+            values.sprintScale, values.sprintMult, values.jumpShot);
+    }
+    bool valid = host_rules::Valid(values);
+    if (!valid && !S->rules.invalidWarned) {
+        CoopStatus("Invalid host YAP gameplay setting. Sprint scale must be nonnegative and both sprint values finite.");
+        Log("rules: unsupported host values; new joins rejected and existing peers notified");
+    }
+    S->rules.invalidWarned = !valid;
+}
+void HostRulesTick()
+{
+    if (S->role == HOST) {
+        RefreshHostRules();
+        DWORD now = GetTickCount();
+        for (int n = 1; n < g::MAX_CLIENTS; ++n) {
+            if (!S->remote[n].active || S->rules.ack[n] == S->rules.serial || now - S->rules.sent[n] < 250) continue;
+            Writer packet(M_RULES); packet.Put(S->rules.serial); packet.Put(S->rules.host);
+            SendTo(S->remote[n].addr, packet.buf, packet.len); S->rules.sent[n] = now;
+        }
+    } else if (S->role == JOINER && S->rules.received && g::uo) {
+        if (!S->rules.saved) {
+            if (!ApplyHostRules(S->rules.received, S->rules.accepted)) {
+                Writer bye(M_BYE); SendTo(S->host, bye.buf, bye.len);
+                JoinerLeave("Cannot protect local YAP settings after reloading the core. Restart the game before retrying.");
+            }
+            return;
+        }
+        // Local config/console changes cannot override host prediction rules during a session.
+        if (!host_rules::Same(ReadHostRules(), S->rules.accepted)) SetHostRules(S->rules.accepted);
+    } else if (S->role == NONE && !S->waitingForMap) {
+        RestoreHostRules(); S->rules.received = S->rules.required = 0;
+    }
+}
+
+bool MoviePlaying()
+{
+    // Stock cl_movieplaying remains zero during the native scripted movie.
+    // cls_state=3 and CIN's active handle are the actual playback state; the
+    // native stop path resets the handle to -1 (UO 0x40776b).
+    return g::cls_state == 3 && *(int*)g::A(0x56ee48, 0x571154) >= 0;
+}
+void ForgetMovieWorld();
+
+bool MovieAvailable(const char* name)
+{
+    char member[128]; snprintf(member, sizeof member, "video/%s", name);
+    const std::string base = suite::GameDir();
+    const char* roots[] = {"Main", g::uo ? "uo" : "Main", g::CvarString("fs_game")};
+    unsigned packages = 0;
+    for (unsigned root = 0; root < 3; ++root) {
+        if (!*roots[root] || (root == 1 && !g::uo)) continue;
+        std::string directory = base + roots[root] + "\\";
+        DWORD attrs = GetFileAttributesA((directory + member).c_str());
+        if (attrs != INVALID_FILE_ATTRIBUTES && !(attrs & FILE_ATTRIBUTE_DIRECTORY)) return true;
+        WIN32_FIND_DATAA info{};
+        HANDLE search = FindFirstFileA((directory + "*.pk3").c_str(), &info);
+        if (search == INVALID_HANDLE_VALUE) continue;
+        bool found = false;
+        do {
+            if (info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) continue;
+            if (++packages > 256) break;
+            if (campaign_cinematics::PackageHasMovie((directory + info.cFileName).c_str(), member)) {
+                found = true; break;
+            }
+        } while (FindNextFileA(search, &info));
+        FindClose(search);
+        if (found) return true;
+        if (packages > 256) return false;
+    }
+    return false;
+}
+
+void SendMovie(int n)
+{
+    Writer w(M_CINEMATIC); w.Put(S->movie.serial);
+    w.Put(S->movie.map, sizeof S->movie.map);
+    w.Put(S->movie.name, (int)strlen(S->movie.name) + 1);
+    SendTo(S->remote[n].addr, w.buf, w.len);
+    S->movie.sent[n] = GetTickCount();
+}
+
+void HostScriptMovie(const char* name)
+{
+    if (S->role != HOST) return;
+    uint32_t serial = S->movie.serial + 1;
+    if (!serial) serial = 1;
+    S->movie = MovieControl{};
+    S->movie.serial = serial;
+    snprintf(S->movie.name, sizeof S->movie.name, "%s", name);
+    snprintf(S->movie.map, sizeof S->movie.map, "%s", g::CvarString("mapname"));
+    S->movie.begun = GetTickCount();
+    Log("cinematic: host script requested %s (sequence %u, asset %s)", name, serial,
+        MovieAvailable(name) ? "present" : "MISSING");
+    for (int n = 1; n < g::MAX_CLIENTS; ++n)
+        if (S->remote[n].active) SendMovie(n);
+}
+
+void AckMovie()
+{
+    Writer ack(M_CINEMATIC_ACK); ack.Put(S->receivedMovie); ack.Put(S->receivedMovieStatus);
+    SendTo(S->host, ack.buf, ack.len);
+}
+
+void JoinerMovie(Reader r)
+{
+    uint32_t serial = r.Get<uint32_t>();
+    if (!r.Ok() || r.end - r.p < 64 || !memchr(r.p, 0, 64)) return;
+    if (_stricmp((const char*)r.p, S->hostMap)) return;
+    r.p += 64;
+    size_t bytes = (size_t)(r.end - r.p);
+    if (!r.Ok() || !serial || !bytes || bytes > campaign_cinematics::NAME_BYTES || r.end[-1] ||
+        memchr(r.p, 0, bytes - 1)) return;
+    char command[160], name[campaign_cinematics::NAME_BYTES];
+    snprintf(command, sizeof command, "cinematic %s 0 force", (const char*)r.p);
+    if (!campaign_cinematics::Parse(command, name)) return;
+    if (serial == S->receivedMovie) { AckMovie(); return; }
+    // Delayed duplicates from an older movie must not interrupt a newer one.
+    if (!campaign_cinematics::Newer(serial, S->receivedMovie)) return;
+    S->receivedMovie = serial;
+    S->receivedMovieStatus = MovieAvailable(name) ? 0 : 2;
+    if (S->receivedMovieStatus == 2) {
+        Log("cinematic: missing local asset %s; session retained", name);
+        CoopStatus("Missing campaign movie %s. Repair the complete suite.", name);
+        g::Com_Printf("^1COOP: missing campaign movie %s; repair the complete suite.\n", name);
+    } else {
+        // Actual two-instance UO playback clears the local world. Retaining
+        // its animation block indices caused a post-movie MT_FreeIndex crash.
+        // Forget before native cleanup; preserve the party and its control link.
+        ForgetMovieWorld();
+        // Native CIN_Stop executes local nextmap. Only the host advances the
+        // campaign; its normal map load will arrive through M_RELOAD.
+        g::Cvar_Set("nextmap", "");
+        strcat(command, "\n");
+        g::Cbuf_AddText(command);
+        Log("cinematic: joiner queued %s (sequence %u)", name, serial);
+    }
+    AckMovie();
+}
+
+void MovieTick()
+{
+    campaign_cinematics::Sync(g::gvm, S->role == HOST, HostScriptMovie);
+    if (S->role == JOINER && S->joined && S->receivedMovie && !S->receivedMovieStatus && MoviePlaying()) {
+        S->receivedMovieStatus = 1; AckMovie();
+        Log("cinematic: joiner playback started (sequence %u)", S->receivedMovie);
+    }
+    if (S->role != HOST || !S->movie.serial || !*S->movie.name) return;
+    DWORD now = GetTickCount();
+    for (int n = 1; n < g::MAX_CLIENTS; ++n) {
+        if (!S->remote[n].active || S->movie.ack[n]) continue;
+        if (now - S->movie.sent[n] >= 250) SendMovie(n);
+        if (!S->movie.warned && now - S->movie.begun > 15000) {
+            S->movie.warned = true;
+            Log("cinematic: waiting for playback acknowledgement; retaining session and retrying");
+            CoopStatus("Waiting for campaign movie playback acknowledgement...");
+        }
+    }
+}
 
 const char* SafeStr(const void* p)
 {
     return p && !IsBadReadPtr(p, 4) ? (const char*)p : "?";
+}
+
+// QA-only evidence harness. No model catalog is read in regular sessions.
+using QAEndRegistration = void(__cdecl*)();
+QAEndRegistration g_qaEndOriginal;
+bool g_qaEndEnabled;
+int QAModelCount()
+{
+    if (suite::IsQA() && g::uo && S && S->role == JOINER && S->joined) {
+        int count = 0;
+        for (int i = 1; i < 256; ++i) {
+            uint16_t h = ((uint16_t*)0x48362d0)[32 + i];
+            if (h && *(const char*)(g::sl_pool + h * 8 + 4)) ++count;
+        }
+        return count;
+    }
+    if (g::sv_state == 0) return 0;
+    int count = 0;
+    for (int i = 1; i < 256; ++i) if (*g::ConfigString(32 + i)) ++count;
+    return count;
+}
+std::string QASafeModel(const char* pointer)
+{
+    if (!pointer) return {};
+    MEMORY_BASIC_INFORMATION region{};
+    if (!VirtualQuery(pointer, &region, sizeof region) || region.State != MEM_COMMIT ||
+        (region.Protect & (PAGE_NOACCESS | PAGE_GUARD))) return {};
+    size_t available = (uintptr_t)region.BaseAddress + region.RegionSize - (uintptr_t)pointer;
+    size_t length = 0;
+    while (length < available && length < 64 && pointer[length]) ++length;
+    if (length >= available || length >= 64) return {};
+    std::string name(pointer, length);
+    if (name.compare(0, 7, "xmodel/")) name = "xmodel/" + name;
+    return qa_preload::ValidName(name) ? name : std::string{};
+}
+#include "qa_deferred_models.inc"
+
+void QAExportModels()
+{
+    if (!suite::IsQA() || !g::uo || S->role != HOST || g::sv_state != 2 || g::cls_state != 2 || !g::cgvm) return;
+    uint8_t* game = (uint8_t*)GetModuleHandleA(g::GameDll());
+    if (!game) return;
+    static int world = -1, previousCount = -1;
+    int id = CvarInt("sv_serverid"), count = QAModelCount();
+    if (!count || (world == id && previousCount == count)) return;
+    std::vector<std::string> names;
+    for (int i = 1; i < 256; ++i) {
+        std::string name = QASafeModel(g::ConfigString(32 + i));
+        if (!name.empty() && !qa_preload::Add(names, name)) return;
+    }
+    size_t csNames = names.size();
+    uint8_t** definitions = *(uint8_t***)(game + g::G_WEAPONDEFS);
+    int weapons = *(int*)(game + g::G_NUMWEAPONS);
+    int* registered = (int*)(game + g::G_ITEMREGISTERED);
+    if (definitions && weapons >= 0 && weapons < 128 && !IsBadReadPtr(definitions, (weapons + 1) * sizeof(void*))) {
+        for (int w = 1; w <= weapons; ++w) {
+            if (!registered[w] || !definitions[w] || IsBadReadPtr(definitions[w], 0x18)) continue;
+            for (int offset : {0x10, 0x14}) {
+                std::string name = QASafeModel(*(char**)(definitions[w] + offset));
+                if (!name.empty() && !qa_preload::Add(names, name)) return;
+            }
+        }
+    }
+    const auto base = suite::GameDir();
+    FILE* file = fopen((base + "qa-model-export.tmp").c_str(), "wb");
+    if (!file) return;
+    for (const auto& name : names) fprintf(file, "%s\n", name.c_str());
+    fclose(file);
+    MoveFileExA((base + "qa-model-export.tmp").c_str(), (base + "qa-model-export.txt").c_str(), MOVEFILE_REPLACE_EXISTING);
+    file = fopen((base + "qa-model-export.json").c_str(), "wb");
+    if (file) {
+        fprintf(file, "{\"map\":\"%s\",\"world\":%d,\"game_cs_models\":%d,\"cs_names\":%u,\"total_names\":%u,\"registered_weapons\":%d}\n",
+                g::CvarString("mapname"), id, count, (unsigned)csNames, (unsigned)names.size(), weapons);
+        fclose(file);
+    }
+    world = id; previousCount = count;
+}
+void __cdecl Hook_QAEndRegistration()
+{
+    if (g_qaEndEnabled && g_api && suite::IsQA()) {
+        const auto base = suite::GameDir();
+        if (g_qaDeferredEnabled) {
+            // Observe native baseline/restore reservations too; never rewrite them.
+            for (int i = 1; i < 256; ++i) {
+                std::string name = QASafeModel(g::ConfigString(32 + i));
+                if (name.empty()) continue;
+                if (auto* entry = g_qaLedger.Approve(name)) {
+                    entry->cached = *(void**)(g_qaGameBase + 0xd2e70 + 4 * i);
+                    if (!g_qaLedger.Bind(*entry, i)) Log("QA deferred: ERROR native CS binding conflict %s %d", name.c_str(), i);
+                }
+            }
+            int before = QAModelCount(), loaded = 0;
+            int strict = CvarInt("r_errorOnConflicts"), closed = *(int*)0x47a91a4, allowance = *(int*)0x47a91a0;
+            if (strict == 1 && (!closed || allowance > 0)) {
+                for (auto& entry : g_qaLedger.entries) {
+                    int handle = ((int(__cdecl*)(const char*, int))0x4fda70)(entry.name.c_str(), 7);
+                    if (handle <= 0 || handle >= 2048) break;
+                    if (!entry.cached) entry.cached = g::XModelPrecache(entry.name.c_str() + 7);
+                    if (entry.cached) ++loaded;
+                }
+            }
+            QAPersistLedger();
+            FILE* audit = fopen((base + "qa-deferred-models.json").c_str(), "wb");
+            if (audit) {
+                fprintf(audit, "{\"map\":\"%s\",\"init_count\":%u,\"calls_before_end\":%u,\"approved\":%u,\"loaded\":%d,\"deferred\":%u,\"bound_cumulative\":%u,\"late_bindings\":%u,\"cs_before\":%d,\"cs_after\":%d,\"strict\":%d,\"guards_unchanged\":%s}\n",
+                    g::CvarString("mapname"), g_qaInitCount, g_qaCallsBeforeEnd, (unsigned)g_qaLedger.entries.size(), loaded,
+                    g_qaLedger.deferrals, g_qaLedger.bindings, g_qaLedger.lateBindings, before, QAModelCount(), strict,
+                    strict == CvarInt("r_errorOnConflicts") && closed == *(int*)0x47a91a4 && allowance == *(int*)0x47a91a0 ? "true" : "false");
+                fclose(audit);
+            }
+            Log("QA deferred before EndRegistration: calls=%u approved=%u loaded=%d deferred=%u bound=%u CS=%d->%d",
+                g_qaCallsBeforeEnd, (unsigned)g_qaLedger.entries.size(), loaded, g_qaLedger.deferrals, g_qaLedger.bindings, before, QAModelCount());
+        }
+        FILE* local = fopen((base + "qa-model-local-at-end.txt").c_str(), "wb");
+        if (local) {
+            for (int i = 1; i < 256; ++i) if (*g::ConfigString(32 + i)) fprintf(local, "%s\n", g::ConfigString(32 + i));
+            fclose(local);
+        }
+        FILE* file = fopen((base + "qa-render-models.txt").c_str(), "rb");
+        if (file) {
+            std::string text; char chunk[2048]; size_t got;
+            while ((got = fread(chunk, 1, sizeof chunk, file)) && text.size() <= qa_preload::MAX_BYTES) text.append(chunk, got);
+            fclose(file);
+            std::vector<std::string> names;
+            bool valid = qa_preload::Parse(text, names);
+            int before = QAModelCount(), rendererBefore = *(int*)0x47abb58;
+            int closedBefore = *(int*)0x47a91a4, allowanceBefore = *(int*)0x47a91a0, strictBefore = CvarInt("r_errorOnConflicts");
+            bool allowed = strictBefore == 1 && (!closedBefore || allowanceBefore > 0);
+            unsigned loaded = 0;
+            if (valid && allowed) {
+                for (const auto& name : names) {
+                    int handle = ((int(__cdecl*)(const char*, int))0x4fda70)(name.c_str(), 7);
+                    if (handle <= 0 || handle >= 2048) break;
+                    ++loaded;
+                }
+            }
+            int after = QAModelCount(), rendererAfter = *(int*)0x47abb58;
+            bool missingFixture = true;
+            for (int i = 1; i < 256; ++i) if (!_stricmp(g::ConfigString(32 + i), "xmodel/v_rs_air_il2")) missingFixture = false;
+            bool guards = closedBefore == *(int*)0x47a91a4 && allowanceBefore == *(int*)0x47a91a0 && strictBefore == CvarInt("r_errorOnConflicts");
+            file = fopen((base + "qa-render-preload.json").c_str(), "wb");
+            if (file) {
+                fprintf(file, "{\"map\":\"%s\",\"valid_catalog\":%s,\"native_loading_allowed\":%s,\"names\":%u,\"loaded\":%u,\"game_cs_before\":%d,\"game_cs_after\":%d,\"renderer_before\":%d,\"renderer_after\":%d,\"closed_before\":%d,\"allowance_before\":%d,\"strict_guard\":%d,\"guards_unchanged\":%s,\"fixture_missing_local_cs\":%s}\n",
+                        g::CvarString("mapname"), valid ? "true" : "false", allowed ? "true" : "false", (unsigned)names.size(), loaded,
+                        before, after, rendererBefore, rendererAfter, closedBefore, allowanceBefore, strictBefore, guards ? "true" : "false", missingFixture ? "true" : "false");
+                fclose(file);
+            }
+            Log("QA cache-only preload: %u/%u models, game CS %d -> %d, renderer %d -> %d, closed=%d allowance=%d strict=%d unchanged=%d",
+                loaded, (unsigned)names.size(), before, after, rendererBefore, rendererAfter, closedBefore, allowanceBefore, strictBefore, guards);
+        }
+    }
+    if (g_qaEndOriginal) g_qaEndOriginal();
+}
+void HookQAEndRegistration(bool on)
+{
+    if (!g::uo || (!suite::IsQA() && on)) return;
+    constexpr uintptr_t entry = 0x4fdc10;
+    const uint8_t expected[] = {0xe8, 0x6b, 0x7d, 0xfd, 0xff}; // call 0x4d5980; relocated in trampoline
+    if (on) {
+        if (patch_owner::JumpTargets((uint8_t*)entry, (uintptr_t)Hook_QAEndRegistration)) { g_qaEndEnabled = true; return; }
+        if (memcmp((void*)entry, expected, sizeof expected)) { Log("QA preload: EndRegistration signature mismatch"); return; }
+        uint8_t* trampoline = (uint8_t*)VirtualAlloc(nullptr, 10, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+        if (!trampoline) return;
+        trampoline[0] = 0xe8; *(int32_t*)(trampoline + 1) = (int32_t)(0x4d5980 - ((uintptr_t)trampoline + 5));
+        trampoline[5] = 0xe9; *(int32_t*)(trampoline + 6) = (int32_t)(entry + 5 - ((uintptr_t)trampoline + 10));
+        uint8_t patch[5] = {0xe9}; *(int32_t*)(patch + 1) = (int32_t)((uintptr_t)Hook_QAEndRegistration - entry - 5);
+        g_qaEndOriginal = (QAEndRegistration)trampoline;
+        if (!hook::Write(entry, patch, sizeof patch)) { VirtualFree(trampoline, 0, MEM_RELEASE); g_qaEndOriginal = nullptr; return; }
+        g_qaEndEnabled = true;
+    } else {
+        g_qaEndEnabled = false;
+        if (!g_qaEndOriginal) return;
+        bool restored = !memcmp((void*)entry, expected, sizeof expected);
+        if (patch_owner::JumpTargets((uint8_t*)entry, (uintptr_t)Hook_QAEndRegistration)) restored = hook::Write(entry, expected, sizeof expected);
+        if (restored) { VirtualFree((void*)g_qaEndOriginal, 0, MEM_RELEASE); g_qaEndOriginal = nullptr; }
+        else {
+            HMODULE retained = nullptr;
+            GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN,
+                               reinterpret_cast<LPCSTR>(&Hook_QAEndRegistration), &retained);
+            Log("QA preload: later EndRegistration wrapper retained; forwarding core pinned");
+        }
+    }
 }
 
 // ---------- host ----------
@@ -537,6 +1039,12 @@ void HostDropGhosts()
 
 void HostJoin(const sockaddr_in& from, Reader r)
 {
+    RefreshHostRules();
+    if (!host_rules::Valid(S->rules.host)) {
+        Writer reject(suite::REJECT);
+        const char* why = "Host has an invalid YAP gameplay setting. Ask the host to correct it before joining.";
+        reject.Put(why, (int)strlen(why) + 1); SendTo(from, reject.buf, reject.len); return;
+    }
     int qport = r.Get<int>(), lastIncoming = r.Get<int>(), serverCmdSeq = r.Get<int>(), relSeq = r.Get<int>();
     if (!r.Ok()) return;
     if (g::sv_state != 2) return;  // sin partida no hay a donde unirse
@@ -572,7 +1080,17 @@ void HostJoin(const sockaddr_in& from, Reader r)
         uint8_t* nc = cl + g::CL_NETCHAN;
         *(int*)(nc + g::NC_SOCK) = NS_SERVER;
         *(netadr_t*)(nc + g::NC_ADR) = ToNet(from);
-        *(int*)(nc + g::NC_QPORT) = qport & 0xffff;
+        uint16_t assigned = (uint16_t)qport;
+        if (!assigned) assigned = 1;
+        for (int tries = 0; tries < g::MAX_CLIENTS; ++tries) {
+            bool collision = false;
+            for (int other = 1; other < g::MAX_CLIENTS; ++other)
+                if (other != n && S->remote[other].active && S->remote[other].addr.sin_addr.s_addr == from.sin_addr.s_addr &&
+                    *(int*)(g::Client(other) + g::CL_NETCHAN + g::NC_QPORT) == assigned) collision = true;
+            if (!collision) break;
+            if (!++assigned) assigned = 1;
+        }
+        *(int*)(nc + g::NC_QPORT) = assigned;
         *(int*)(nc + g::NC_IN) = 0;
         *(int*)(nc + g::NC_OUT) = lastIncoming + 10;  // el cgame del que entra ya vio snapshots hasta ahi
         if (g::uo) {
@@ -610,11 +1128,25 @@ void HostJoin(const sockaddr_in& from, Reader r)
         *(int*)(cl + g::CL_DELTA) = -1;
         g::GameCall(3, n);
         FixClientNum(n);
+        // Initial launcher starts do not know how many friends will join. Carry
+        // the actual party into the next mission, while preserving a larger
+        // participant count already agreed for a supervised restart.
+        int party = 1;
+        for (int peer = 1; peer < g::MAX_CLIENTS; ++peer) party += S->remote[peer].active ? 1 : 0;
+        if (party > CvarInt("coop_expected_players")) {
+            char value[8]; snprintf(value, sizeof value, "%d", party);
+            g::Cvar_Set("coop_expected_players", value);
+        }
         Log("host: jugador remoto %s:%d -> slot %d (qport %d)", inet_ntoa(from.sin_addr), ntohs(from.sin_port), n, qport);
         g::Com_Printf("^2COOP: a player joined (slot %d)\n", n);
     }
     Writer w(M_ACCEPT);
     w.Put<int>(n);
+    w.Put<int>(*(int*)(g::Client(n) + g::CL_NETCHAN + g::NC_QPORT));
+    w.Put<int>(g::sv_time);
+    w.Put(S->reloadToken);
+    w.Put(S->rules.serial); w.Put(S->rules.host);
+    S->rules.ack[n] = 0; // acceptance must be acknowledged even by a rejoining slot
     const char* map = g::CvarString("mapname");
     w.Put(map, (int)strlen(map) + 1);
     SendTo(from, w.buf, w.len);
@@ -686,7 +1218,7 @@ void PutStr(Writer& w, const char* s)
 bool GetStr(Reader& r, char* out, int size)
 {
     int l = r.Get<uint8_t>();
-    if (r.p + l > r.end || l >= size) return false;
+    if (!r.Ok() || (size_t)l > (size_t)(r.end - r.p) || l >= size) return false;
     memcpy(out, r.p, l);
     out[l] = 0;
     r.p += l;
@@ -727,26 +1259,34 @@ void SendDObjs(int n)
         uint8_t* tree = d ? *(uint8_t**)d : nullptr;
         if (!tree) continue;
         int size = *(int*)(*(uint8_t**)tree + 4);
-        int count = 0;
-        for (int a = 0; a < size; ++a)
-            if (*(uint16_t*)(tree + g::TREE_INFO + a * 2)) ++count;
-        if (aw.len + 4 + count * (2 + ANIM_STATE) > MAX_PACKET) {
-            SendTo(rm->addr, aw.buf, aw.len);
-            aw = Writer(M_ANIM);
-        }
-        aw.Put<uint16_t>((uint16_t)e);
-        aw.Put<uint16_t>((uint16_t)count);
-        for (int a = 0; a < size; ++a) {
+        std::vector<uint8_t> states;
+        for (int a = 0; a < size && a < animwire::MAX_NODES; ++a) {
             uint16_t idx = *(uint16_t*)(tree + g::TREE_INFO + a * 2);
             if (!idx) continue;
             const uint8_t* info = g::xanimInfo + idx * 0x44;
-            aw.Put<uint16_t>((uint16_t)a);
-            aw.Put(info + 0x1c, 4);
-            aw.Put(info + 0x24, 2);
-            aw.Put(info + 0x28, 16);
+            size_t offset = states.size(); states.resize(offset + animwire::STATE_BYTES);
+            uint16_t node = (uint16_t)a;
+            memcpy(states.data() + offset, &node, 2);
+            memcpy(states.data() + offset + 2, info + 0x1c, 4);
+            memcpy(states.data() + offset + 6, info + 0x24, 2);
+            memcpy(states.data() + offset + 8, info + 0x28, 16);
         }
+        int total = (int)states.size() / animwire::STATE_BYTES;
+        int offset = 0;
+        do {
+            int room = (MAX_PACKET - aw.len - (int)sizeof(animwire::Header)) / animwire::STATE_BYTES;
+            if (room < 1) {
+                SendTo(rm->addr, aw.buf, aw.len); aw = Writer(M_ANIM);
+                room = (MAX_PACKET - aw.len - (int)sizeof(animwire::Header)) / animwire::STATE_BYTES;
+            }
+            int count = total - offset < room ? total - offset : room;
+            animwire::Header header{(uint16_t)e, (uint16_t)total, (uint16_t)offset, (uint16_t)count, (uint32_t)g::sv_time};
+            aw.Put(&header, sizeof header);
+            if (count) aw.Put(states.data() + offset * animwire::STATE_BYTES, count * animwire::STATE_BYTES);
+            offset += count;
+        } while (offset < total);
     }
-    if (aw.len > 5) SendTo(rm->addr, aw.buf, aw.len);
+    if (aw.len > 5 + (int)sizeof(suite::Identity)) SendTo(rm->addr, aw.buf, aw.len);
 }
 
 void FreeTreeInfos(uint8_t* tree)
@@ -776,6 +1316,8 @@ OldTree g_oldTrees[g::MAX_GENTITIES];
 int g_oldTreeCount;
 void KeepOldTrees()
 {
+    for (auto& borrowed : g_qaBorrowed) borrowed = {};
+    for (auto& owner : g_qaNativeOwners) owner = {};
     for (int e = 0; e < g::MAX_GENTITIES; ++e) {
         uint8_t* tree = S->ownTree[e];
         if (!tree || !XAnimLoaded(*(uint8_t**)tree) || g_oldTreeCount >= g::MAX_GENTITIES) continue;
@@ -790,16 +1332,37 @@ void FreeOldTrees()
     g_oldTreeCount = 0;
 }
 
+void ForgetMovieWorld()
+{
+    S->movieWorldSuspended = true;
+    for (auto& borrowed : g_qaBorrowed) borrowed = {};
+    for (auto& owner : g_qaNativeOwners) owner = {};
+    g_animAssembler.Reset();
+    memset(S->ownTree, 0, sizeof S->ownTree);
+    g_oldTreeCount = 0; // native movie/map cleanup invalidates these allocator indices
+}
+
 void JoinerFreeDObj(int e)
 {
     uint8_t* tree = S->ownTree[e];
+    auto borrowed = g_qaBorrowed[e];
+    g_qaBorrowed[e] = {}; // native Game ownership never enters the Core free path
     S->ownTree[e] = nullptr;
-    if (g::serverObjMap[e]) g::Com_ServerDObjFree(e);
+    if (g::serverObjMap[e]) g::Com_ServerDObjFree(e, true);
     g::Com_SyncClientDObjs();
     // un arbol hecho con un XAnim que ya no esta en la tabla (el juego recargo los assets al volver a entrar tras un
     // checkpoint) vive en memoria ya liberada: liberarlo de nuevo rompia el juego (0x45b8f0). Se olvida.
     if (tree && (IsBadReadPtr(tree, 4) || !XAnimLoaded(*(uint8_t**)tree))) {
         Log("dobj %d: arbol de antes de la recarga, se olvida", e);
+        return;
+    }
+    if (g_qaBorrowEnabled) {
+        tree_owner::Reference reference = tree_owner::Reference{(uintptr_t)tree, g_qaInitCount, tree_owner::Owner::Core};
+        if (!tree || borrowed.tree == (uintptr_t)tree) reference = borrowed;
+        tree_owner::ReleaseReference(reference, g_qaInitCount, true, reference.tree != 0, [&](uintptr_t address) {
+            auto* owned = (uint8_t*)address;
+            FreeTreeInfos(owned); g::XAnimFreeTree(owned);
+        });
         return;
     }
     if (tree) {
@@ -817,6 +1380,76 @@ uint8_t* FindXAnim(const char* name)
     return nullptr;
 }
 
+const char* QAModelConfigString(int index)
+{
+    if (g_qaDeferredEnabled && g::uo && S->role == JOINER && S->joined) {
+        uint16_t handle = ((uint16_t*)0x48362d0)[index];
+        return handle ? (const char*)(g::sl_pool + handle * 8 + 4) : "";
+    }
+    return g::ConfigString(index);
+}
+void QACaptureNativeTrees()
+{
+    for (auto& owner : g_qaNativeOwners) owner = {};
+    if (!g_qaBorrowEnabled || (uintptr_t)GetModuleHandleA(g::GameDll()) != g_qaGameBase ||
+        !g::sv_gentities || g::sv_gentitySize != 0x2d0) return;
+    unsigned captured = 0;
+    for (int e = 0; e < g::MAX_GENTITIES; ++e) {
+        uint8_t* ent = g::Entity(e);
+        if (!ent[0x11c]) continue;
+        uintptr_t slot = (uintptr_t)ent + 0x2c8;
+        if (ent[0] == 11) {
+            uintptr_t actor = *(uintptr_t*)(ent + 0x10c), actors = *(uintptr_t*)(g_qaGameBase + 0x307f1c);
+            if (!actors || actor < actors || (actor - actors) % 4656 || (actor - actors) / 4656 >= 32) continue;
+            slot = g_qaGameBase + 0x153850 + 4 * ((actor - actors) / 4656);
+        } else if (ent[0] == 13) {
+            slot = 0;
+            unsigned number = *(uint16_t*)(ent + 6);
+            for (unsigned i = 0; i < 64; ++i)
+                if (*(unsigned*)(g_qaGameBase + 0x1538d4 + 32 * i) == number) { slot = g_qaGameBase + 0x1538d0 + 32 * i; break; }
+            if (!slot) continue;
+        }
+        auto* tree = *(uint8_t**)slot;
+        if (!tree || IsBadReadPtr(tree, 12) || !XAnimLoaded(*(uint8_t**)tree)) continue;
+        // Verify reconstruction against the pure native getter while local
+        // entityState is still intact, before host packets replace its type.
+        uint8_t* native = ent;
+        asm volatile("call *%1" : "+a"(native) : "r"((void*)(g_qaGameBase + 0x48870)) : "ecx", "edx", "memory");
+        if (native != tree) continue;
+        g_qaNativeOwners[e] = {slot, (uintptr_t)tree, g_qaInitCount}; ++captured;
+    }
+    Log("QA native ownership captured before attach: %u exact entity owners", captured);
+}
+uint8_t* QANativeTree(int entity)
+{
+    if (!g_qaBorrowEnabled || entity < 0 || entity >= g::MAX_GENTITIES ||
+        (uintptr_t)GetModuleHandleA(g::GameDll()) != g_qaGameBase) return nullptr;
+    const auto& owner = g_qaNativeOwners[entity];
+    if (!owner.slot || owner.generation != g_qaInitCount || IsBadReadPtr((void*)owner.slot, 4) ||
+        *(uintptr_t*)owner.slot != owner.tree) return nullptr;
+    return (uint8_t*)owner.tree;
+}
+uint8_t* QABorrowTree(int entity, uint8_t* xanim)
+{
+    uint8_t* tree = QANativeTree(entity);
+    bool valid = tree && !IsBadReadPtr(tree, 12) && XAnimLoaded(*(uint8_t**)tree);
+    if (!valid || !xanim || *(uint8_t**)tree != xanim) return nullptr;
+    bool alias = false;
+    for (int e = 0; e < g::MAX_GENTITIES && !alias; ++e) {
+        if (e == entity) continue;
+        alias = QANativeTree(e) == tree || g_qaBorrowed[e].tree == (uintptr_t)tree || S->ownTree[e] == tree;
+    }
+    if (!tree_owner::CanBorrow((uintptr_t)tree, g_qaInitCount, true, true, alias)) return nullptr;
+    return tree;
+}
+uint8_t* QACurrentBorrow(int entity)
+{
+    const auto& borrowed = g_qaBorrowed[entity];
+    if (!g_qaBorrowEnabled || !borrowed.tree || borrowed.owner != tree_owner::Owner::Native || borrowed.generation != g_qaInitCount) return nullptr;
+    auto* tree = (uint8_t*)borrowed.tree;
+    if (QANativeTree(entity) != tree || IsBadReadPtr(tree, 12) || !XAnimLoaded(*(uint8_t**)tree)) return nullptr;
+    return tree;
+}
 void JoinerApplyDObj(Reader r)
 {
     ModelEntry models[8] = {};
@@ -828,6 +1461,12 @@ void JoinerApplyDObj(Reader r)
         if (!GetStr(r, name, sizeof name)) return;
         parents[k] = r.Get<uint8_t>();
         models[k].flags = r.Get<uint16_t>();
+        if (g_qaDeferredEnabled) {
+            int id = -(int16_t)models[k].flags;
+            char full[264]; snprintf(full, sizeof full, "xmodel/%s", name);
+            if (id <= 0 || id >= 256 || _stricmp(QAModelConfigString(32 + id), full)) return;
+            // Native reliable CS can lag this UDP packet; host retries DObjs.
+        }
         models[k].model = g::XModelPrecache(name);  // si no estaba cargado lo carga
         if (!models[k].model || _stricmp(SafeStr(*(char**)models[k].model), name) != 0) {
             Log("dobj %d: modelo '%s' no resuelto", e, name);
@@ -848,12 +1487,21 @@ void JoinerApplyDObj(Reader r)
     bool same = d && d[0x16] == nm && (*(uint8_t**)d ? **(uint8_t***)d : nullptr) == xanim;
     for (int k = 0; same && k < nm; ++k) same = *(void**)(d + g::DO_MODELS + k * 4) == models[k].model;
     if (!same) {
+        uint8_t* borrowed = QABorrowTree(e, xanim);
         JoinerFreeDObj(e);
-        uint8_t* tree = xanim ? g::XAnimCreateTree(xanim) : nullptr;
-        S->ownTree[e] = tree;
+        uint8_t* tree = borrowed ? borrowed : (xanim ? g::XAnimCreateTree(xanim) : nullptr);
+        if (borrowed) {
+            g_qaBorrowed[e] = {(uintptr_t)tree, g_qaInitCount, tree_owner::Owner::Native};
+            ++g_qaBorrowCount;
+            Log("QA native tree borrowed entity=%d ptr=%p generation=%u", e, tree, g_qaInitCount);
+        } else S->ownTree[e] = tree;
         DObjCreate(models, nm, tree, e, u12);
         d = g::ServerDObj(e);
         if (!d) return;
+    }
+    if (g_qaBorrowEnabled && !S->ownTree[e] && !g_qaBorrowed[e].tree) {
+        if (uint8_t* native = QABorrowTree(e, xanim))
+            if (d && *(uint8_t**)d == native) g_qaBorrowed[e] = {(uintptr_t)native, g_qaInitCount, tree_owner::Owner::Native};
     }
     for (int k = 0; k < nm; ++k) {
         d[g::DO_PARENTS + k] = parents[k];
@@ -918,7 +1566,7 @@ int ModelIndex(const char* name)
     char full[128];
     snprintf(full, sizeof full, "xmodel/%s", name);
     for (int i = 1; i < MAX_MODELS; ++i)
-        if (!_stricmp(g::ConfigString(CS_MODELS + i), full)) return i;
+        if (!_stricmp(QAModelConfigString(CS_MODELS + i), full)) return i;
     return 0;
 }
 
@@ -1014,7 +1662,7 @@ void HostFreeBody(int n)
 {
     uint8_t* tree = S->bodyTree[n];
     S->bodyTree[n] = nullptr;
-    if (g::serverObjMap[n]) g::Com_ServerDObjFree(n);
+    if (g::serverObjMap[n]) g::Com_ServerDObjFree(n, true);
     g::Com_SyncClientDObjs();
     if (tree) {
         FreeTreeInfos(tree);
@@ -1103,15 +1751,35 @@ _CgSyscallHook:
     mov eax, [esp+4]
     mov ecx, [eax]
     cmp ecx, dword ptr [_g_cgEntityTrap]
-    jne 1f
+    je 1f
+    cmp ecx, dword ptr [_g_cgRunServerTrap]
+    jne 3f
+    call _CoopSuppressClientSimulation
+    test eax, eax
+    jz 3f
+    xor eax, eax
+    ret
+1:
     push eax
     call _CgEntityState
     add esp, 4
     ret
-1:  jmp dword ptr [_g_addrCgSyscalls]
+3:  jmp dword ptr [_g_addrCgSyscalls]
 .att_syntax
 )");
 extern "C" void CgSyscallHook();
+extern "C" int __cdecl CoopSuppressClientSimulation()
+{
+    if (!S || S->role != JOINER || !S->frozen) return 0;
+    if (!S->suppressedClientFrames++)
+        Log("joiner: client server-simulation trap %x suppressed; host owns world", g_cgRunServerTrap);
+    g::inGameCall = 0; // native secondary-frame epilogue selects the client animation block
+    // The SP cgame also advances the local server through this separate trap
+    // (UO 0x404719 -> 0x44f510 -> GAME call11). Running it against replicated
+    // host DObjs updates obsolete local vehicle physics after checkpoints.
+    // Client rendering and our per-frame animation advance are independent.
+    return 1;
+}
 
 namespace {
 
@@ -1243,7 +1911,7 @@ void JoinerAdvanceAnims(float dt)
     int prevSide = g::inGameCall;
     g::inGameCall = 1;  // BodyAnimUpdate trabaja sobre el bloque servidor (+0x38..)
     for (int e = 0; e < g::MAX_GENTITIES; ++e) {
-        uint8_t* tree = S->ownTree[e];
+        uint8_t* tree = S->ownTree[e] ? S->ownTree[e] : QACurrentBorrow(e);
         uint8_t* d = g::ServerDObj(e);
         if (!tree || !d || *(uint8_t**)d != tree) continue;
         ++trees;
@@ -1384,6 +2052,10 @@ void SetDowned(int n, bool downed)
 void __cdecl Hook_GDamage(uint8_t* targ, uint8_t* inflictor, uint8_t* attacker, float* dir, float* point, int damage,
                           int dflags, int mod, int hitLoc)
 {
+    if (!g_api) { // a pinned later-plugin chain must not touch retired Coop state
+        if (g_origDamage) g_origDamage(targ, inflictor, attacker, dir, point, damage, dflags, mod, hitLoc);
+        return;
+    }
     uint8_t* ff = g::Cvar_FindVar("coop_friendlyfire");
     bool friendlyFire = ff && *(int*)(ff + 0x20);
     bool targPlayer = targ && *(void**)(targ + g::GE_CLIENT);
@@ -1677,6 +2349,50 @@ void HostVehicles()
 }  // namespace
 extern "C" void* g_getUsercmdTramp;
 void* g_getUsercmdTramp;
+extern "C" void* g_reliableWriteTramp;
+void* g_reliableWriteTramp;
+extern "C" int __cdecl CoopAllowReliable(uint8_t* client, const char* text)
+{
+    if (!S || S->role != HOST || !g::svs_clients) return 1;
+    uintptr_t offset = (uintptr_t)client - (uintptr_t)g::svs_clients;
+    if (offset % g::CLIENT_SIZE || offset / g::CLIENT_SIZE >= g::MAX_CLIENTS) return 1;
+    int n = (int)(offset / g::CLIENT_SIZE);
+    if (!n) return 1; // never hide a failure of the host's own reliable channel
+    bool initialized = *(int*)(client + 4) > 0 && *(void**)(client + 8) &&
+                       *(void**)(client + 0xc) && *(void**)(client + 0x10);
+    if (S->remote[n].active && *(int*)(client + g::CL_STATE) == 1 && initialized) return 1;
+    // A save retains game clients for entity references, but their transport
+    // buffers do not survive native loading. Scripts can still address those
+    // disconnected players before HostDropGhosts removes them. Do not queue
+    // commands for an absent transport; rejoin sends the authoritative gamestate.
+    static DWORD logged[g::MAX_CLIENTS];
+    DWORD now = GetTickCount();
+    if (!logged[n] || now - logged[n] > 1000) {
+        logged[n] = now;
+        Log("reliable: skipped absent slot %d active=%d state=%d bytes=%d data=%p ring=%p seq=%d ack=%d command=%.80s",
+            n, S->remote[n].active, *(int*)client, *(int*)(client + 4), *(void**)(client + 8),
+            *(void**)(client + 0xc), *(int*)(client + g::CL_RELSEQ), *(int*)(client + g::CL_RELACK), text ? text : "");
+    }
+    return 0;
+}
+asm(R"(
+.intel_syntax noprefix
+.globl _Hook_ReliableWrite
+_Hook_ReliableWrite:
+    pushad
+    push dword ptr [esp+40]
+    push dword ptr [esp+32]
+    call _CoopAllowReliable
+    add esp, 8
+    test eax, eax
+    jz 1f
+    popad
+    jmp dword ptr [_g_reliableWriteTramp]
+1:  popad
+    ret
+.att_syntax
+)");
+extern "C" void Hook_ReliableWrite();
 asm(R"(
 .intel_syntax noprefix
 .globl _Hook_GetUsercmd
@@ -1731,6 +2447,13 @@ void HookExe(bool on, uintptr_t addr, const uint8_t* prologue, int len, void* de
     if (!on && hooked && tramp) hook::Write(addr, prologue, len);
 }
 
+void HookReliable(bool on)
+{
+    const uint8_t prologue[5] = {0x51, 0x53, 0x55, 0x56, 0x57};
+    HookExe(on, g::A(0x44bc80, 0x44ded0), prologue, 5, (void*)Hook_ReliableWrite,
+            g_reliableWriteTramp, "reliable command transport");
+}
+
 void HookUsercmd(bool on)
 {
     if (S->role == HOST || !on)
@@ -1749,15 +2472,15 @@ void HookLoad(uint8_t* game, bool on)
     uint8_t* jne = game + (g::uo ? 0x30b74 : 0x2de6f);  // jne +0x0d (cliente conectado) antes de "push msg; call"
     if ((jne[0] == 0x75 || jne[0] == 0xEB) && jne[1] == 0x0d && jne[2] == 0x68) {
         const uint8_t op = on ? 0xEB : 0x75;
-        if (jne[0] != op) hook::Write((uintptr_t)jne, &op, 1);
-        if (on) Log("checkpoint: carga tambien a los remotos guardados");
+        if (jne[0] != op && hook::Write((uintptr_t)jne, &op, 1) && on)
+            Log("checkpoint: carga tambien a los remotos guardados");
     }
 }
 
 void HookDamage(bool on)
 {
     uint8_t* game = (uint8_t*)GetModuleHandleA(g::GameDll());
-    if (on && game && game != g_damageHooked) {
+    if (on && game) {
         // UO: scripts como animscripts GetPlayer() hacen getent("player", "classname"); con varios jugadores el
         // juego corta el script con "getent used with more than one entity". Se salta el error y queda el primero
         // (el host): "push msg; call Scr_Error" -> "jmp" al siguiente.
@@ -1771,19 +2494,42 @@ void HookDamage(bool on)
         }
         HookLoad(game, true);
         uint8_t* fn = game + G_DAMAGE_RVA;
-        if (memcmp(fn, kGDamagePrologue, sizeof kGDamagePrologue) != 0) {
-            Log("G_Damage: prologo inesperado, sin opcion de dano entre jugadores");
-            g_damageHooked = game;  // no reintentar en cada frame
-            return;
+        if (!memcmp(fn, kGDamagePrologue, sizeof kGDamagePrologue)) {
+            // The engine reloads its game DLL at the same preferred base on
+            // mission changes. A matching HMODULE is not proof of a live hook.
+            if (g_origDamage && g_damageHooked == game) {
+                uint8_t patch[sizeof kGDamagePrologue]; memset(patch, 0x90, sizeof patch);
+                patch[0] = 0xE9;
+                *(int32_t*)(patch + 1) = (int32_t)((uintptr_t)Hook_GDamage - ((uintptr_t)fn + 5));
+                if (hook::Write((uintptr_t)fn, patch, sizeof patch))
+                    Log("G_Damage reattached after game DLL reload at the same base %p", game);
+            } else {
+                GDamage_t previous = g_origDamage;
+                g_origDamage = (GDamage_t)hook::Inline((uintptr_t)fn, (void*)Hook_GDamage, sizeof kGDamagePrologue);
+                if (previous && g_origDamage) VirtualFree((void*)previous, 0, MEM_RELEASE);
+                Log("G_Damage enganchado en %p", fn);
+            }
+            g_damageHooked = game;
+        } else if (game != g_damageHooked) {
+            Log("G_Damage: unexpected prologue; required damage hook unavailable");
+            g_damageHooked = game;
         }
-        g_origDamage = (GDamage_t)hook::Inline((uintptr_t)fn, (void*)Hook_GDamage, sizeof kGDamagePrologue);
-        g_damageHooked = game;
-        Log("G_Damage enganchado en %p", fn);
     }
-    if (!on && g_damageHooked && g_damageHooked == game && g_origDamage &&
-        *(game + G_DAMAGE_RVA) == 0xE9) {  // el detour vive en esta DLL: se restaura antes de descargarla
-        hook::Write((uintptr_t)(game + G_DAMAGE_RVA), kGDamagePrologue, sizeof kGDamagePrologue);
-        g_damageHooked = nullptr;
+    if (!on && game && g_damageHooked == game && g_origDamage) {
+        uint8_t* fn = game + G_DAMAGE_RVA;
+        bool restored = !memcmp(fn, kGDamagePrologue, sizeof kGDamagePrologue);
+        if (patch_owner::JumpTargets(fn, (uintptr_t)Hook_GDamage))
+            restored = hook::Write((uintptr_t)fn, kGDamagePrologue, sizeof kGDamagePrologue);
+        if (restored) g_damageHooked = nullptr;
+        else {
+            // A later wrapper may still forward to Hook_GDamage. Preserve its
+            // patch and keep that callback mapped after the loader releases us.
+            HMODULE retained = nullptr;
+            if (GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN,
+                                 reinterpret_cast<LPCSTR>(&Hook_GDamage), &retained))
+                Log("G_Damage: foreign/retained hook preserved; core pinned until process exit");
+            else Log("G_Damage: ERROR could not pin retained hook (%lu)", GetLastError());
+        }
     }
     if (!on && game) HookLoad(game, false);
 }
@@ -1895,6 +2641,70 @@ void JoinerSkipPregame()
     Log("joiner: pantalla de inicio salteada");
 }
 
+// Continue the earned CoD1 finale into UO, after preserving the original
+// credits. This is exactly victoryscreen's normal Continue action (close +
+// cl_paused 0), never a synthetic mission success or direct map command.
+void MainlineContinue()
+{
+    static DWORD readySince;
+    uint8_t* game = (uint8_t*)GetModuleHandleA(g::GameDll());
+    bool earned = S->role == HOST && g::uo && CvarInt("coop_mainline") == 1 &&
+                  !_stricmp(g::CvarString("mapname"), "coop_cod1_credits") &&
+                  CvarInt("g_reloading") == 4 && !MoviePlaying() && game &&
+                  !strcmp((const char*)game + g::G_EXIT_MAP, "bastogne1");
+    if (!earned) { readySince = 0; return; }
+    if (!readySince) {
+        readySince = GetTickCount();
+        Log("mainline: original credits complete; continuing into United Offensive in 5 seconds");
+        CoopStatus("CoD completed. Continuing together into United Offensive...");
+    }
+    if (GetTickCount() - readySince < 5000 || !g::uivm) return;
+    int args[13] = {7, 0};
+    g::CallVM(g::uivm, args);
+    g::Cvar_Set("cl_paused", "0");
+    Log("mainline: normal victory Continue action, next mission bastogne1");
+    readySince = 0;
+}
+
+void MainlineStartMission()
+{
+    static pregame::Gate startup;
+    static bool warned;
+    bool partyTransition = CvarInt("coop_expected_players") > 1;
+    if (S->role != HOST || (!(g::uo && CvarInt("coop_mainline") == 1) && !partyTransition)) {
+        startup = pregame::Gate{}; warned = false; return;
+    }
+    bool nativeReady = !MoviePlaying() && g::uivm && g::cgvm && g::cls_state == 2 && g::sv_state == 2 &&
+        g::cl_snapNum > 0 && g::cl_snapServerTime > 0 && PlayerInGame(0);
+    int expected = CvarInt("coop_expected_players");
+    if (expected < 1) expected = 1;
+    if (expected > g::MAX_CLIENTS) nativeReady = false;
+    int ready = 1;
+    for (int n = 1; n < g::MAX_CLIENTS; ++n) {
+        if (!S->remote[n].active) continue;
+        if (!S->remote[n].worldReady) nativeReady = false;
+        ++ready;
+    }
+    nativeReady = nativeReady && ready >= expected;
+    // Never close the previous UI while the new cgame is still initializing.
+    // A late native pause reassertion may be retried only in this same world,
+    // before its clock has advanced, at most three times within five seconds.
+    bool start = startup.Poll(CvarInt("sv_serverid"), (uintptr_t)g::cgvm, (uintptr_t)g::uivm,
+                              nativeReady, PregameOpen(), CvarInt("cl_paused") != 0, g::sv_time, GetTickCount());
+    if (!startup.exhausted) warned = false;
+    if (startup.exhausted && !warned) {
+        warned = true;
+        Log("mainline: native mission-start UI did not advance; waiting for manual start/retry");
+        CoopStatus("Mission start is still paused. Use the game's Start action or retry the session.");
+    }
+    if (!start) return;
+    int args[13] = {7, 0};
+    g::CallVM(g::uivm, args);
+    g::Cvar_Set("cl_paused", "0"); g::Cvar_Set("cg_norender", "0");
+    g::Cbuf_AddText("fade 0 0 0 0 3\n");
+    Log("mainline: %d players ready, normal mission-start UI action", ready);
+}
+
 // Desconexiones (3.3). El host anota cuando llego el ultimo paquete de cada remoto; si pasan REMOTE_TIMEOUT sin
 // nada (se cerro el juego, se corto la red) lo suelta: cuerpo, entidad (ClientDisconnect = vmMain 4 del juego;
 // el 5 es ClientCommand y el 6 ClientThink) y lugar. Con el menu abierto el remoto no manda usercmds: manda
@@ -1903,12 +2713,18 @@ constexpr DWORD REMOTE_TIMEOUT = 8000, HOST_TIMEOUT = 15000;
 DWORD g_lastSeen[g::MAX_CLIENTS];  // host: ultimo paquete de cada remoto (0 = sin medir todavia)
 DWORD g_hostSeen;                  // remoto: ultimo paquete del host
 
-void HostDropRemote(int n)
+void HostDropRemote(int n, bool explicitLeave = false)
 {
     Log("host: se libera el lugar del jugador %d (ultimo paquete hace %lu ms)", n, GetTickCount() - g_lastSeen[n]);
     if (S->bodyTree[n]) HostFreeBody(n);
     S->downed[n] = false;
     S->remote[n].active = false;
+    if (explicitLeave) {
+        char expected[8];
+        snprintf(expected, sizeof expected, "%d", patch_owner::ExpectedAfterDeparture(CvarInt("coop_expected_players"), true));
+        g::Cvar_Set("coop_expected_players", expected);
+        Log("party: player %d explicitly left; expected players now %s", n + 1, expected);
+    }
     g::GameCall(4, n);
     *(int*)(g::Client(n) + g::CL_STATE) = 0;
     g_lastSeen[n] = 0;
@@ -1946,8 +2762,32 @@ void HostCheckRemotes()
 // Antes de que el host cargue un mapa (el checkpoint o uno nuevo) se sueltan los remotos y los cuerpos. Si quedaran
 // conectados, la carga les manda comandos que nadie confirma ("Reliable command buffer overflow"); los arboles se
 // liberan ahora, mientras su memoria sigue siendo valida. Los remotos cargan `map` y se vuelven a unir solos.
+bool HostReloadPending()
+{
+    for (int n = 1; n < g::MAX_CLIENTS; ++n)
+        if (S->reloadPending[n].delivery.active) return true;
+    return false;
+}
+
+void HostReloadTick()
+{
+    if (S->role != HOST) return;
+    DWORD now = GetTickCount();
+    for (int n = 1; n < g::MAX_CLIENTS; ++n) {
+        auto& pending = S->reloadPending[n];
+        if (!reload_delivery::Due(pending.delivery, now)) continue;
+        Writer w(M_RELOAD);
+        w.Put(pending.delivery.token); w.Put(pending.movieCutoff);
+        w.Put(pending.map, (int)strlen(pending.map) + 1);
+        SendTo(pending.address, w.buf, w.len);
+        reload_delivery::Sent(pending.delivery, now);
+    }
+}
+
 void HostDropRemotes(const char* map, bool freeBodies)
 {
+    if (!++S->reloadToken.generation) ++S->reloadToken.generation;
+    S->movie.name[0] = 0; // a subsequent mission must not replay a delayed old film
     // Los cuerpos se liberan solo antes de un mapa nuevo (Hook_SpawnServer). Con la mision fallida el juego sigue
     // corriendo la pantalla de derrota y le pide al motor el DObj de los jugadores (trap -> 0x449bf0, que se cae si
     // ya no esta); al cargar partida el servidor ya se cerro (svs.clients en 0, esa memoria liberada: 0x45b8f0). En
@@ -1959,20 +2799,40 @@ void HostDropRemotes(const char* map, bool freeBodies)
         S->downed[n] = false;
     }
     for (int n = 1; n < g::MAX_CLIENTS; ++n) {
-        if (!S->remote[n].active) continue;
-        Writer w(M_RELOAD);
-        w.Put(map, (int)strlen(map) + 1);
-        for (int k = 0; k < 3; ++k) SendTo(S->remote[n].addr, w.buf, w.len);  // UDP: el remoto atiende el primero
+        if (!S->remote[n].active && !S->reloadPending[n].delivery.active) continue;
+        auto& pending = S->reloadPending[n];
+        if (S->remote[n].active) pending.address = S->remote[n].addr;
+        pending.delivery = {S->reloadToken, 0, true, false};
+        pending.movieCutoff = S->movie.serial;
+        snprintf(pending.map, sizeof pending.map, "%s", map);
         if (server) *(int*)(g::Client(n) + g::CL_STATE) = 0;
         S->remote[n].active = false;
     }
+    HostReloadTick();
 }
 
 // g_reloading copia el tipo de salida del nivel (gamex86 0x2001e6b0): 1 = mision fallida (pantalla de "La mision
 // ha fracasado" hasta que carga el checkpoint), 4 = nivel terminado (pantalla de victoria), 2 = justo antes de
 // "spmap <siguiente>", 0x10 = otra salida. Aca solo el 1; el nivel siguiente lo atiende Hook_SpawnServer.
+int g_hostWorldId;
+int g_hostWorldTime;
+bool g_hostWorldKnown;
 void HostCheckReload()
 {
+    if (S->role != HOST) { g_hostWorldKnown = false; return; }
+    if (g::sv_state == 2 && g::svs_clients && g::sv_gameClients) {
+        int id = CvarInt("sv_serverid");
+        bool changed = g_hostWorldKnown && (id != g_hostWorldId || g::sv_time < g_hostWorldTime);
+        g_hostWorldId = id; g_hostWorldTime = g::sv_time; g_hostWorldKnown = true;
+        if (changed && (CoopActive() || HostReloadPending())) {
+            // Native loadgame can set and clear g_reloading entirely inside
+            // one command execution. Catch its server generation before any
+            // rolled-back snapshots reach a still-running remote cgame.
+            Log("host: restored world generation %d time %d; reconnect remote clients", id, g::sv_time);
+            HostDropRemotes(g::CvarString("mapname"), false);
+            return;
+        }
+    }
     uint8_t* reloading = g::Cvar_FindVar("g_reloading");
     int value = reloading ? *(int*)(reloading + 0x20) : 0;
     if (value != 1 || !CoopActive()) return;
@@ -1986,11 +2846,12 @@ const uintptr_t SPAWN_SERVER = g::A(0x44c1b0, 0x44e3f0), SPAWN_SERVER_CALL = g::
 
 void __cdecl Hook_SpawnServer(const char* map, int x)
 {
-    if (S && S->role == HOST && CoopActive()) {
+    if (S && S->role == HOST && (CoopActive() || HostReloadPending())) {
         Log("host: carga el mapa %s, los remotos lo cargan y vuelven", map);
         HostDropRemotes(map, true);
     }
     ((void(__cdecl*)(const char*, int))SPAWN_SERVER)(map, x);
+    HookDamage(true); // install fresh game-module hooks before another player can join
 }
 
 void HookSpawnServer(bool on)
@@ -2004,8 +2865,26 @@ void HookSpawnServer(bool on)
 
 void JoinerSendJoin()
 {
+    if (!g_profileReady) return;
+    if (!S->compatible) {
+        if (suite::HandshakeExpired(GetTickCount(), S->joinStarted, S->lastJoinTry)) {
+            CoopStatus("Host did not pass the suite handshake (offline or older mod). Update both installations.");
+            Log("suite: handshake timed out");
+            S->role = NONE;
+            return;
+        }
+        Writer hello(suite::HELLO);
+        SendTo(S->host, hello.buf, hello.len);
+        S->lastJoinTry = GetTickCount();
+        return;
+    }
+    if (!S->qport) {
+        sockaddr_in local{}; int size = sizeof local;
+        if (getsockname(S->sock, (sockaddr*)&local, &size)) return;
+        S->qport = ntohs(local.sin_port);
+    }
     Writer w(M_JOIN);
-    w.Put<int>(*(int*)(g::clc_netchan + g::NC_QPORT));
+    w.Put<int>(S->qport);
     w.Put<int>(*(int*)(g::clc_netchan + g::NC_IN));
     w.Put<int>(g::clc_serverCommandSequence);
     w.Put<int>(g::clc_reliableSequence);
@@ -2015,31 +2894,46 @@ void JoinerSendJoin()
     S->lastJoinTry = GetTickCount();
 }
 
+void QueueJoinerMap(const char* map)
+{
+    S->gamestateReady = false;
+    snprintf(S->pendingMap, sizeof S->pendingMap, "%s", map);
+    S->previousLocalWorld = CvarInt("sv_serverid");
+    S->mapLoadStarted = GetTickCount();
+    S->waitingForMap = true;
+    S->role = NONE; S->joined = S->frozen = false;
+    S->movieWorldSuspended = false;
+    char command[96];
+    snprintf(command, sizeof command, "devmap %s\n", S->pendingMap);
+    g::Cbuf_AddText(command);
+}
+
 void JoinerHijack()
 {
-    if (S->frozen) return;
+    if (S->frozen || !S->rules.required || S->rules.received != S->rules.required) return;
     // sv_state 1 tambien sirve: al volver a entrar sin cerrar el juego el servidor local queda en 1 con el mapa
     // cargado, y pedir el mapa de nuevo era un ciclo sin fin
-    if (g::sv_state == 0 || _stricmp(S->hostMap, g::CvarString("mapname")) != 0) {
+    if (g::sv_state == 0 || !g::cgvm || g::cls_state == 0 || _stricmp(S->hostMap, g::CvarString("mapname")) != 0) {
         // sin el mapa del host cargado (o un error del motor lo cerro): cargarlo y volver a entrar
         Log("joiner: mapa local '%s' (servidor %d), cargo %s y vuelvo a entrar", g::CvarString("mapname"), g::sv_state,
             S->hostMap);
-        S->role = NONE;
-        char cmd[128];
-        snprintf(cmd, sizeof cmd, "devmap %s\ncooprejoin\n", S->hostMap);
-        g::Cbuf_AddText(cmd);
+        QueueJoinerMap(S->hostMap);
         return;
     }
+    SetHostRules(S->rules.accepted); // exact accepted rules immediately before native prediction attaches
     FreeOldTrees();
+    QACaptureNativeTrees();
     S->frozen = true;                              // el servidor local queda solo para colision y assets
     *(int*)(g::Client(0) + g::CL_STATE) = 0;      // que no acumule comandos que nadie confirma
     for (int i = 0; i < g::MAX_CONFIGSTRINGS; ++i)
         if (strcmp(g::ConfigString(i), S->cs[i]) != 0) g::SV_SetConfigstring(i, S->cs[i]);
     int state = g::cls_state;
     g::CL_NetchanSetup(ToNet(S->host));
+    *(int*)(g::clc_netchan + g::NC_QPORT) = S->qport;
     g::cls_state = state;
     g::CL_ApplyConfigstrings(g::sv_configstrings);
     S->joined = true;
+    Writer ready(M_WORLD_READY); SendTo(S->host, ready.buf, ready.len);
     Log("joiner: conectado al host como slot %d en %s", S->slot, S->hostMap);
     g::Com_Printf("^2COOP: connected to the host (player %d)\n", S->slot + 1);
 }
@@ -2060,12 +2954,73 @@ const char* MapName(const Reader& r)
 
 void JoinerControl(uint8_t type, Reader r)
 {
+    if (S->movieWorldSuspended && (type == M_ENTS || type == M_DOBJ || type == M_ANIM || type == M_DOWNED)) return;
     switch (type) {
-    case M_ACCEPT:
-        if (S->joined) return;
-        S->slot = r.Get<int>();
-        snprintf(S->hostMap, sizeof S->hostMap, "%s", MapName(r));
+    case M_RULES: {
+        uint32_t serial = r.Get<uint32_t>(); auto values = r.Get<host_rules::Values>();
+        if (!r.Ok() || r.p != r.end || !serial) return;
+        if (serial != S->rules.received && !host_rules::Newer(serial, S->rules.received)) return;
+        if (!ApplyHostRules(serial, values)) {
+            Writer bye(M_BYE); SendTo(S->host, bye.buf, bye.len);
+            JoinerLeave("The host supplied an unsupported YAP gameplay setting. Correct the host settings before retrying.");
+        } else S->rules.required = serial;
         break;
+    }
+    case M_CINEMATIC:
+        if (S->joined) JoinerMovie(r);
+        break;
+    case suite::READY:
+        if (!S->compatible && !S->joined) {
+            S->compatible = true;
+            Log("suite: host compatibility verified, requesting player slot");
+            JoinerSendJoin();
+        }
+        break;
+    case suite::REJECT: {
+        const char* reason = (const char*)r.p;
+        if (!memchr(r.p, 0, (size_t)(r.end - r.p))) return;
+        Log("suite: rejected: %.200s", reason);
+        CoopStatus("%.200s", reason);
+        S->role = NONE;
+        S->compatible = false;
+        break;
+    }
+    case M_ACCEPT: {
+        if (S->joined || !S->compatible) return;
+        int slot = r.Get<int>();
+        int qport = r.Get<int>();
+        int hostTime = r.Get<int>();
+        auto world = r.Get<reload_delivery::Token>();
+        uint32_t ruleSerial = r.Get<uint32_t>(); auto ruleValues = r.Get<host_rules::Values>();
+        const char* map = MapName(r);
+        if (!r.Ok() || hostTime < 0 || slot < 1 || slot >= g::MAX_CLIENTS || qport < 1 || qport > 65535 || !*map) return;
+        if (!reload_delivery::Valid(world)) return;
+        if (S->reloadToken.session && !reload_delivery::Same(world, S->reloadToken) &&
+            !reload_delivery::Newer(world, S->reloadToken)) return;
+        if (!ruleSerial || !host_rules::Valid(ruleValues)) {
+            JoinerLeave("The host supplied an unsupported YAP gameplay setting."); return;
+        }
+        if (S->rules.received && ruleSerial != S->rules.received && !host_rules::Newer(ruleSerial, S->rules.received)) return;
+        if (!ApplyHostRules(ruleSerial, ruleValues)) {
+            JoinerLeave("Could not preserve local YAP settings before joining."); return;
+        }
+        S->rules.required = ruleSerial;
+        S->reloadToken = world;
+        // A player can enter Coop after spending time in their local SP world.
+        // Cgame rejects older host snapshots. Reload through the normal engine
+        // path instead of altering its private snapshot/prediction structures.
+        if (g::cl_snapServerTime > hostTime) {
+            Writer leave(M_BYE); SendTo(S->host, leave.buf, leave.len);
+            snprintf(S->hostMap, sizeof S->hostMap, "%s", map);
+            Log("joiner: local clock %d ahead of host %d; reload before joining", g::cl_snapServerTime, hostTime);
+            QueueJoinerMap(S->hostMap);
+            return;
+        }
+        S->qport = (uint16_t)qport;
+        S->slot = slot;
+        snprintf(S->hostMap, sizeof S->hostMap, "%s", map);
+        break;
+    }
     case M_FULL:
         g::Com_Printf("^1COOP: the host is full (4 players)\n");
         CoopStatus("The host already has 4 players.");
@@ -2076,13 +3031,10 @@ void JoinerControl(uint8_t type, Reader r)
         if (S->joined || S->role != JOINER || !*map) return;
         if (!_stricmp(map, g::CvarString("mapname"))) return;  // respuesta vieja (pedidos en cola mientras el host cargaba)
         snprintf(S->hostMap, sizeof S->hostMap, "%s", map);
-        S->role = NONE;  // hasta cooprejoin
         Log("joiner: el host esta en %s, lo cargo y vuelvo a entrar", map);
         g::Com_Printf("^3COOP: the host is on %s, loading...\n", map);
         CoopStatus("Host found: loading %s...", map);
-        char cmd[128];
-        snprintf(cmd, sizeof cmd, "devmap %s\ncooprejoin\n", map);
-        g::Cbuf_AddText(cmd);
+        QueueJoinerMap(map);
         break;
     }
     case M_CS:
@@ -2103,7 +3055,10 @@ void JoinerControl(uint8_t type, Reader r)
             break;
         }
         Log("joiner: gamestate completo (%d configstrings)", have);
-        JoinerHijack();
+        // Packet polling can run inside an already-started SV_Frame. Mutating
+        // local DObjs here lets that old game frame run against host models.
+        // Attach only at the next server-frame boundary, which will be skipped.
+        S->gamestateReady = true;
         break;
     }
     case M_DOBJ:
@@ -2112,16 +3067,37 @@ void JoinerControl(uint8_t type, Reader r)
     case M_BYE:
         JoinerLeave("The host closed the co-op game.");
         break;
-    case M_ANIM:
-        if (S->joined) JoinerApplyAnims(r);
+    case M_ANIM: {
+        if (!S->joined) return;
+        while (r.p <= r.end && (size_t)(r.end - r.p) >= sizeof(animwire::Header)) {
+            animwire::Header h{}; memcpy(&h, r.p, sizeof h); r.p += sizeof h;
+            size_t bytes = (size_t)h.count * animwire::STATE_BYTES;
+            if (bytes > (size_t)(r.end - r.p)) return;
+            std::vector<uint8_t> complete;
+            if (g_animAssembler.Feed(h, r.p, bytes, complete))
+                JoinerApplyAnims(Reader{complete.data(), complete.data() + complete.size()});
+            r.p += bytes;
+        }
         break;
+    }
     case M_RELOAD: {
         // El host carga un mapa: el checkpoint (su reloj retrocede y el cgame de aca cortaria con "Server time went
         // backwards") o el nivel siguiente. Se hace como al entrar: ese mapa local y despues unirse (cooprejoin).
         // Los DObj propios no se liberan: el servidor local corre un frame mas antes del devmap y le pide al motor
         // esos DObj (trap -> 0x449bf0 se caia), y despues el devmap limpia esa memoria. Solo se olvidan.
-        if (!S->joined) return;
+        auto token = r.Get<reload_delivery::Token>();
+        uint32_t movieCutoff = r.Get<uint32_t>();
+        if (!r.Ok()) return;
         const char* map = MapName(r);
+        if (!*map || !reload_delivery::Valid(token)) return;
+        bool duplicate = reload_delivery::Same(token, S->reloadToken);
+        if (!duplicate && (!S->joined || !reload_delivery::Newer(token, S->reloadToken))) return;
+        Writer ack(M_RELOAD_ACK); ack.Put(token); SendTo(S->host, ack.buf, ack.len);
+        if (duplicate) return; // acknowledge again without reloading the world twice
+        S->reloadToken = token;
+        if (campaign_cinematics::Newer(movieCutoff, S->receivedMovie)) S->receivedMovie = movieCutoff;
+        S->movieWorldSuspended = false;
+        g_animAssembler.Reset();
         bool newMap = *map && _stricmp(map, S->hostMap) != 0;
         if (*map) snprintf(S->hostMap, sizeof S->hostMap, "%s", map);
         if (g::uo) KeepOldTrees();
@@ -2132,9 +3108,7 @@ void JoinerControl(uint8_t type, Reader r)
         Log("joiner: el host carga %s (%s), lo cargo y vuelvo a entrar", S->hostMap, newMap ? "nivel nuevo" : "checkpoint");
         if (newMap) g::Com_Printf("^3COOP: the host moved on to %s, loading...\n", S->hostMap);
         else g::Com_Printf("^3COOP: the host went back to the last checkpoint, reconnecting...\n");
-        char cmd[128];
-        snprintf(cmd, sizeof cmd, "devmap %s\ncooprejoin\n", S->hostMap);
-        g::Cbuf_AddText(cmd);
+        QueueJoinerMap(S->hostMap);
         break;
     }
     case M_DOWNED: {
@@ -2174,6 +3148,7 @@ void JoinerKeepAlive()
     if (now - lastPing > 1000) {
         Writer w(M_PING);
         SendTo(S->host, w.buf, w.len);
+        Writer ready(M_WORLD_READY); SendTo(S->host, ready.buf, ready.len);
         lastPing = now;
     }
     if (!g_hostSeen) g_hostSeen = now;  // nucleo recien recargado
@@ -2186,8 +3161,11 @@ void JoinerKeepAlive()
 // "disconnect" lo cierra y le pediria al motor los que se liberaran.
 void JoinerLeave(const char* why)
 {
+    S->reloadToken = {};
+    RestoreHostRules(); S->rules.received = S->rules.required = 0;
+    g_animAssembler.Reset();
     for (int e = 0; e < g::MAX_GENTITIES; ++e)
-        if (S->ownTree[e]) JoinerFreeDObj(e);
+        if (S->ownTree[e] || g_qaBorrowed[e].tree) JoinerFreeDObj(e);
     S->joined = S->frozen = false;
     S->role = NONE;
     HookCgame(false);  // como un juego recien abierto: si no, el mapa local no termina de cargar al volver a entrar
@@ -2231,6 +3209,7 @@ void HideFriendButtons(int k)
 // amigos anfitriones para el menu Cooperativo (cvars ui_coop_friend1..3 = texto, coop_friendid1..3 = SteamID).
 void SteamFrame()
 {
+    if (suite::IsQA() && getenv("CODCOOP_QA_NO_STEAM")) return;
     static bool wasUp, presence, triedOnce;
     bool up = steam::Start();
     if (up != wasUp || !triedOnce) {
@@ -2280,10 +3259,66 @@ void SteamFrame()
     g::Cvar_Set("ui_coop_steam", found ? "Steam friends hosting a game:" : "Steam: none of your friends is hosting yet.");
 }
 
+// UO grenade spawn RVA 0x27a50 stores the thrower number at +0xfc and
+// the thrower entity pointer at +0x14c. Both must agree before exporting it.
+// GSC consumes these on the authoritative host; clients never supply ownership.
+void HostMissileOwners()
+{
+    if (!g::uo || !g::sv_gentities || !g::sv_gameClients || g::sv_state != 2) return;
+    static int sampledTime = -1;
+    if (sampledTime == g::sv_time) return;
+    sampledTime = g::sv_time;
+    constexpr int BANKS = 128;
+    static int previous[BANKS];
+    static bool initialized;
+    if (!initialized) { for (int& v : previous) v = -1; initialized = true; }
+    int values[BANKS]; for (int& v : values) v = -1;
+    int count = 0, overflow = 0;
+    if (S->role != JOINER) for (int e = 0; e < g::MAX_GENTITIES; ++e) {
+        uint8_t* entity = g::Entity(e);
+        if (entity[0] != 3) continue;
+        int owner = *(int*)(entity + 0xfc);
+        if (owner < 0 || owner >= g::MAX_CLIENTS || !PlayerInGame(owner) ||
+            *(uint8_t**)(entity + 0x14c) != g::Entity(owner)) continue;
+        if (count == BANKS) { ++overflow; continue; }
+        values[count++] = (e + 1) * 4 + owner;
+    }
+    for (int i = 0; i < BANKS; ++i) {
+        if (values[i] == previous[i]) continue;
+        previous[i] = values[i];
+        char key[48], value[24];
+        snprintf(key, sizeof key, "coop_owner_bank_%d", i);
+        snprintf(value, sizeof value, "%d", values[i]);
+        g::Cvar_Set(key, value);
+    }
+    static int previousCount = -1, previousOverflow = -1;
+    if (count != previousCount) {
+        char value[24]; snprintf(value, sizeof value, "%d", count);
+        g::Cvar_Set("coop_owner_bank_count", value); previousCount = count;
+    }
+    if (overflow != previousOverflow) {
+        char value[24]; snprintf(value, sizeof value, "%d", overflow);
+        g::Cvar_Set("coop_owner_bank_overflow", value); previousOverflow = overflow;
+        if (overflow) Log("ownership: more than %d simultaneous player missiles (%d unassigned)", BANKS, overflow);
+    }
+}
+
 // ---------- comandos de consola ----------
 
 void Cmd_CoopHost()
 {
+    RestoreHostRules();
+    if (!PrepareIdentity()) return;
+    if (S->role != HOST) {
+        HCRYPTPROV provider = 0;
+        uint64_t nonce = 0;
+        bool ready = CryptAcquireContextA(&provider, nullptr, nullptr, PROV_RSA_AES, CRYPT_VERIFYCONTEXT) &&
+                     CryptGenRandom(provider, sizeof nonce, (BYTE*)&nonce) && nonce;
+        if (provider) CryptReleaseContext(provider, 0);
+        if (!ready) { CoopStatus("Could not initialize a new co-op session. Retry hosting."); return; }
+        S->reloadToken = {nonce, 1};
+        memset(S->reloadPending, 0, sizeof S->reloadPending);
+    }
     int port = g::cmd_argc > 1 ? atoi(g::Argv(1)) : 28960;
     if (!OpenSocket(port)) {
         g::Com_Printf("^1COOP: could not open UDP port %d\n", port);
@@ -2305,6 +3340,18 @@ void Cmd_CoopHost()
 // coopjoin <ip>[:puerto]; sin argumento usa la IP escrita en el menu Cooperativo (cvar coop_ip)
 void Cmd_CoopJoin()
 {
+    S->reloadToken = {};
+    RestoreHostRules();
+    S->rules.received = S->rules.required = 0;
+    S->suppressedClientFrames = 0;
+    S->gamestateReady = false;
+    S->waitingForMap = false;
+    S->receivedMovie = 0; S->receivedMovieStatus = 0;
+    S->movieWorldSuspended = false;
+    g_animAssembler.Reset();
+    if (!PrepareIdentity()) return;
+    S->compatible = false;
+    S->joinStarted = 0;
     const char* target = g::cmd_argc > 1 ? g::Argv(1) : g::CvarString("coop_ip");
     if (!*target) {
         g::Com_Printf("usage: coopjoin <ip>[:port]\n");
@@ -2358,11 +3405,14 @@ void Cmd_CoopJoin()
 // todos y deja de ser anfitrion (la partida sigue para el solo). M_BYE avisa al otro lado para que no espere el corte.
 void Cmd_CoopLeave()
 {
+    S->waitingForMap = false;
     Writer w(M_BYE);
+    w.Put<uint8_t>(1); // intentional departure; empty/zero BYE is temporary clock/map recovery
     if (S->role == JOINER) {
         for (int k = 0; k < 3; ++k) SendTo(S->host, w.buf, w.len);  // UDP: el host atiende el primero
         JoinerLeave("You left the co-op game.");
     } else if (S->role == HOST) {
+        memset(S->reloadPending, 0, sizeof S->reloadPending);
         for (int n = 1; n < g::MAX_CLIENTS; ++n) {
             if (!S->remote[n].active) continue;
             for (int k = 0; k < 3; ++k) SendTo(S->remote[n].addr, w.buf, w.len);
@@ -2370,6 +3420,7 @@ void Cmd_CoopLeave()
             S->remote[n].active = false;
         }
         S->role = NONE;
+        g::Cvar_Set("coop_expected_players", "1");
         g_noPause = false;
         SkipUiPauseCheck(false);  // el menu vuelve a pausar como en el SP
         g::Cvar_Set("ui_coop_host", "");
@@ -2394,13 +3445,114 @@ void Cmd_CoopJoinFriend()
 // despues de recargar el mapa por M_RELOAD: volver a unirse al mismo host (lo reintenta cada 1 s)
 void Cmd_CoopRejoin()
 {
+    if (S->waitingForMap) return;
+    if (!PrepareIdentity()) return;
+    S->compatible = false;
+    S->joinStarted = 0;
     if (S->sock == INVALID_SOCKET || S->role != NONE || !S->host.sin_port) return;
     S->role = JOINER;
+    S->suppressedClientFrames = 0;
+    S->gamestateReady = false;
     S->joined = false;
     S->hostMap[0] = 0;
     memset(S->cs, 0, sizeof S->cs);
     JoinerSendJoin();
     g::Com_Printf("COOP: rejoining...\n");
+}
+
+void JoinerMapTick()
+{
+    if (!S->waitingForMap) return;
+    if (GetTickCount() - S->mapLoadStarted > 240000) {
+        S->waitingForMap = false;
+        CoopStatus("Loading %s timed out. Retry joining the host.", S->pendingMap);
+        Log("joiner: native map load timed out for %s", S->pendingMap);
+        return;
+    }
+    if (g::sv_state != 2 || !g::cgvm || g::cls_state != 2 || g::cl_snapNum <= 0 ||
+        CvarInt("sv_serverid") == S->previousLocalWorld ||
+        _stricmp(S->pendingMap, g::CvarString("mapname"))) return;
+    Log("joiner: native map %s ready, generation %d -> %d; rejoin now", S->pendingMap,
+        S->previousLocalWorld, CvarInt("sv_serverid"));
+    S->waitingForMap = false;
+    Cmd_CoopRejoin();
+}
+
+void Cmd_CoopQAStart()
+{
+    if (!suite::IsQA() || !g::uivm || !PregameOpen()) return;
+    // Same engine operations as uiScript playerstart / JoinerSkipPregame.
+    int args[13] = {7, 0};
+    g::CallVM(g::uivm, args);
+    g::Cvar_Set("cl_paused", "0");
+    g::Cvar_Set("cg_norender", "0");
+    g::Cbuf_AddText("fade 0 0 0 0 3\n");
+    Log("qa: start mission through engine UI");
+}
+
+// Read-only QA probe. Disabled in regular sessions; never advances gameplay itself.
+void QATick()
+{
+    if (!suite::IsQA() || !S) return;
+    QAExportModels();
+    static DWORD last;
+    DWORD now = GetTickCount();
+    if (now - last < 250) return;
+    last = now;
+    std::string base = suite::GameDir();
+    FILE* f = fopen((base + "qa-state.tmp").c_str(), "wb");
+    if (!f) return;
+    int trees = 0;
+    for (auto* tree : S->ownTree) if (tree) ++trees;
+    fprintf(f, "{\"tick\":%lu,\"role\":%d,\"joined\":%s,\"compatible\":%s,\"slot\":%d,\"server_time\":%d,\"snapshot_time\":%d,\"snapshot_num\":%d,\"trees\":%d,\"map\":\"%s\",\"players\":[",
+            now, S->role, S->joined ? "true" : "false", S->compatible ? "true" : "false", S->slot,
+            g::sv_time, g::cl_snapServerTime, g::cl_snapNum, trees, g::CvarString("mapname"));
+    for (int n = 0; n < g::MAX_CLIENTS; ++n) {
+        bool valid = g::sv_state == 2 && g::svs_clients && g::sv_gameClients;
+        uint8_t* ps = valid ? PlayerState(n) : nullptr;
+        const float* pos = ps ? (const float*)(ps + 0x14) : nullptr;
+        fprintf(f, "%s{\"slot\":%d,\"active\":%s,\"state\":%d,\"command_time\":%d,\"health\":%d,\"pm_type\":%d,\"linked\":%s,\"forward\":%d,\"downed\":%s,\"position\":[%.3f,%.3f,%.3f]}",
+                n ? "," : "", n, S->remote[n].active ? "true" : "false",
+                valid ? *(int*)(g::Client(n) + g::CL_STATE) : 0, ps ? *(int*)ps : 0,
+                ps ? *(int*)(ps + g::PS_HEALTH) : 0, ps ? *(int*)(ps + 4) : -1,
+                valid && *(uint8_t**)(g::Entity(n) + g::GE_LINK) ? "true" : "false",
+                valid ? (int)*(int8_t*)(g::Client(n) + 0x30 + 0x14) : 0,
+                S->downed[n] ? "true" : "false",
+                pos ? pos[0] : 0, pos ? pos[1] : 0, pos ? pos[2] : 0);
+    }
+    unsigned movieAck = 0;
+    for (int n = 1; n < g::MAX_CLIENTS; ++n) if (S->movie.ack[n] == 1) movieAck |= 1u << n;
+    auto ruleValues = ReadHostRules();
+    unsigned ruleAck = 0;
+    for (int n = 1; n < g::MAX_CLIENTS; ++n) if (S->rules.serial && S->rules.ack[n] == S->rules.serial) ruleAck |= 1u << n;
+    fprintf(f, "],\"rules\":{\"serial\":%u,\"required\":%u,\"ack_mask\":%u,\"saved_local\":%s,\"valid\":%s,\"sprint_scale\":%.9g,\"sprint_multiplier\":%.9g,\"jump_shot\":%u},",
+            S->role == HOST ? S->rules.serial : S->rules.received, S->rules.required, ruleAck,
+            S->rules.saved ? "true" : "false", host_rules::Valid(ruleValues) ? "true" : "false",
+            std::isfinite(ruleValues.sprintScale) ? ruleValues.sprintScale : 0,
+            std::isfinite(ruleValues.sprintMult) ? ruleValues.sprintMult : 0, ruleValues.jumpShot);
+    fprintf(f, "\"deferred_models\":{\"enabled\":%s,\"init_count\":%u,\"approved\":%u,\"deferred\":%u,\"bound_cumulative\":%u,\"late_bindings\":%u,\"cs_count\":%d},",
+        g_qaDeferredEnabled ? "true" : "false", g_qaInitCount, (unsigned)g_qaLedger.entries.size(), g_qaLedger.deferrals,
+        g_qaLedger.bindings, g_qaLedger.lateBindings, g_qaDeferredEnabled ? QAModelCount() : 0);
+    unsigned nativeBorrowed = 0;
+    for (int e = 0; e < g::MAX_GENTITIES; ++e) if (QACurrentBorrow(e)) ++nativeBorrowed;
+    fprintf(f, "\"native_tree_borrow\":{\"enabled\":%s,\"active\":%u,\"acquisitions\":%u},",
+        g_qaBorrowEnabled ? "true" : "false", nativeBorrowed, g_qaBorrowCount);
+    int fixture = CvarInt("coop_qa_render_entity");
+    bool fixtureModel = false;
+    if (fixture > 0 && fixture < g::MAX_GENTITIES && g::sv_state == 2) {
+        if (uint8_t* object = g::ServerDObj(fixture))
+            for (int k = 0; k < object[0x16] && k < 8; ++k) {
+                uint8_t* model = *(uint8_t**)(object + g::DO_MODELS + k * 4);
+                if (model && !_stricmp(SafeStr(*(char**)model), "v_rs_air_il2")) fixtureModel = true;
+            }
+    }
+    fprintf(f, "\"qa_render_fixture\":{\"entity\":%d,\"dobj_model\":%s},", fixture, fixtureModel ? "true" : "false");
+    fprintf(f, "\"local_fov\":%.9g,\"local_rawinput\":%d,", atof(g::CvarString("cg_fov")), CvarInt("m_rawinput"));
+    fprintf(f, "\"movieplaying\":%d,\"cl_movieplaying\":%d,\"cls_state\":%d,\"movie_serial\":%u,\"movie_ack_mask\":%u,\"movie_receive_status\":%u,\"expected_players\":%d}\n",
+            MoviePlaying() ? 1 : 0, CvarInt("cl_movieplaying"), g::cls_state, S->role == HOST ? S->movie.serial : S->receivedMovie,
+            movieAck, S->receivedMovieStatus, CvarInt("coop_expected_players"));
+    fclose(f);
+    MoveFileExA((base + "qa-state.tmp").c_str(), (base + "qa-state.json").c_str(), MOVEFILE_REPLACE_EXISTING);
 }
 
 // Pruebas sin teclado: lo que se escriba en codcoop.cmd (o codcoop_join.cmd) va a la consola.
@@ -2642,12 +3794,14 @@ void Cmd_CoopAnims()
     }
 }
 
+#include "session_switch.inc"
+
 struct CmdDef {
     const char* name;
     void (*fn)();
 };
 const CmdDef kCmds[] = {
-    {"coophost", Cmd_CoopHost}, {"coopjoin", Cmd_CoopJoin}, {"coopinfo", Cmd_CoopInfo}, {"coopbring", Cmd_CoopBring},
+    {"coopswitch", Cmd_CoopSwitch}, {"coopswitchcancel", Cmd_CoopSwitchCancel}, {"coopswitchretry", Cmd_CoopSwitchRetry}, {"coopqastart", Cmd_CoopQAStart}, {"coophost", Cmd_CoopHost}, {"coopjoin", Cmd_CoopJoin}, {"coopinfo", Cmd_CoopInfo}, {"coopbring", Cmd_CoopBring},
     {"coopdobj", Cmd_CoopDObj}, {"coopgod", Cmd_CoopGod},   {"cooplook", Cmd_CoopLook}, {"coopstate", Cmd_CoopState},
     {"coopbodydraw", Cmd_CoopBodyDraw}, {"coopanims", Cmd_CoopAnims}, {"coopcmd", Cmd_CoopCmd}, {"coopent", Cmd_CoopEnt},
     {"coophealth", Cmd_CoopHealth}, {"coopkill", Cmd_CoopKill}, {"cooplists", Cmd_CoopLists},
@@ -2670,16 +3824,38 @@ EXPORT void Coop_Init(const CoreApi* api, void* state, int fresh)
         S->sock = INVALID_SOCKET;
         S->role = NONE;
     }
+    if (!fresh && S->role != NONE && !PrepareIdentity()) {
+        S->role = NONE; S->joined = S->frozen = false;
+    }
+    HookArchiveVariables(true);
+    HookQAEndRegistration(true);
+    HookQADeferred(true);
     Log("nucleo listo (rol %d, %s)", S->role, fresh ? "estado nuevo" : "estado conservado");
     if (!steam::SelfTest()) Log("steam: FALLA la autoprueba de direcciones falsas / nombres");
 }
 
 EXPORT void Coop_Shutdown()
 {
+    g_archiveSwap.End();
+    RestoreHostRules();
+    HookArchiveVariables(false);
+    HookQADeferred(false);
+    HookQAEndRegistration(false);
+    if (!campaign_cinematics::Sync(g::gvm, false, nullptr)) {
+        // A later plugin retained our syscall wrapper. Its forwarding code
+        // must stay mapped, even though notifications have been disabled.
+        HMODULE retained = nullptr;
+        if (GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN,
+                             reinterpret_cast<LPCSTR>(&campaign_cinematics::Intercept), &retained))
+            Log("cinematic: later plugin retains syscall chain; core pinned until process exit");
+        else Log("cinematic: ERROR could not pin retained syscall chain (%lu)", GetLastError());
+    }
+    AbortSwitch("core reloaded");
     HookCgame(false);  // el puntero apunta a esta DLL, que se va a descargar
     HookDamage(false);
     HookSpawnServer(false);
     HookUsercmd(false);
+    HookReliable(false);
     HookPlayerTrace(false);
     SkipUiPauseCheck(false);
     Log("nucleo descargado");
@@ -2707,24 +3883,63 @@ EXPORT void Coop_Command(const char* name)
 
 EXPORT void __cdecl Coop_SendPacket(int sock, const void* data, int len, const netadr_t* to)
 {
-    if (S->sock != INVALID_SOCKET) SendTo(ToSock(*to), data, len);
+    if (S->sock == INVALID_SOCKET || len <= 0) return;
+    // CoD SP Netchan_Transmit writes a literal zero qport (CoD1 0x43edfb).
+    // The server routes clients by base address + qport, so several joiners
+    // behind the same IP would otherwise all control the first remote slot.
+    if (S->role == JOINER && sock == NS_CLIENT && S->qport && len >= 6) {
+        std::vector<uint8_t> packet((const uint8_t*)data, (const uint8_t*)data + len);
+        packet[4] = (uint8_t)S->qport;
+        packet[5] = (uint8_t)(S->qport >> 8);
+        SendTo(ToSock(*to), packet.data(), (int)packet.size());
+    } else SendTo(ToSock(*to), data, len);
 }
 
 // Se llama cuando la cola loopback de `sock` esta vacia: devuelve paquetes UDP del motor y
 // procesa los de control.
 EXPORT int __cdecl Coop_GetPacket(int sock, msg_t* msg, netadr_t* from)
 {
+    // Native Com_Error uses longjmp. Recover borrowed writer pointers if an
+    // I/O failure unwound its call without returning through our wrapper.
+    g_archiveSwap.End();
+    HookReliable(true);
+    if (S->role == HOST) HookDamage(true);
+    // Com_Error can unwind native asset registration out of JoinerHijack.
+    // The engine has then destroyed the local world; retrying a half-attached
+    // gamestate would leave the client frozen forever and reuse stale trees.
+    if (S->role == JOINER && S->frozen && !S->joined && g::cls_state == 0) {
+        Log("joiner: native world attachment failed: %s", g::CvarString("com_errorMessage"));
+        ForgetMovieWorld();
+        S->movieWorldSuspended = false;
+        S->role = NONE;
+        RestoreHostRules(); S->rules.received = S->rules.required = 0;
+        S->frozen = S->compatible = S->gamestateReady = false;
+        CoopStatus("Could not attach the host world. Check the game console and installed content before retrying.");
+        g::Com_Printf("^1COOP: host world attachment failed; check the native error above before retrying.\n");
+    }
     PollCmdFile();
+    HostCheckReload();
+    JoinerMapTick();
+    HostReloadTick();
+    MovieTick();
+    HostRulesTick();
+    QATick();
+    SwitchTick();
+    WriteSupervisorState();
+    HostMissileOwners();
     StatsTick();
     SteamFrame();
     UiPausedFrame();
+    MainlineContinue();
+    MainlineStartMission();
     if (S->sock == INVALID_SOCKET) return 0;
     FlushDelayed();
     if (S->role == HOST && sock == NS_SERVER) {  // corre aunque el juego este en pausa
         HostCheckReload();
         HostNoPause();
     }
-    if (!((S->role == HOST && sock == NS_SERVER) || (S->role == JOINER && sock == NS_CLIENT))) return 0;
+    const bool waitingReload = S->role == NONE && S->waitingForMap && sock == NS_CLIENT;
+    if (!((S->role == HOST && sock == NS_SERVER) || (S->role == JOINER && sock == NS_CLIENT) || waitingReload)) return 0;
     if (S->role == JOINER && !S->joined && GetTickCount() - S->lastJoinTry > 1000) JoinerSendJoin();
 
     static uint8_t buf[0x10000];
@@ -2740,20 +3955,96 @@ EXPORT int __cdecl Coop_GetPacket(int sock, msg_t* msg, netadr_t* from)
             if (S->role == HOST) HostCheckRemotes();
             return 0;
         }
-        if (S->role == HOST) {
-            int slot = FindSlot(a);
-            if (slot > 0) g_lastSeen[slot] = GetTickCount();
-        } else if (a.sin_addr.s_addr == S->host.sin_addr.s_addr && a.sin_port == S->host.sin_port) {
-            g_hostSeen = GetTickCount();
-        }
+        const bool fromHost = a.sin_addr.s_addr == S->host.sin_addr.s_addr && a.sin_port == S->host.sin_port;
+        const int peerSlot = S->role == HOST ? FindSlot(a) : -1;
+        if (S->role == JOINER && !fromHost) continue;
         if (n >= 5 && *(uint32_t*)buf == CTRL) {
             ++g_statCtrl;
-            Reader r{buf + 5, buf + n};
-            if (S->role == HOST && buf[4] == M_JOIN) HostJoin(a, r);
-            else if (S->role == HOST && buf[4] == M_BYE && FindSlot(a) > 0) HostDropRemote(FindSlot(a));
-            else if (S->role == JOINER) JoinerControl(buf[4], r);
+            const uint8_t type = buf[4];
+            suite::Identity peer{};
+            const bool hasHeader = n >= 5 + (int)sizeof peer;
+            if (hasHeader) memcpy(&peer, buf + 5, sizeof peer);
+            const char* mismatch = !hasHeader ? "Older CoDCoop protocol; install the complete 0.6 suite." : suite::Difference(g_identity, peer);
+            if (waitingReload) {
+                if (fromHost && hasHeader && !mismatch && type == M_RELOAD) {
+                    Reader pending{buf + 5 + sizeof peer, buf + n};
+                    auto token = pending.Get<reload_delivery::Token>();
+                    if (pending.Ok() && reload_delivery::Same(token, S->reloadToken)) {
+                        Writer ack(M_RELOAD_ACK); ack.Put(token); SendTo(S->host, ack.buf, ack.len);
+                    }
+                }
+                continue;
+            }
+            if (S->role == HOST && hasHeader && !mismatch && type == M_RELOAD_ACK) {
+                Reader ack{buf + 5 + sizeof peer, buf + n};
+                auto token = ack.Get<reload_delivery::Token>();
+                if (ack.Ok() && ack.p == ack.end) for (int slot = 1; slot < g::MAX_CLIENTS; ++slot) {
+                    auto& pending = S->reloadPending[slot];
+                    if (pending.address.sin_addr.s_addr == a.sin_addr.s_addr && pending.address.sin_port == a.sin_port &&
+                        reload_delivery::Acknowledge(pending.delivery, token))
+                        Log("reload: player %d acknowledged world %u", slot, token.generation);
+                }
+                continue;
+            }
+            if (S->role == HOST && (type == suite::HELLO || type == M_JOIN)) {
+                if (!g_profileReady || mismatch) {
+                    if (hasHeader && SwitchAllowsPending(peer.variant)) continue;
+                    Writer reject(suite::REJECT);
+                    const char* why = g_profileReady ? mismatch : "Host suite has not been verified.";
+                    reject.Put(why, (int)strlen(why) + 1);
+                    SendTo(a, reject.buf, reject.len);
+                    continue;
+                }
+                if (type == suite::HELLO) {
+                    Writer ready(suite::READY);
+                    SendTo(a, ready.buf, ready.len);
+                    continue;
+                }
+            } else if (S->role == HOST && peerSlot < 1) continue;
+            if (type != suite::REJECT && mismatch) continue;
+            if (!hasHeader) continue;
+            Reader r{buf + 5 + sizeof peer, buf + n};
+            if (SwitchControl(type, r, a)) continue;
+            if (S->role == HOST && type == M_WORLD_READY && peerSlot > 0) {
+                S->remote[peerSlot].worldReady = true;
+                if (*S->movie.name && MoviePlaying()) SendMovie(peerSlot);
+            }
+            else if (S->role == HOST && type == M_RULES_ACK && peerSlot > 0) {
+                uint32_t serial = r.Get<uint32_t>();
+                if (r.Ok() && r.p == r.end && serial == S->rules.serial) S->rules.ack[peerSlot] = serial;
+            }
+            else if (S->role == HOST && type == M_CINEMATIC_ACK && peerSlot > 0) {
+                uint32_t serial = r.Get<uint32_t>(); uint8_t status = r.Get<uint8_t>();
+                if (r.Ok() && serial == S->movie.serial && status <= 2 && *S->movie.name) {
+                    if (S->movie.ack[peerSlot] != status)
+                        Log("cinematic: player %d acknowledged sequence %u status %u", peerSlot, serial, status);
+                    // A delayed queued ACK must not undo the playing ACK.
+                    if (status > S->movie.ack[peerSlot]) S->movie.ack[peerSlot] = status;
+                    if (status == 2) CoopStatus("Player %d is missing campaign movie %s. Repair the suite.", peerSlot + 1, S->movie.name);
+                }
+            }
+            else if (S->role == HOST && type == M_JOIN) HostJoin(a, r);
+            else if (S->role == HOST && type == M_BYE && peerSlot > 0) {
+                bool explicitLeave = r.p < r.end && r.Get<uint8_t>() == 1;
+                HostDropRemote(peerSlot, explicitLeave);
+            }
+            else if (S->role == JOINER) {
+                if (type != suite::READY && type != suite::REJECT && !S->compatible) continue;
+                g_hostSeen = GetTickCount();
+                JoinerControl(type, r);
+            }
+            if (S->role == HOST && peerSlot > 0) g_lastSeen[peerSlot] = GetTickCount();
             continue;
         }
+        // Engine datagrams are accepted only from the selected/allocated peer.
+        if (S->role == HOST) {
+            if (peerSlot < 1 || n < 6) continue;
+            uint16_t qport; memcpy(&qport, buf + 4, 2);
+            if (qport != *(int*)(g::Client(peerSlot) + g::CL_NETCHAN + g::NC_QPORT)) continue;
+        }
+        if (S->role == JOINER && (!S->compatible || !S->joined || S->movieWorldSuspended)) continue;
+        if (S->role == HOST) g_lastSeen[peerSlot] = GetTickCount();
+        else g_hostSeen = GetTickCount();
         if (n > msg->maxsize) continue;
         if (S->role == JOINER && !S->joined) continue;
         memcpy(msg->data, buf, n);
@@ -2768,6 +4059,7 @@ EXPORT int __cdecl Coop_GetPacket(int sock, msg_t* msg, netadr_t* from)
 EXPORT void __cdecl Coop_HostFrame()
 {
     if (S->role != HOST) return;
+    HostCheckReload();
     HookCgame(true);
     HookDamage(true);
     HookSpawnServer(true);
@@ -2824,12 +4116,21 @@ EXPORT void __cdecl Coop_HostFrame()
 // (CL_Frame 0x40df80): lo avanzamos siguiendo al ultimo snapshot del host, un snapshot atras para interpolar.
 EXPORT int __cdecl Coop_FrozenFrame(int msec)
 {
+    if (S->role == JOINER && !S->joined && S->gamestateReady) {
+        S->gamestateReady = false;
+        Log("joiner: attach complete gamestate at server-frame boundary");
+        JoinerHijack();
+    }
+    // While looking for the host, do not let the independent singleplayer
+    // simulation run ahead of it. Keep rendering and servicing the handshake.
+    if (S->role == JOINER && !S->joined && g::sv_state == 2) return 1;
     if (!S->frozen) return 0;
     HookCgame(true);
     HookUsercmd(true);
     JoinerSkipPregame();
     JoinerKeepAlive();
     if (!S->frozen) return 0;  // se perdio el host
+    if (S->movieWorldSuspended) return 1; // native movie owns rendering/world until host M_RELOAD
     DrawTeamOnCompass(g_team, g_teamPos, S->slot);
     int& t = S->frozenTime;
     int latest = g::cl_snapServerTime;

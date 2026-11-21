@@ -13,6 +13,7 @@
 
 static FILE* g_log;
 static char g_dir[MAX_PATH];  // carpeta del exe, con barra final
+static HMODULE g_yap;         // process lifetime; never hot-reloaded with the coop core
 
 static void LogLine(const char* s)
 {
@@ -31,6 +32,39 @@ static void Log(const char* fmt, ...)
     vsnprintf(b, sizeof b, fmt, a);
     va_end(a);
     LogLine(b);
+}
+
+// The upstream YAP proxy checks its own filename during DLL_PROCESS_ATTACH.
+// Keep that filename in a separate directory, rather than pretending to be an
+// ASI loader or patching out the upstream initialization checks. An absolute
+// path is essential: LoadLibrary("ddraw.dll") would return our own proxy.
+static bool LoadYap()
+{
+    if (!g::uo) return true;  // YAP supports the UO engine, not CoDSP.exe.
+    char path[MAX_PATH];
+    int n = snprintf(path, sizeof path, "%splugins\\yap\\DDRAW.dll", g_dir);
+    if (n < 0 || n >= (int)sizeof path || GetFileAttributesA(path) == INVALID_FILE_ATTRIBUTES) {
+        Log("YAP: required plugin missing: plugins/yap/DDRAW.dll");
+        MessageBoxA(nullptr, "The UO co-op profile requires plugins/yap/DDRAW.dll.\n"
+                    "Repair the complete CoD Coop installation before starting this profile.",
+                    "Call of Duty Coop - incomplete installation", MB_OK | MB_ICONERROR);
+        return false;
+    }
+    g_yap = LoadLibraryExA(path, nullptr, LOAD_WITH_ALTERED_SEARCH_PATH);
+    if (!g_yap) {
+        Log("YAP: LoadLibraryEx failed (%lu): %s", GetLastError(), path);
+        MessageBoxA(nullptr, "The required YAP plugin could not be loaded.\n"
+                    "See codcoop.log and repair the complete CoD Coop installation.",
+                    "Call of Duty Coop - plugin error", MB_OK | MB_ICONERROR);
+        return false;
+    }
+    char loaded[MAX_PATH];
+    if (!GetModuleFileNameA(g_yap, loaded, sizeof loaded) || _stricmp(loaded, path)) {
+        Log("YAP: unexpected module resolved for %s", path);
+        return false;
+    }
+    Log("YAP: loaded %s at %p before coop hooks (process lifetime)", loaded, (void*)g_yap);
+    return true;
 }
 
 static FARPROC Real(const char* name)
@@ -82,7 +116,7 @@ void HookSendPacket();
 void HookGetLoopPacket();
 }
 
-static char g_cmdNames[32][32];
+static char g_cmdNames[64][32];
 static int g_numCmds;
 
 static void ReloadCore();
@@ -99,7 +133,10 @@ static void RegisterCmd(const char* name)
 {
     for (int i = 0; i < g_numCmds; ++i)
         if (!_stricmp(g_cmdNames[i], name)) return;
-    if (g_numCmds == 32 || strlen(name) >= sizeof g_cmdNames[0]) return;
+    if (g_numCmds == (int)(sizeof g_cmdNames / sizeof g_cmdNames[0]) || strlen(name) >= sizeof g_cmdNames[0]) {
+        Log("Coop: command registration capacity exceeded: %.64s", name);
+        return;
+    }
     strcpy(g_cmdNames[g_numCmds], name);
     g::Cmd_AddCommand(g_cmdNames[g_numCmds++], LoaderCmd);
 }
@@ -288,7 +325,7 @@ static void __cdecl Hook_SvFrame(int msec)
     if (!g_core.frozenFrame || !g_core.frozenFrame(msec)) g_origSvFrame(msec);
 }
 
-static void InstallHooks()
+static bool InstallHooks()
 {
     // los mismos 4 ganchos en CoD1 y en UO (solo cambian las direcciones que llevan adentro)
     uintptr_t send = g::A(0x43f290, 0x441120), getLoop = g::A(0x43f1c0, 0x441050), sendMsgs = g::A(0x44da50, 0x44fd00),
@@ -297,13 +334,14 @@ static void InstallHooks()
                           Expect(sendMsgs, "\xA1\xA4\x07\x7C\x03", 5) && Expect(svFrame, "\x51\xA1\x80\x1C\x80\x04", 6)
                     : Expect(send, "\x56\x8B\xF0\xA1\x80\x07\x4F\x01", 8) && Expect(getLoop, "\x69\xC0\x0C\x20\x00\x00", 6) &&
                           Expect(sendMsgs, "\xA1\xB8\x9D\x3F\x01", 5) && Expect(svFrame, "\x51\xA1\x20\xE9\x52\x01", 6);
-    if (!ok) return;
+    if (!ok) return false;
     g_trampSend = hook::Inline(send, (void*)HookSendPacket, 8);
     g_trampGetLoop = hook::Inline(getLoop, (void*)HookGetLoopPacket, 6);
     g_origSendClientMessages = (void (*)())hook::Inline(sendMsgs, (void*)Hook_SendClientMessages, 5);
     g_origSvFrame = (void (*)(int))hook::Inline(svFrame, (void*)Hook_SvFrame, 6);
     Log("ganchos (%s): send %p getloop %p sendmsgs %p svframe %p", g::uo ? "UO" : "CoD1", g_trampSend, g_trampGetLoop,
         (void*)g_origSendClientMessages, (void*)g_origSvFrame);
+    return g_trampSend && g_trampGetLoop && g_origSendClientMessages && g_origSvFrame;
 }
 
 // Crash sin manejar: direccion y posibles direcciones de retorno de la pila (codigo del exe o de las DLL).
@@ -344,18 +382,6 @@ BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID)
             g_log = _fsopen(p, "w", _SH_DENYWR);
         }
         Log("codcoop cargado en %s, exe base %p", GetCommandLineA(), GetModuleHandleA(nullptr));
-        // Singleplayer-Mods (SP Improved, United Fronts) bringen ihre eigene
-        // Spiellogik mit; die Co-op-Hooks werden dort nicht gebraucht und
-        // wuerden das Spiel beim Laden der Karte abstuerzen lassen.
-        const char* cmdline = GetCommandLineA();
-        if (strstr(cmdline, "sp_improved") || strstr(cmdline, "UnitedFronts")) {
-            snprintf(p, sizeof p, "%scoduo_yap.dll", g_dir);
-            if (GetFileAttributesA(p) != INVALID_FILE_ATTRIBUTES)
-                Log("Singleplayer-Mod: YAP %s", LoadLibraryA(p) ? "geladen" : "nicht geladen");
-            else
-                Log("Singleplayer-Mod erkannt - Coop-Hooks werden nicht geladen");
-            return TRUE;
-        }
         char exe[MAX_PATH];
         GetModuleFileNameA(nullptr, exe, MAX_PATH);
         if (!_stricmp(strrchr(exe, '\\') + 1, "CoD2SP_s.exe")) {  // CoD2: modulo aparte (src/cod2.cpp), en prueba
@@ -363,8 +389,19 @@ BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID)
             Log("CoD2: %s %s", p, LoadLibraryA(p) ? "cargado" : "no se pudo cargar");
             return TRUE;
         }
+        // YAP initializes during process attach, before the engine's cvars and
+        // game modules exist. Install our hooks afterwards so Expect() also
+        // detects any overlap with a different/unverified YAP build.
+        if (!LoadYap()) return FALSE;
         LoadLibraryA("ws2_32.dll");  // que winsock quede cargado aunque se descargue el nucleo
-        InstallHooks();
+        if (!InstallHooks()) {
+            Log("Coop: engine hook verification/installation failed; refusing partial initialization");
+            MessageBoxA(nullptr, "Co-op could not verify the engine hooks.\n"
+                        "The game executable or a plugin differs from this supported build.\n"
+                        "See codcoop.log and repair the complete CoD Coop installation.",
+                        "Call of Duty Coop - incompatible engine or plugin", MB_OK | MB_ICONERROR);
+            return FALSE;
+        }
         SetUnhandledExceptionFilter(CrashLog);
     }
     return TRUE;

@@ -1,0 +1,37 @@
+{
+  "mg30Cal": {
+    "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+    "member": "weapons/sp/mg30Cal",
+    "sha256": "dc9c6693e2037b40fa8368d1b71fe27c09d627eec740ae57f25629c11b2cda1f"
+  },
+  "mg30cal_de": {
+    "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+    "member": "weapons/sp/mg30cal_de",
+    "sha256": "4cfec7e5574b07daa22fac8e642f0c2edeedf052b9c2cf5b15cfbb69ade9bf61"
+  },
+  "mg34": {
+    "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+    "member": "weapons/sp/mg34",
+    "sha256": "73e25023e877ad4db30549b90efb6752f1bb6875412acc1cc0747a05e1e792ae"
+  },
+  "mg34_de": {
+    "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+    "member": "weapons/sp/mg34_de",
+    "sha256": "c27f0d776ec2b98112116bedfecc2af4eea0b74c414035916e8ef698d1bdb53d"
+  },
+  "mg42": {
+    "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+    "member": "weapons/sp/mg42",
+    "sha256": "4c5f5f19f96d887127859f492fb2abbe0d81b4697fc8562e8aaaf80d33322ea2"
+  },
+  "mg42_de": {
+    "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+    "member": "weapons/sp/mg42_de",
+    "sha256": "79969def9c7d9f490656e5455a7a8cdfa1503cf1a16327bf426273382ab12ec1"
+  },
+  "dp28": {
+    "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+    "member": "weapons/sp/dp28",
+    "sha256": "108d1058d53b86f0cd80f4df469689855813556b611c4ac40616010311c1144c"
+  }
+}

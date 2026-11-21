@@ -20,7 +20,7 @@
 //
 // Requires administrator rights (manifest): game folders usually live under
 // Program Files / Steam. Nothing else has to be prepared by hand.
-#define _WIN32_WINNT 0x0601
+#define _WIN32_WINNT 0x0A00
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <commctrl.h>
@@ -29,6 +29,7 @@
 #include <ole2.h>
 #include <shldisp.h>
 #include <urlmon.h>
+#include <wininet.h>
 #include <string>
 #include <vector>
 #include <thread>
@@ -36,6 +37,7 @@
 #include <cstdio>
 #include <cmath>
 #include <cwctype>
+#include "suite_check.h"
 
 static const wchar_t* TITLE = L"Call of Duty Coop - Setup";
 static const DWORD CODSP_SIZE = 1716224;   // CoDSP.exe 1.5: the mod uses fixed addresses of that exe
@@ -58,7 +60,7 @@ enum {
     IDC_ST_SET, IDC_ST_NAME, IDC_NAME, IDC_ST_RES, IDC_RES, IDC_FULL,
     IDC_ST_FOV, IDC_FOV, IDC_FOVNOTE, IDC_ST_Q, IDC_Q,
     IDC_FIXNOTE, IDC_ST_EXTRAS, IDC_SP, IDC_UF, IDC_MAP, IDC_EXNOTE,
-    IDC_PROGRESS, IDC_STATUS, IDC_INSTALL, IDC_QUIT
+    IDC_PROGRESS, IDC_STATUS, IDC_INSTALL, IDC_QUIT, IDC_CONFIGURE = 130
 };
 
 enum { L_DE = 0, L_EN = 1 };
@@ -69,10 +71,36 @@ enum { COD1 = 1, UO = 2, COD2 = 4 };
 #define WM_APP_STATUS (WM_APP + 1)  // wParam = percent (-1 = marquee), lParam = new wstring
 #define WM_APP_DONE   (WM_APP + 2)  // wParam = 1 ok / 0 failed, lParam = new wstring (message)
 
-static int g_ui = L_DE;       // language of this window (system language)
-static int g_game = L_DE;     // language the game is installed in (radio buttons)
+static int g_ui = L_EN;       // language of this window (system language)
+static int g_game = L_EN;     // language the game is installed in (radio buttons)
 static int g_state = S_IDLE;
+static std::wstring g_overlayOverride;
 static HWND g_dlg = nullptr;
+
+struct ChangedFile { std::wstring path, backup; bool existed; };
+static std::vector<ChangedFile> g_changes;
+static bool g_transactionActive=false;
+static void RememberFile(const std::wstring& path) {
+    if (!g_transactionActive) return;
+    for (const auto& change:g_changes) if (!_wcsicmp(change.path.c_str(),path.c_str())) return;
+    DWORD attributes=GetFileAttributesW(path.c_str());
+    bool exists=attributes!=INVALID_FILE_ATTRIBUTES;
+    if (exists && (attributes&(FILE_ATTRIBUTE_DIRECTORY|FILE_ATTRIBUTE_REPARSE_POINT)))
+        throw std::runtime_error("unsafe destination: "+suite::Utf8(path));
+    std::wstring backup;
+    if (exists) {
+        backup=path+L".coop-backup."+std::to_wstring(GetCurrentProcessId())+L"."+std::to_wstring(g_changes.size());
+        if (!CopyFileW(path.c_str(),backup.c_str(),TRUE)) throw std::runtime_error("cannot back up "+suite::Utf8(path));
+    }
+    g_changes.push_back({path,backup,exists});
+}
+static void RollbackFiles() {
+    for (auto i=g_changes.rbegin();i!=g_changes.rend();++i) {
+        if (i->existed) CopyFileW(i->backup.c_str(),i->path.c_str(),FALSE);
+        else DeleteFileW(i->path.c_str());
+    }
+    g_transactionActive=false;
+}
 
 static std::string Narrow(const std::wstring& w, UINT cp);
 static std::wstring Widen(const std::string& s, UINT cp);
@@ -189,6 +217,7 @@ static std::string ReadAll(const std::wstring& path)
 
 static bool WriteAll(const std::wstring& path, const std::string& data)
 {
+    RememberFile(path);
     HANDLE f = CreateFileW(path.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (f == INVALID_HANDLE_VALUE) return false;
     DWORD written = 0;
@@ -244,6 +273,7 @@ static std::string Resource(int id)
 // false with GetLastError() of the file
 static bool WriteResource(int id, const std::wstring& path)
 {
+    RememberFile(path);
     HRSRC r = FindResourceW(nullptr, MAKEINTRESOURCEW(id), MAKEINTRESOURCEW(10));
     HGLOBAL g = r ? LoadResource(nullptr, r) : nullptr;
     if (!g) return false;
@@ -262,8 +292,11 @@ static bool WriteResource(int id, const std::wstring& path)
 static int GamesIn(const std::wstring& dir)
 {
     bool cod1 = Exists(dir + L"\\CoDSP.exe");  // United Offensive is an expansion: same folder
-    return (cod1 ? COD1 : 0) | (cod1 && Exists(dir + L"\\CoDUOSP.exe") ? UO : 0) |
-           (Exists(dir + L"\\CoD2SP_s.exe") ? COD2 : 0);
+    int detected=(cod1 ? COD1 : 0) | (cod1 && Exists(dir + L"\\CoDUOSP.exe") ? UO : 0);
+#ifdef COOP_EXPERIMENTAL_COD2
+    detected |= Exists(dir + L"\\CoD2SP_s.exe") ? COD2 : 0;
+#endif
+    return detected;
 }
 
 static std::wstring GameNames(int games)
@@ -375,7 +408,7 @@ static std::wstring PickDir(HWND owner)
 {
     BROWSEINFOW bi{};
     bi.hwndOwner = owner;
-    bi.lpszTitle = L"Choose the game folder (the one with CoDSP.exe or CoD2SP_s.exe):";
+    bi.lpszTitle = L"Choose the Call of Duty folder (the one with CoDSP.exe):";
     bi.ulFlags = BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE;
     PIDLIST_ABSOLUTE pidl = SHBrowseForFolderW(&bi);
     if (!pidl) return L"";
@@ -590,17 +623,70 @@ public:
     HRESULT STDMETHODCALLTYPE OnObjectAvailable(REFIID, IUnknown*) override { return S_OK; }
 };
 
+static std::string ExpectedArchive(const std::wstring& name) {
+    if (name.find(L"German") != std::wstring::npos) return "5f1113e82aa11c12c3769275a5048a5e3d0fe5e38fb5929c1305883cdf515b5c";
+    if (name.find(L"Extras") != std::wstring::npos) return "9630d73e2e87331f8a115816cfda38636c10917211419a11d0d72b49c1366d3c";
+    return "c5f22a300a4186ad07755e704606bde9e2dfc9fbb3c15ac214ea7d96ec5b2f3d";
+}
+static bool VerifyArchive(const std::wstring& path, const std::string& expected) {
+    try { return suite::Hash(path)==expected; } catch (...) { return false; }
+}
 static bool Download(const std::wstring& url, const std::wstring& path, const std::wstring& label)
 {
-    DeleteFileW(path.c_str());
-    DownloadCB cb;
-    cb.label = label;
-    HRESULT hr = URLDownloadToFileW(nullptr, url.c_str(), path.c_str(), 0, &cb);
-    if (FAILED(hr) || !Exists(path)) {
-        DeleteFileW(path.c_str());
-        return false;
+    const std::string expected=ExpectedArchive(url);
+    if (Exists(path) && VerifyArchive(path,expected)) return true;
+    // WinINet is loaded dynamically so the existing build command stays valid.
+    HMODULE library=LoadLibraryW(L"wininet.dll");
+    if (!library) return false;
+    auto open=(decltype(&InternetOpenW))GetProcAddress(library,"InternetOpenW");
+    auto openUrl=(decltype(&InternetOpenUrlW))GetProcAddress(library,"InternetOpenUrlW");
+    auto query=(decltype(&HttpQueryInfoW))GetProcAddress(library,"HttpQueryInfoW");
+    auto read=(decltype(&InternetReadFile))GetProcAddress(library,"InternetReadFile");
+    auto close=(decltype(&InternetCloseHandle))GetProcAddress(library,"InternetCloseHandle");
+    if (!open || !openUrl || !query || !read || !close) { FreeLibrary(library); return false; }
+    std::wstring part=path+L".part";
+    DWORD offset=Exists(part)?FileSize(part):0;
+    const DWORD expectedSize=url.find(L"German")!=std::wstring::npos?657419767:
+                             url.find(L"Extras")!=std::wstring::npos?922302300:1036938510;
+    if (offset==expectedSize && VerifyArchive(part,expected)) return MoveFileExW(part.c_str(),path.c_str(),MOVEFILE_REPLACE_EXISTING);
+    if (offset>=expectedSize) { DeleteFileW(part.c_str()); offset=0; }
+    std::wstring headers=offset?L"Range: bytes="+std::to_wstring(offset)+L"-\r\n":L"";
+    HINTERNET session=open(L"CoDCoop-Suite/0.6",INTERNET_OPEN_TYPE_PRECONFIG,nullptr,nullptr,0);
+    HINTERNET request=session?openUrl(session,url.c_str(),headers.c_str(),(DWORD)headers.size(),
+                                    INTERNET_FLAG_RELOAD|INTERNET_FLAG_NO_CACHE_WRITE,0):nullptr;
+    bool ok=false;
+    if (request) {
+        DWORD status=0, size=sizeof status;
+        if (query(request,HTTP_QUERY_STATUS_CODE|HTTP_QUERY_FLAG_NUMBER,&status,&size,nullptr) && (status==200 || status==206)) {
+            bool rangeOk=true;
+            if (status==206) {
+                wchar_t range[128]={}; size=sizeof range;
+                std::wstring prefix=L"bytes "+std::to_wstring(offset)+L"-";
+                rangeOk=query(request,HTTP_QUERY_CONTENT_RANGE,range,&size,nullptr) && std::wstring(range).rfind(prefix,0)==0;
+            } else offset=0;
+            HANDLE file=rangeOk?CreateFileW(part.c_str(),GENERIC_WRITE,0,nullptr,offset?OPEN_EXISTING:CREATE_ALWAYS,FILE_ATTRIBUTE_NORMAL,nullptr):INVALID_HANDLE_VALUE;
+            if (file!=INVALID_HANDLE_VALUE) {
+                SetFilePointer(file,offset,nullptr,FILE_BEGIN);
+                BYTE block[65536]; DWORD got=0,written=0,total=offset;
+                ok=true; int last=-1;
+                while (true) {
+                    if (!read(request,block,sizeof block,&got)) { ok=false; break; }
+                    if (!got) break;
+                    if (got>expectedSize-total || !WriteFile(file,block,got,&written,nullptr) || written!=got) { ok=false; break; }
+                    total+=got; int pct=(int)((unsigned long long)total*100/expectedSize);
+                    if (pct!=last) { Say(label,pct); last=pct; }
+                }
+                FlushFileBuffers(file); CloseHandle(file);
+                ok=ok && total==expectedSize && VerifyArchive(part,expected);
+                if (total==expectedSize && !VerifyArchive(part,expected)) DeleteFileW(part.c_str());
+                if (ok) ok=MoveFileExW(part.c_str(),path.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH);
+            }
+        }
+        close(request);
     }
-    return true;
+    if (session) close(session);
+    FreeLibrary(library);
+    return ok;
 }
 
 // ---------------------------------------------------------------- unzip
@@ -1048,6 +1134,7 @@ static void CountTree(const std::wstring& src, int& files, unsigned long long& b
 // .bak, .bak.1, .bak.2... without overwriting an older copy
 static void Backup(const std::wstring& path)
 {
+    RememberFile(path);
     std::wstring bak = path + L".bak";
     for (int i = 1; Exists(bak); ++i) bak = path + L".bak." + std::to_wstring(i);
     MoveFileW(path.c_str(), bak.c_str());
@@ -1064,13 +1151,29 @@ static void CopyTree(const std::wstring& src, const std::wstring& dst, CopyStats
         if (name == L"." || name == L"..") continue;
         std::wstring s = src + L"\\" + name, d = dst + L"\\" + name;
         if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+            std::wstring lower=name;
+            for (wchar_t& c:lower) c=(wchar_t)towlower(c);
+            if (lower==L"save" || lower==L"saves" || lower==L"players" || lower==L"backups") continue;
             CreateDirectoryW(d.c_str(), nullptr);
             CopyTree(s, d, st, total, done);
             continue;
         }
-        if (Exists(d) && FileSize(d) == fd.nFileSizeLow) {
+        std::wstring low = name;
+        for (wchar_t& c : low) c = (wchar_t)towlower(c);
+        bool user = low == L"config.cfg" || low == L"config_mp.cfg" || low == L"uoconfig.cfg" || low == L"autoexec.cfg" ||
+                    (low.size() >= 4 && (low.substr(low.size()-4)==L".sav" || low.substr(low.size()-4)==L".svg"));
+        if (user) { ++st.kept; continue; }
+        bool equal=false;
+        if (Exists(d)) {
+            if (user) equal=true;
+            else if (FileSize(d)==fd.nFileSizeLow) {
+                try { equal=suite::Hash(s)==suite::Hash(d); } catch (...) { equal=false; }
+            }
+        }
+        if (equal) {
             ++st.kept;
         } else {
+            RememberFile(d);
             if (Exists(d)) Backup(d);
             if (!CopyFileW(s.c_str(), d.c_str(), FALSE)) {
                 ++st.failed;
@@ -1195,6 +1298,7 @@ static std::wstring PreparePayload(std::wstring& err)
     } else {
         tmp = TempPath(L"cod-coop-ready");
     }
+    if (!VerifyArchive(zip,ExpectedArchive(READY_URL))) { err=L"Base package checksum mismatch"; return L""; }
     if (!ExtractZip(zip, tmp, L("Paket wird entpackt...", "Extracting the package..."))) {
         err = L("Das Paket konnte nicht entpackt werden.", "The package could not be extracted.");
         return L"";
@@ -1210,8 +1314,7 @@ static std::wstring PreparePayload(std::wstring& err)
 
 static std::wstring PrepareGerman(std::wstring& err)
 {
-    std::wstring src = FindLocalDir({L"german", L"CoD-UO-German-Language"});
-    if (!src.empty()) return src;
+    std::wstring src; // German content is accepted only from the pinned ZIP.
     std::wstring zip = FindLocalFile({L"CoD-UO-German-Language.zip"});
     if (zip.empty()) {
         zip = TempPath(L"CoD-UO-German-Language.zip");
@@ -1223,6 +1326,7 @@ static std::wstring PrepareGerman(std::wstring& err)
         }
     }
     std::wstring tmp = TempPath(L"cod-german");
+    if (!VerifyArchive(zip,ExpectedArchive(GERMAN_URL))) { err=L"Language package checksum mismatch"; return L""; }
     if (!ExtractZip(zip, tmp, L("Sprachpaket wird entpackt...", "Extracting the language pack..."))) {
         err = L("Das Sprachpaket konnte nicht entpackt werden.", "The language pack could not be extracted.");
         return L"";
@@ -1236,7 +1340,6 @@ static std::wstring PrepareGerman(std::wstring& err)
 static bool InstallGerman(const std::wstring& dir, std::wstring& err)
 {
     std::wstring main = FindChild(dir, L"Main");
-    if (!main.empty() && Exists(main + L"\\.cod-coop-german")) return true;
 
     std::wstring src = PrepareGerman(err);
     if (src.empty()) return false;
@@ -1255,8 +1358,10 @@ static bool InstallGerman(const std::wstring& dir, std::wstring& err)
             if (low.rfind(L"localized_", 0) != 0 || low.size() < 4 || low.substr(low.size() - 4) != L".pk3") continue;
             if (!haveBackup) {
                 CreateDirectoryW(bak.c_str(), nullptr);
+                RememberFile(dst + L"\\" + n);
                 MoveFileW((dst + L"\\" + n).c_str(), (bak + L"\\" + n).c_str());
             } else {
+                RememberFile(dst + L"\\" + n);
                 DeleteFileW((dst + L"\\" + n).c_str());
             }
         }
@@ -1264,6 +1369,7 @@ static bool InstallGerman(const std::wstring& dir, std::wstring& err)
             std::wstring low = n;
             for (wchar_t& c : low) c = (wchar_t)towlower(c);
             if (low.rfind(L"localized_", 0) != 0 || low.size() < 4 || low.substr(low.size() - 4) != L".pk3") continue;
+            RememberFile(dst + L"\\" + n);
             if (!CopyFileW((from + L"\\" + n).c_str(), (dst + L"\\" + n).c_str(), FALSE)) {
                 err = L("Sprachdatei konnte nicht kopiert werden:\n", "Could not copy a language file:\n") +
                       dst + L"\\" + n;
@@ -1275,24 +1381,61 @@ static bool InstallGerman(const std::wstring& dir, std::wstring& err)
     return true;
 }
 
+static bool RestoreCanonicalEnglish(const std::wstring& dir, std::wstring& err)
+{
+    try {
+        auto inventory=suite::EnglishInventory(dir);
+        if (inventory.empty()) return true; // Existing English game, development overlay.
+        for (auto i=inventory.begin();i!=inventory.end();++i)
+            if (suite::Hash(suite::Resolve(dir,i.key()))!=i.value()) throw std::runtime_error("canonical English source changed: "+i.key());
+        for (const wchar_t* sub:{L"Main",L"uo"}) {
+            auto folder=FindChild(dir,sub);
+            for (const auto& name:ListDir(folder)) {
+                auto low=name;for(auto& c:low)c=(wchar_t)towlower(c);
+                if (low.rfind(L"localized_",0)==0 && low.size()>4 && low.substr(low.size()-4)==L".pk3") {
+                    auto file=folder+L"\\"+name;RememberFile(file);
+                    if (!DeleteFileW(file.c_str())) throw std::runtime_error("cannot remove previous localization");
+                }
+            }
+        }
+        for (auto i=inventory.begin();i!=inventory.end();++i) {
+            std::string relative=i.key().substr(std::string("coop/languages/en/").size());
+            auto destination=suite::Resolve(dir,relative);RememberFile(destination);
+            if (!CopyFileW(suite::Resolve(dir,i.key()).c_str(),destination.c_str(),FALSE) || suite::Hash(destination)!=i.value())
+                throw std::runtime_error("cannot restore canonical English file: "+relative);
+        }
+        auto marker=suite::Resolve(dir,"Main/.cod-coop-german");RememberFile(marker);DeleteFileW(marker.c_str());
+        return true;
+    } catch (const std::exception& e) { err=Widen(e.what());return false; }
+}
+
 // ---------------------------------------------------------------- extras
 
 static void WriteLaunchers(const std::wstring& dir)
 {
-    const wchar_t* mods[][2] = {{L"sp_improved", L"Start-SP-Improved.bat"},
-                                {L"UnitedFronts", L"Start-United-Fronts.bat"}};
-    for (auto& m : mods) {
-        if (FindChild(dir, m[0]).empty()) continue;
-        std::string text = "@echo off\r\ncd /d \"%~dp0\"\r\nstart \"\" CoDUOSP.exe +set fs_game ";
-        text += Narrow(m[0]);
-        text += " +set com_introplayed 1\r\n";
-        WriteAll(dir + L"\\" + m[1], text);
+    const wchar_t* profiles[][4]={{L"sp_improved",L"Start-CoD-Coop.bat",L"CoDUOSP.exe",L"sp_improved"},
+        {L"cod1",L"Start-CoD-Classic.bat",L"CoDSP.exe",L""},
+        {L"uo",L"Start-UO-Coop.bat",L"CoDUOSP.exe",L""},
+        {L"sp_improved",L"Start-SP-Improved.bat",L"CoDUOSP.exe",L"sp_improved"},
+        {L"united_fronts",L"Start-United-Fronts.bat",L"CoDUOSP.exe",L"UnitedFronts"}};
+    for (const auto& profile:profiles) {
+        std::string text="@echo off\r\ncd /d \"%~dp0\"\r\n"
+            "if not exist \"%~dp0coop\\launcher\\CoD-Coop-Launcher.exe\" (echo Windows launcher missing. Repair with a Windows 0.6 package. & exit /b 2)\r\n"
+            "start \"\" \"%~dp0coop\\launcher\\CoD-Coop-Launcher.exe\" --game \"%~dp0\" --variant "+Narrow(profile[0])+"\r\n";
+        if (!WriteAll(dir+L"\\"+profile[1],text)) throw std::runtime_error("cannot write campaign launcher");
     }
 }
 
 static bool InstallExtras(const std::wstring& dir, bool sp, bool uf, bool map, std::wstring& err)
 {
-    std::wstring src = FindLocalDir({L"extras", L"CoD-SP-Extras"});
+    bool haveSp=VerifyArchive(dir+L"\\sp_improved\\sp_improved_1.5.pk3","25c1978fb48ec9324babed270be78d2f647e0d8a3e24c2415cd88aabb012e678");
+    bool haveUf=VerifyArchive(dir+L"\\UnitedFronts\\ZUnitedFronts_1.1_beta.pk3","b4f6bb7d03477d7e77e5150af4ca88eeb3dee30e0f715edfa1e2338d3e9d1cbe");
+    if ((!sp || haveSp) && (!uf || haveUf) && (!map || Exists(dir+L"\\uo\\uomappack00.pk3"))) {
+        WriteLaunchers(dir);
+        return true;
+    }
+
+    std::wstring src = g_overlayOverride.empty()?FindLocalDir({L"suite", L"extras", L"CoD-SP-Extras"}):g_overlayOverride;
     if (src.empty()) {
         std::wstring zip = FindLocalFile({L"CoD-SP-Extras.zip"});
         if (zip.empty()) {
@@ -1305,6 +1448,7 @@ static bool InstallExtras(const std::wstring& dir, bool sp, bool uf, bool map, s
             }
         }
         std::wstring tmp = TempPath(L"cod-extras");
+        if (!VerifyArchive(zip,ExpectedArchive(EXTRAS_URL))) { err=L"Extras package checksum mismatch"; return false; }
         if (!ExtractZip(zip, tmp, L("Zusatzinhalte werden entpackt...", "Extracting the extras..."))) {
             err = L("Die Zusatzinhalte konnten nicht entpackt werden.",
                     "The extras could not be extracted.");
@@ -1390,17 +1534,38 @@ static bool EnsureCod15(const std::wstring& dir, const std::wstring& payload)
 struct Job {
     std::wstring dir;
     bool german = false;
-    std::wstring name;
-    std::wstring res;
+    std::wstring name=L"Player";
+    std::wstring res=L"1920x1080";
     bool fullscreen = true;
-    int fov = 80;
+    int fov = 96;
     int quality = Q_HIGH;
-    bool sp = false, uf = false, map = false;
+    bool sp = true, uf = true, map = false, configure = false;
 };
 static Job g_job;
 static std::wstring g_summary;
 
 static void Line(const std::wstring& text) { g_summary += text + L"\r\n"; }
+
+static void RetireOldPayload(const std::wstring& game,const std::wstring& overlay) {
+    auto oldPath=game+L"\\coop\\runtime-lock.json", newPath=overlay+L"\\coop\\runtime-lock.json";
+    if (!Exists(oldPath) || !Exists(newPath)) return;
+    auto old=suite::Json::parse(suite::Read(oldPath)).at("files");
+    auto current=suite::Json::parse(suite::Read(newPath)).at("files");
+    std::set<std::string> keep;
+    for (auto it=current.begin();it!=current.end();++it) keep.insert(suite::Lower(it.key()));
+    for (auto it=old.begin();it!=old.end();++it) {
+        std::string lower=suite::Lower(it.key());
+        std::string base=lower.substr(lower.find_last_of('/')+1);
+        bool generated=(lower.size()>=4 && lower.substr(lower.size()-4)==".pk3" && base.find("codcoop")!=std::string::npos) || lower.rfind("coop/launcher/",0)==0;
+        if (!generated || keep.count(lower)) continue;
+        auto path=suite::Resolve(game,it.key());
+        if (suite::PersonalPath(path)) continue;
+        if (Exists(path) && it.value().is_string() && suite::Hash(path)==it.value().get<std::string>()) {
+            RememberFile(path);
+            if (!DeleteFileW(path.c_str())) throw std::runtime_error("cannot retire previous runtime file");
+        }
+    }
+}
 
 static bool RunInstall(std::wstring& err)
 {
@@ -1413,9 +1578,52 @@ static bool RunInstall(std::wstring& err)
     }
 
     bool cod1 = (games & COD1) != 0;
+    std::wstring overlay = g_overlayOverride.empty()?FindLocalDir({L"suite"}):g_overlayOverride;
+    if (!cod1 || overlay.empty() || !Exists(overlay + L"\\coop\\variants.json") ||
+        !Exists(overlay + L"\\coop\\runtime-lock.json")) {
+        err = L("Ein vollstaendiges 0.6-Paket im Ordner suite neben dem Installer ist erforderlich. CoD 2 bleibt experimentell.",
+                "A complete 0.6 payload in the suite folder next to the installer is required. CoD 2 remains experimental.");
+        return false;
+    }
+    if (!Exists(overlay+L"\\coop\\launcher\\CoD-Coop-Launcher.exe")) {
+        err=L("Das Paket enthaelt keinen Windows-Launcher. Ein Linux-Paket ist keine vollstaendige Windows-Installation.",
+              "The payload has no Windows launcher. A Linux payload is not a complete Windows installation.");
+        return false;
+    }
+    std::wstring currentMain=FindChild(dir,L"Main");
+    if (!g_job.german && !currentMain.empty() && Exists(currentMain+L"\\.cod-coop-german") &&
+        !Exists(overlay+L"\\coop\\languages\\en\\manifest.json") && !Exists(dir+L"\\coop\\languages\\en\\manifest.json")) {
+        err=L("Zum Wechsel auf Englisch fehlen gepruefte englische Sprachdateien. Deutsch beibehalten oder zuerst die englische Basis wiederherstellen.",
+              "Verified English language files are needed to switch this German installation. Keep German or restore the English base first.");
+        return false;
+    }
+    auto suiteManifest=suite::Json::parse(suite::Read(overlay+L"\\coop\\variants.json"));
+    for (const auto& item:suiteManifest.at("required")) {
+        if (item.value("kind",std::string())!="base_content" || item.value("engine",std::string())!="cod1") continue;
+        std::string relative=item.at("path");
+        if (!Exists(suite::Resolve(dir,relative)) && !Exists(suite::Resolve(overlay,relative))) {
+            err=L("Urspruengliche CoD-Kampagnendaten fehlen: ","Original CoD campaign content is missing: ")+Widen(relative)+
+                L(". Die vollstaendige eigene CoD-1.5-Installation oder ein geprueftes Vollpaket wiederherstellen. Das UO-Ready-ZIP enthaelt diese CoD-Basis nicht.",
+                  ". Restore your complete owned CoD 1.5 installation or use a verified full suite payload. The UO Ready ZIP does not supply this original base content.");
+            return false;
+        }
+    }
+    g_changes.clear();
+    g_transactionActive=true;
+    RetireOldPayload(dir,overlay);
+    if (suiteManifest.contains("ignored_placeholder")) {
+        const auto& item=suiteManifest.at("ignored_placeholder");
+        if (item.value("path",std::string())=="Main/pakb.pk3" && item.value("size",0)==1) {
+            auto path=suite::Resolve(dir,"Main/pakb.pk3");
+            if (FileSize(path)==1 && suite::Hash(path)==item.at("sha256")) {
+                RememberFile(path);
+                if (!DeleteFileW(path.c_str())) throw std::runtime_error("cannot remove invalid one-byte pakb placeholder");
+            }
+        }
+    }
     std::wstring payload;
     if (cod1) {
-        payload = PreparePayload(err);
+        payload = Exists(dir + L"\\CoDUOSP.exe") ? overlay : PreparePayload(err);
         if (payload.empty()) return false;
     }
 
@@ -1465,26 +1673,24 @@ static bool RunInstall(std::wstring& err)
         if (mainDir.empty()) { CreateDirectoryW((dir + L"\\Main").c_str(), nullptr); mainDir = dir + L"\\Main"; }
         for (int i = 0; i < 4; ++i) {
             std::wstring path = (i == 2) ? mainDir + L"\\pakz_coop.pk3" : dir + L"\\" + dest[i];
-            WriteResource(ids[i], path);
+            if (Exists(path)) Backup(path);
+            if (!WriteResource(ids[i], path)) { err=L"Could not write embedded Coop module"; return false; }
         }
         CreateDirectoryW((dir + L"\\uo").c_str(), nullptr);
-        WriteResource(6, dir + L"\\uo\\pakz_coop.pk3");
-
-        // German after the game files: the package ships English paks
-        if (g_job.german) {
-            if (!InstallGerman(dir, err)) return false;
-            Line(L("Deutsches Sprachpaket installiert (Texte und Stimmen).",
-                   "German language pack installed (texts and voices)."));
-        }
+        if (Exists(dir + L"\\uo\\pakz_coop.pk3")) Backup(dir + L"\\uo\\pakz_coop.pk3");
+        if (!WriteResource(6, dir + L"\\uo\\pakz_coop.pk3")) { err=L"Could not write UO menu"; return false; }
 
         Say(L("Einstellungen werden geschrieben...", "Writing the settings..."), -1);
-        WriteSettings(dir, g_job.name, g_job.res, g_job.fullscreen, g_job.fov, g_job.quality);
-        Line(L("Einstellungen: ", "Settings: ") + g_job.res + L", " +
+        bool changedSettings=g_job.configure || !Exists(dir + L"\\Main\\config.cfg");
+        if (changedSettings)
+            WriteSettings(dir, g_job.name, g_job.res, g_job.fullscreen, g_job.fov, g_job.quality);
+        if (changedSettings) Line(L("Einstellungen: ", "Settings: ") + g_job.res + L", " +
              (g_job.fullscreen ? L("Vollbild", "fullscreen") : L("Fenster", "window")) +
              L", FOV " + std::to_wstring(g_job.fov) + L", " +
              (g_job.quality == Q_LOW ? L("niedrig", "low")
                                      : g_job.quality == Q_MED ? L("mittel", "medium") : L("hoch", "high")) +
              L", Name \"" + g_job.name + L"\"");
+        else Line(L("Vorhandene persoenliche Einstellungen bleiben erhalten.", "Existing personal settings preserved."));
 
         if (g_job.sp || g_job.uf || g_job.map) {
             if (!InstallExtras(dir, g_job.sp, g_job.uf, g_job.map, err)) return false;
@@ -1495,6 +1701,25 @@ static bool RunInstall(std::wstring& err)
             Line(L("Zusatzinhalte installiert: ", "Extras installed: ") + what);
         }
 
+        // The source overlay is applied LAST: embedded 0.5 compatibility
+        // resources must never replace the pinned development core.
+        {
+            CopyStats overlayStats; int total=0, done=0; unsigned long long bytes=0;
+            CountTree(overlay,total,bytes); CopyTree(overlay,dir,overlayStats,total,done);
+            if (g_job.german) {
+                if (!InstallGerman(dir,err)) return false;
+            } else if (!RestoreCanonicalEnglish(dir,err)) return false;
+            std::string why;
+            RememberFile(dir+L"\\coop\\install.json");
+            RememberFile(dir+L"\\coop\\profile.ini");
+            // Seal validates all pinned content and writes its receipt/profile in one pass.
+            if (overlayStats.failed || !suite::Validate(dir,true,why)) {
+                err=L("Vollstaendigkeitspruefung fehlgeschlagen: ", "Full-suite verification failed: ")+Widen(why);
+                return false;
+            }
+            Line(L("Alle erforderlichen Coop-Pakete geprueft. Spieltests sind separat dokumentiert.",
+                   "All required Coop packages verified. Gameplay tests are documented separately."));
+        }
         // the improper-quit marker makes the game ask "did your computer change?"
         DeleteFileW((dir + L"\\__CoDSP").c_str());
         DeleteFileW((dir + L"\\__CoDUOSP").c_str());
@@ -1510,6 +1735,7 @@ static bool RunInstall(std::wstring& err)
                "Friends: same version, then Host IP -> Join or a Steam invite."));
     }
 
+#ifdef COOP_EXPERIMENTAL_COD2
     if (games & COD2) {
         if (WrongSize(dir + L"\\CoD2SP_s.exe", COD2SP_SIZE)) {
             Line(L("Hinweis: CoD2SP_s.exe ist nicht 1.3 - der Co-op braucht 1.3.",
@@ -1524,13 +1750,25 @@ static bool RunInstall(std::wstring& err)
         WriteResource(5, dir + L"\\steam_api.dll");
         Line(L("Call of Duty 2 installiert (Menue \"Co-op\").", "Call of Duty 2 installed (menu \"Co-op\")."));
     }
+#endif
     return true;
 }
 
 static DWORD WINAPI Worker(LPVOID)
 {
     std::wstring err;
-    bool ok = RunInstall(err);
+    bool ok=false;
+    try { ok=RunInstall(err); }
+    catch (const std::exception& e) { err=Widen(e.what()); }
+    if (!ok) RollbackFiles();
+    else {
+        g_transactionActive=false;
+        suite::Json journal=suite::Json::array();
+        for (const auto& item:g_changes) journal.push_back({{"path",suite::Utf8(item.path)},
+            {"backup",suite::Utf8(item.backup)},{"existed",item.existed}});
+        try { suite::Write(g_job.dir+L"\\coop\\last-install-backup.json",suite::Canonical(journal)+"\n"); }
+        catch (const std::exception& e) { err=Widen(e.what()); ok=false; RollbackFiles(); }
+    }
     std::wstring* msg = new std::wstring(ok ? g_summary : err);
     PostMessageW(g_dlg, WM_APP_DONE, ok ? 1 : 0, (LPARAM)msg);
     return 0;
@@ -1545,7 +1783,7 @@ static bool g_settingName = false;
 static void EnableInputs(HWND dlg, BOOL on)
 {
     for (int id : {IDC_LIST, IDC_BROWSE, IDC_DE, IDC_EN, IDC_NAME, IDC_RES, IDC_FULL,
-                   IDC_FOV, IDC_Q, IDC_SP, IDC_UF, IDC_MAP})
+                   IDC_FOV, IDC_Q, IDC_MAP, IDC_CONFIGURE})
         EnableWindow(GetDlgItem(dlg, id), on);
 }
 
@@ -1576,18 +1814,17 @@ static void ApplyLanguage(HWND dlg)
                      "kein Maus-Lag, korrekte Helligkeit nach Alt+Tab, maximales Modell-Detail.",
                      "Applies the PCGamingWiki fixes: no intro, multicore, maxfps 125,\r\n"
                      "no mouse lag, correct brightness after Alt+Tab, max model detail."));
-    SetWindowTextW(GetDlgItem(dlg, IDC_ST_EXTRAS), L("Zusatzinhalte (optional)", "Extras (optional)"));
+    SetWindowTextW(GetDlgItem(dlg, IDC_ST_EXTRAS), L("Vollstaendiger Coop-Umfang", "Complete Coop suite"));
     SetWindowTextW(GetDlgItem(dlg, IDC_SP), L("Singleplayer Improved", "Singleplayer Improved"));
     SetWindowTextW(GetDlgItem(dlg, IDC_UF), L("United Fronts", "United Fronts"));
     SetWindowTextW(GetDlgItem(dlg, IDC_MAP), L("UO Map Pack", "UO map pack"));
     SetWindowTextW(GetDlgItem(dlg, IDC_EXNOTE),
-                   L("Zusammen ~880 MB, wird nur bei Auswahl geladen.\r\n"
-                     "Start ueber Start-SP-Improved.bat / Start-United-Fronts.bat.",
-                     "About 880 MB together, downloaded only if selected.\r\n"
-                     "Start with Start-SP-Improved.bat / Start-United-Fronts.bat."));
+                   L("SP Improved + United Fronts + YAP sind erforderlich.\r\nUO Map Pack: separater Multiplayer-Zusatz.",
+                     "SP Improved + United Fronts + YAP are required.\r\nUO Map Pack: separate multiplayer addition."));
     if (g_state == S_IDLE) SetWindowTextW(GetDlgItem(dlg, IDC_INSTALL), L("Installieren", "Install"));
     SetWindowTextW(GetDlgItem(dlg, IDC_QUIT), L("Beenden", "Quit"));
 
+    SetWindowTextW(GetDlgItem(dlg, IDC_CONFIGURE), L("Vorhandene Einstellungen aendern", "Change existing settings"));
     HWND q = GetDlgItem(dlg, IDC_Q);
     int sel = (int)SendMessageW(q, CB_GETCURSEL, 0, 0);
     SendMessageW(q, CB_RESETCONTENT, 0, 0);
@@ -1726,8 +1963,8 @@ static void OnInstall(HWND dlg)
     g_job.fullscreen = IsDlgButtonChecked(dlg, IDC_FULL) == BST_CHECKED;
     g_job.fov = fov;
     g_job.quality = (int)SendMessageW(GetDlgItem(dlg, IDC_Q), CB_GETCURSEL, 0, 0);
-    g_job.sp = IsDlgButtonChecked(dlg, IDC_SP) == BST_CHECKED;
-    g_job.uf = IsDlgButtonChecked(dlg, IDC_UF) == BST_CHECKED;
+    g_job.sp = g_job.uf = true;
+    g_job.configure = IsDlgButtonChecked(dlg, IDC_CONFIGURE) == BST_CHECKED;
     g_job.map = IsDlgButtonChecked(dlg, IDC_MAP) == BST_CHECKED;
     g_summary.clear();
     g_state = S_RUNNING;
@@ -1750,7 +1987,7 @@ static INT_PTR CALLBACK DlgProc(HWND dlg, UINT msg, WPARAM wParam, LPARAM lParam
         // language: German Windows or an already German installation -> German
         LANGID ui = GetUserDefaultUILanguage();
         g_ui = (PRIMARYLANGID(ui) == LANG_GERMAN) ? L_DE : L_EN;
-        g_game = g_ui;
+        g_game = L_EN;
 
         Detect(g_found);
         HWND cb = GetDlgItem(dlg, IDC_RES);
@@ -1762,6 +1999,10 @@ static INT_PTR CALLBACK DlgProc(HWND dlg, UINT msg, WPARAM wParam, LPARAM lParam
 
         SetDlgItemTextW(dlg, IDC_NAME, L"Soldier");
         CheckDlgButton(dlg, IDC_FULL, BST_CHECKED);
+        CheckDlgButton(dlg, IDC_SP, BST_CHECKED);
+        CheckDlgButton(dlg, IDC_UF, BST_CHECKED);
+        EnableWindow(GetDlgItem(dlg, IDC_SP), FALSE);
+        EnableWindow(GetDlgItem(dlg, IDC_UF), FALSE);
         CheckDlgButton(dlg, IDC_DE, g_game == L_DE ? BST_CHECKED : BST_UNCHECKED);
         CheckDlgButton(dlg, IDC_EN, g_game == L_DE ? BST_UNCHECKED : BST_CHECKED);
         SendMessageW(GetDlgItem(dlg, IDC_Q), CB_SETCURSEL, Q_HIGH, 0);
@@ -1798,9 +2039,9 @@ static INT_PTR CALLBACK DlgProc(HWND dlg, UINT msg, WPARAM wParam, LPARAM lParam
             std::wstring d = PickDir(dlg);
             if (d.empty()) return TRUE;
             if (!GamesIn(d)) {
-                MessageBoxW(dlg, L("In diesem Ordner liegt kein CoDSP.exe oder CoD2SP_s.exe.\n"
+                MessageBoxW(dlg, L("In diesem Ordner liegt kein CoDSP.exe.\n"
                                    "Bitte den Ordner waehlen, in dem Call of Duty installiert ist.",
-                                   "That folder has no CoDSP.exe or CoD2SP_s.exe.\n"
+                                   "That folder has no CoDSP.exe.\n"
                                    "Choose the folder where Call of Duty is installed."),
                             TITLE, MB_ICONWARNING);
                 return TRUE;
@@ -1883,6 +2124,40 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, LPWSTR, int)
     INITCOMMONCONTROLSEX icc{sizeof icc, ICC_PROGRESS_CLASS | ICC_STANDARD_CLASSES};
     InitCommonControlsEx(&icc);
 
+    // Unattended deployment uses exactly the GUI's worker implementation.
+    // No release URL, executable or command is accepted from the network.
+    int argc=0; LPWSTR* argv=CommandLineToArgvW(GetCommandLineW(),&argc);
+    bool unattended=false;
+    for (int i=1;argv && i<argc;++i) {
+        if (!wcscmp(argv[i],L"--yes")) unattended=true;
+        else if (!wcscmp(argv[i],L"--game") && i+1<argc) g_job.dir=argv[++i];
+        else if (!wcscmp(argv[i],L"--suite-source") && i+1<argc) g_overlayOverride=argv[++i];
+        else if (!wcscmp(argv[i],L"--language") && i+1<argc) {
+            std::wstring lang=argv[++i];
+            if (lang!=L"de" && lang!=L"en") { LocalFree(argv); return 2; }
+            g_job.german=lang==L"de";
+        } else if (!wcscmp(argv[i],L"--repair")) g_job.configure=false;
+        else { LocalFree(argv); return 2; }
+    }
+    if (argv) LocalFree(argv);
+    if (unattended) {
+        if (g_job.dir.empty() || g_overlayOverride.empty()) return 2;
+        std::wstring error; bool ok=false;
+        try { ok=RunInstall(error); }
+        catch (const std::exception& e) { error=Widen(e.what()); }
+        if (!ok) RollbackFiles();
+        else {
+            g_transactionActive=false;
+            suite::Json journal=suite::Json::array();
+            for (const auto& item:g_changes) journal.push_back({{"path",suite::Utf8(item.path)},
+                {"backup",suite::Utf8(item.backup)},{"existed",item.existed}});
+            try { suite::Write(g_job.dir+L"\\coop\\last-install-backup.json",suite::Canonical(journal)+"\n"); }
+            catch (...) { RollbackFiles(); ok=false; }
+        }
+        CoUninitialize();
+        return ok?0:1;
+    }
+    if (!g_job.dir.empty() || !g_overlayOverride.empty()) return 2;
     HRSRC r = FindResourceW(nullptr, MAKEINTRESOURCEW(200), MAKEINTRESOURCEW(5));  // RT_DIALOG
     if (!r) {
         MessageBoxW(nullptr, L"Installer resource missing.", TITLE, MB_ICONERROR);

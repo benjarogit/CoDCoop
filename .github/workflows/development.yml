@@ -1,0 +1,63 @@
+name: CoDCoop development gates
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  tools:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    runs-on: ${{ matrix.os }}
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: tools/requirements-launcher.txt
+      - run: python -m pip install -r tools/requirements-launcher.txt
+      - run: python -m unittest discover -s tests -v
+  engine-build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y g++-mingw-w64-i686
+      - run: ./build.sh
+      - run: g++ -std=c++17 -Wall -Wextra -fsanitize=address,undefined tests/test_suite_protocol.cpp -o build/test_suite_protocol && ./build/test_suite_protocol
+      - run: g++ -std=c++17 -Wall -Wextra -fsanitize=address,undefined tests/test_anim_fragments.cpp -o build/test_anim_fragments && ./build/test_anim_fragments
+      - run: g++ -std=c++17 -Wall -Wextra -fsanitize=address,undefined tests/test_cinematics.cpp -o build/test_cinematics && ./build/test_cinematics
+      - run: g++ -std=c++17 -Wall -Wextra -fsanitize=address,undefined tests/test_patch_ownership.cpp -o build/test_patch_ownership && ./build/test_patch_ownership
+      - run: g++ -std=c++17 -Wall -Wextra -fsanitize=address,undefined tests/test_pregame_gate.cpp -o build/test_pregame_gate && ./build/test_pregame_gate
+      - run: g++ -std=c++17 -Wall -Wextra -fsanitize=address,undefined tests/test_host_rules.cpp -o build/test_host_rules && ./build/test_host_rules
+      - run: g++ -std=c++17 -Wall -Wextra -fsanitize=address,undefined tests/test_archive_rules.cpp -o build/test_archive_rules && ./build/test_archive_rules
+      - run: g++ -std=c++17 -Wall -Wextra -fsanitize=address,undefined tests/test_reload_delivery.cpp -o build/test_reload_delivery && ./build/test_reload_delivery
+      - name: Upload development binaries (not a gameplay certification)
+        uses: actions/upload-artifact@v4
+        with:
+          name: development-engine-binaries
+          path: |
+            build/ddraw.dll
+            build/codcoop_core.dll
+            build/suite-check.exe
+  native-checker-windows:
+    needs: engine-build
+    runs-on: windows-2022
+    env:
+      COOP_NATIVE_CHECKER: build/suite-check.exe
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          name: development-engine-binaries
+          path: build
+      - name: Native receipt interoperability (no game or Windows 10/11 certification)
+        run: python -m unittest discover -s tests -p test_installer_native.py -v

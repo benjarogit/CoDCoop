@@ -1,297 +1,197 @@
+<div align="center">
+
 # Call of Duty Coop
 
-Play the **Call of Duty 1 (2003)** campaign, the **United Offensive** expansion and the **Call of Duty 2** campaign in co-op with friends: up to 4 players, through Steam, over the internet by IP, or on a local network.
+**The original campaigns. One squad.**
 
-**[⬇ Windows: `Install-CoD-Coop.exe`](https://github.com/benjarogit/CoDCoop/releases/latest)** — double-click. A real setup window: it finds the game, asks for language, name, resolution, FOV and quality, and installs Call of Duty 1.5 + United Offensive 1.51 with the mod. It downloads the ~1 GB package itself. No disc image, no patch wizard, no console window.
+[![Development](https://img.shields.io/badge/0.6.0-development-orange)](#development-status)
+![Players](https://img.shields.io/badge/players-2%E2%80%934-blue)
+![Windows target](https://img.shields.io/badge/target-Windows%2010%20%2F%2011-0078D4)
+![Linux](https://img.shields.io/badge/Linux-Wine%20%2F%20Proton-FCC624)
+[![License](https://img.shields.io/badge/CoDCoop-MIT-green)](LICENSE)
 
-**Linux:** one command, nothing to unpack:
+**English** · [Deutsch](README.de.md)
 
-```sh
-curl -fsSL https://raw.githubusercontent.com/benjarogit/CoDCoop/master/tools/install.sh | sh
-```
+[Installation](#installation) · [Campaigns](#campaigns) · [Play together](#play-together) · [Development status](#development-status) · [Building and tests](#building-and-tests)
 
-**[⬇ Offline: `Call of Duty - UO Coop Ready.zip` (~1 GB)](https://github.com/benjarogit/CoDCoop/releases/download/v0.5.4/Call-of-Duty-UO-Coop-Ready.zip)** — for installing without internet later: extract, run `Install-CoD-Coop.exe` (Windows) or `install-linux.sh` (Linux). The German language pack (`CoD-UO-German-Language.zip`, ~630 MB) and the optional singleplayer extras (`CoD-SP-Extras.zip`, ~880 MB) are separate downloads; the installers pick them up automatically when they are next to the exe or download them on demand.
+</div>
 
-**MEGA mirror:** [ready package](https://mega.nz/file/RMw1QS6B#Elowfq-rcNcMqxUUGDwIXeFbijHOzP5TpoSdNxl36mA) ·
-[German pack](https://mega.nz/file/5cpi1LzL#F2kXKeDcP8Rz45oYRgPfcUUTvCdONDtEmDrnJLuAkmg) ·
-[SP extras](https://mega.nz/file/FVYT3Coa#x0StdxHWj2a0lP5uHIZcuASlQWo2_J6SBQw8mg7dH5c)
+> **0.6 is under development.** This branch implements the complete-suite upgrade;
+> it is not a verified full-campaign release. The existing [v0.5.4 release](https://github.com/benjarogit/CoDCoop/releases/tag/v0.5.4)
+> predates this work and does **not** provide Coop for SP Improved or United Fronts.
+> A successful install or short connection test does not certify a campaign.
 
-> **This is a fork** of [TheTiranix/CoDCoop](https://github.com/TheTiranix/CoDCoop), maintained here.
-> It adds first-class Linux support — cross-build, native installer, the Proton/`ddraw` fixes and the
-> Steam overlay/friends-list integration — see [Linux (Proton / Wine)](#linux-proton--wine).
-> Windows works exactly as before.
+## Campaigns
 
-## Features
+**Recommended main campaign: CoD + UO — Improved Coop.** Start with the first
+CoD campaign, keep the SP Improved 1.5 AI/gameplay improvements, watch the original
+CoD closing sequence, then continue into UO with the same group. This route uses
+the UO engine throughout. The credits→UO bridge has passed a targeted two-client
+test; full campaign playthroughs remain part of acceptance.
+Classic profiles and United Fronts remain separate choices.
 
-- **The original campaign, together.** One player hosts: the mission runs on their PC, with the game's own AI, scripts and objectives. The others join their game and play it with them.
-- **Down, not dead.** If you get killed you go down, and a teammate revives you by holding *Use* for 3 seconds. If everyone goes down, you go back to the last checkpoint.
-- **Mission after mission.** When the host moves on to the next level, everyone else follows automatically.
-- **Vehicles.** Teammates ride along with the host and can shoot from the vehicle. On tanks they ride on top with an infantry weapon.
-- **Nobody gets left behind.** Anyone who stays too far from the host for a few seconds reappears right behind them.
-- **Steam or IP.** With Steam there are no ports to open: your friends see you in the menu and join with one click.
-- **Drop in, drop out.** If someone disconnects, their slot is freed and they can join again.
-- **On screen.** Teammates show up on the compass (not yet in United Offensive), with messages when someone is down or being revived.
-- **United Offensive too.** The same install works for the expansion if it is in the same folder: start `CoDUOSP.exe` and use its Co-op menu.
-- **Call of Duty 2 too.** Same idea for the Call of Duty 2 campaign: see [Call of Duty 2](#call-of-duty-2) below.
-- **Same difficulty as the game.** Friendly fire is off by default and can be turned on in the Co-op menu.
-- **No collisions between teammates.** Players can walk through each other, so nobody gets stuck when spawning together.
 
-## Requirements
-
-- **Call of Duty 1 version 1.5** for Windows, on every PC that will play.
-- For the expansion: **United Offensive 1.51** in the same folder — included in the ready package.
-- For Call of Duty 2: **version 1.3** (`CoD2SP_s.exe`).
-- The mod installed on all of those PCs.
-
-## Install
-
-### One action (recommended)
-
-**Windows**
-
-1. Download `Install-CoD-Coop.exe` from the [latest release](https://github.com/benjarogit/CoDCoop/releases/latest).
-2. Double-click it and accept the game folder (it finds it itself: Steam,
-   AnkerGames, registry or portable, and asks when there are several).
-3. If Windows shows "Windows protected your PC", click **More info** →
-   **Run anyway** (the installer is not signed).
-
-The setup asks for
-
-* the game folder (all detected installs are listed: Steam — every library —,
-  AnkerGames, registry, portable; pick one or browse to it),
-* the game language: **German** (downloads the German language pack once) or English,
-* your player name, resolution and fullscreen/windowed,
-* **FOV** and **quality** (low/medium/high),
-* optional **extras**: SP Improved, United Fronts, the UO map pack and the
-  Kar98k FOV fix.
-
-Then it does the rest:
-
-* installs **Call of Duty 1.5** if `CoDSP.exe` is another version (the old one
-  stays as `CoDSP.exe.bak`),
-* downloads the ready package (~1 GB) once and unpacks it,
-* copies **United Offensive 1.51** and the mod into the game folder, keeping
-  existing files as `.bak`,
-* applies the sensible PCGamingWiki fixes: Hor+ FOV, `com_maxfps 125` (footsteps
-  stay audible), `com_hunkmegs 256` (no UO quick-save crash), multicore renderer,
-  skipped intro, and no `WIN_*` start dialogs after an unclean exit,
-* installs the German language pack if chosen (English paks are kept in
-  `localized_backup/`),
-* writes the settings into `Main/config.cfg` and `uo/config.cfg`.
-
-**Linux**
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/benjarogit/CoDCoop/master/tools/install.sh | sh
-```
-
-That downloads the package, extracts it and runs the same setup as a terminal
-wizard: it finds the game folder by itself (Steam libraries, AnkerGames, current
-folder), then asks the same questions (language, name, resolution, FOV, quality,
-extras) and writes the same files. Everything can also be passed as flags for an
-unattended run:
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/benjarogit/CoDCoop/master/tools/install.sh | sh -s -- \
-  --yes --language de --name Soldat --resolution 1920x1080 --fov 96 --quality hoch
-```
-
-Add `--check` to verify an installation afterwards:
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/benjarogit/CoDCoop/master/tools/install.sh | sh -s -- --check
-```
-
-### Offline package
-
-`Call of Duty - UO Coop Ready.zip` (~1 GB) contains everything already: `game/`
-with CoD 1.5, United Offensive 1.51, the mod and both installers. Extract it and
-run `Install-CoD-Coop.exe` (Windows) or `install-linux.sh` (Linux) from that
-folder — no download, no disc image, no patch wizard.
-
-For a fully offline setup put these next to the installer first:
-
-| File | Size | What it is |
+| Variant | What you play | Runtime |
 |---|---|---|
-| `CoD-UO-German-Language.zip` | ~630 MB | German text and voices for CoD and UO ([MEGA](https://mega.nz/file/5cpi1LzL#F2kXKeDcP8Rz45oYRgPfcUUTvCdONDtEmDrnJLuAkmg)) |
-| `CoD-SP-Extras.zip` | ~880 MB | SP Improved, United Fronts, UO map pack, Kar98k fix ([MEGA](https://mega.nz/file/FVYT3Coa#x0StdxHWj2a0lP5uHIZcuASlQWo2_J6SBQw8mg7dH5c)) |
+| Call of Duty | The original 2003 campaign | CoD 1.5 |
+| United Offensive | The original expansion campaign | UO 1.51 + YAP |
+| SP Improved 1.5 | CoD/UO missions with the mod's gameplay and quality improvements | UO + YAP |
+| United Fronts 1.1 beta | Its original and custom missions, campaign-order settings and special weapons | UO + YAP |
 
-The installers look for `german/` and `extras/` folders (or the ZIPs themselves)
-next to the exe and use them instead of downloading.
+Each variant keeps its own rules and saves. They are **not merged into one mod**.
+The complete pinned set is required on every Coop machine; language, resolution
+and other personal display settings remain local. German and English gameplay
+installations are intended to be compatible. Untranslated custom content keeps
+its original language.
 
-## Linux (Proton / Wine)
+In UO-based profiles, the host's sprint and jump-shot settings also govern client
+prediction. Your previous local values are restored when you leave. The launcher
+shows the verified suite version and the latest local save for each campaign;
+joining always follows the host's progress.
 
-The mod is a Windows mod and runs on Linux through Proton. Everything below was
-set up and tested on Linux with the **AnkerGames launcher** and Proton 11.0, on an
-NVIDIA card and with Mesa/llvmpipe:
+**Call of Duty 2 is experimental and outside the current completion target.**
+The UO Map Pack is an ordinary multiplayer extra, not a collection of new Coop
+campaign missions.
 
-1. Install the game and the launcher as usual. Then run the [one command from
-   Install](#install): it installs Call of Duty 1.5, United Offensive 1.51 and
-   the mod into the game folder by itself.
-2. When the launcher warns that the files changed, click **Keep my files**:
+## Play together
 
-   ![Launcher warning: click "Keep my files"](docs/screenshots/launcher-keep-files.png)
+The host runs the shared world: AI, objectives, scripts and progress. Up to three
+other players join. The implementation includes player bodies and animations,
+friendly-fire settings, downed players and reviving, checkpoint recovery,
+mission changes and vehicle passengers.
 
-   *Repair* puts the original files back and removes the mod.
-3. If the game closes right after the intro with **"Buffer overrun detected!"**,
-   that is an old-engine problem with modern GPU drivers, not the mod. Two
-   environment variables fix it:
+The 0.6 work extends that behavior to the additional variants and their mechanics.
+The goal is for every player to participate in objectives. An exclusive scripted
+vehicle or cinematic role remains with the host; the others receive appropriate
+passenger, gunner or shared-scene behavior. This is a development target until
+its mission tests pass.
 
-   ```sh
-   export __GL_ExtensionStringVersion=15000   # NVIDIA
-   export MESA_EXTENSION_MAX_YEAR=2003        # AMD / Intel (Mesa)
-   ```
+1. Start **CoDCoop Launcher** and choose a campaign variant.
+2. The host selects **Host** and starts a mission. Other players select **Join**.
+3. Use the host's IP for LAN/direct-IP play, or the Steam join integration when
+   its prerequisites are met.
+4. Only the host chooses a new campaign. The group must be ready, the current
+   game must be saved at a safe point, then the launchers restart and reconnect.
 
-   Under a launcher, put those two lines in a small wrapper around `umu-run` (or
-   `proton`) and restart the launcher completely, including its tray icon. The
-   same wrapper has to add `WINEDLLOVERRIDES="${WINEDLLOVERRIDES:+$WINEDLLOVERRIDES;}ddraw=n,b"`
-   — without it Wine uses its own `ddraw.dll` and the mod is not loaded (no
-   *Co-op* entry, no `codcoop.log`). The ready-made wrapper is in
-   [docs/linux.md](docs/linux.md), section 1.
-4. **Steam overlay / friends list:** Steam only injects its overlay into games it
-   launches itself. The wrapper above hands the launch to Steam when `CoDSP.exe`
-   exists as a non-Steam game, so starting from AnkerGames still gives you
-   Shift+Tab and the friends list. Without that entry the game and the mod still
-   work, but the overlay is missing.
-5. On the first start Call of Duty may ask whether the hardware changed (the
-   launcher's config comes from another PC). Click **Ja** once — the game then
-   stores the values it detected and the question does not come back.
+The host owns the saves. Keep that host's saves to continue a campaign. There is
+no automatic host migration. During ordinary play, opening the host's pause menu
+does not pause connected teammates; mission start/end screens retain their
+required behavior.
 
-Full guide, including the wrapper, the start check the launcher shows and the
-Steam prerequisites: **[docs/linux.md](docs/linux.md)**.
+<details>
+<summary>Connection requirements</summary>
 
-**Steam friend invites — prerequisites on every PC** (Windows and Linux):
+Direct IP uses **UDP 28960** by default. LAN uses the host's local address;
+Internet IP play requires forwarding that UDP port to the host.
 
-1. Steam is running and signed in.
-2. Spacewar (AppID 480) is installed once — it is free, and both installers offer
-   to open it at the end (`steam://install/480`).
-3. The game has to see Steam:
-   * **Linux:** start the game **through Steam** — *Add a Non-Steam Game* →
-     `CoDSP.exe`, then set Proton for that entry. A game started by the launcher
-     alone does not see Steam. In the shortcut's *Launch Options* put:
+Steam uses **Spacewar, AppID 480**. Each player needs their own signed-in Steam
+account. Under Linux, use the Steam/Proton launch route described in
+[the Linux guide](docs/linux.md). A local two-process IP test does not prove
+Steam invitation behavior across two computers.
 
-     ```
-     WINEDLLOVERRIDES="ddraw=n,b" __GL_ExtensionStringVersion=15000 MESA_EXTENSION_MAX_YEAR=2003 %command%
-     ```
+</details>
 
-     The first part is required: Wine otherwise uses its own `ddraw.dll` and the
-     mod is not loaded at all (no *Co-op* entry, no `codcoop.log`). The two
-     variables are the OpenGL fix from step 3.
-   * **Windows:** starting it normally is enough (also from AnkerGames); the mod
-     finds the running Steam by itself.
+## Installation
 
-Without those the mod logs `steam: no disponible ... solo por IP`, and joining by
-IP still works (UDP 28960). Host and client only have to match on **Call of Duty
-1.5** and the mod version — Windows and Linux can play together.
+**Requirements:** an existing Call of Duty installation, enough disk space for
+UO and the full extra set, 64-bit Windows 10/11 or x86_64 Linux with a working Wine/Proton
+runtime. The Linux graphical bundles require glibc 2.35 or newer (Ubuntu 22.04
+baseline). Game files are not stored in this source repository.
 
-### Building and installing on Linux
-
-The sources build on Linux with a MinGW cross compiler, and the mod can be
-installed without Wine:
-
-```sh
-sudo apt install g++-mingw-w64-i686
-./build.sh                                                  # the three DLLs
-python3 tools/install-linux.py --game "/path/to/Call of Duty"                # latest GitHub release (mod only)
-python3 tools/install-linux.py --game ".../Call of Duty" --build build       # from ./build.sh
-python3 tools/install-linux.py --game ".../Call of Duty" --check             # verify
-```
-
-The ready package ships the same script next to `game/`, so the normal Linux
-install is just:
-
-```sh
-python3 install-linux.py            # auto-detects the game folder
-```
-
-The script insists on Call of Duty **1.5** before touching anything, keeps a
-`.bak` of replaced files and also handles a lowercase `main/` folder. Details in
-**[docs/linux.md](docs/linux.md)**.
-
-## Play
-
-1. Start Call of Duty as usual and open **Co-op** in the main menu.
-2. **Host:** click **Host game** (a green line confirms the port is open) and then pick **New Game** or **Load Game**.
-3. **Everyone else:** click **Join <name>** (Steam friends) or type the host's IP and click **Join**.
-
-In the same menu (also during the game, from the pause menu):
-- **Friendly fire: Yes/No** is decided by the host.
-- **Disconnect** leaves the co-op game: a player who joined goes back to the main menu; if the host clicks it, everyone else goes back to the menu and the host keeps playing alone.
-
-### Through Steam (no ports to open)
-
-- Everyone needs Steam and the game running.
-- When the host starts a game, their Steam friends get a **Join <name>** button in the Co-op menu.
-- You can also use the Steam friends list: right-click the host → **Join Game** (with the game already running).
-- While the game is running, Steam shows "Playing Spacewar": that is expected, co-op uses that Steam test app (AppID 480) to connect.
-
-### Over the internet by IP
-
-- The host opens **UDP port 28960** on their router (forwarded to their PC) and gives the others their public IP.
-- On the same home network the host's local IP is enough (`ipconfig`).
-- If you can't open ports: use a virtual network program (for example Radmin VPN or ZeroTier) and the IP it gives the host.
-
-### Console commands
-
-| Command | What it does |
+| Platform | 0.6 installation route |
 |---|---|
-| `coophost [port]` | Hosts a game (port 28960 if not given) |
-| `coopjoin <ip>[:port]` | Joins the game at that IP |
-| `coopjoin steam:<SteamID>` | Joins that player's game through Steam |
-| `set coop_friendlyfire 1` | Turns friendly fire on (on the host) |
-| `coopleave` | Leaves the co-op game (same as the Disconnect button) |
+| Windows | Native setup window; complete pinned local suite payload during development |
+| Linux | Graphical AppImage assistant; terminal backend also available |
+| Offline | The same pinned payload and required game data, available locally |
 
-## Call of Duty 2
+The setup checks content and runtime hashes, preserves personal configurations
+and saves during repair, and creates an installation receipt. Missing or modified
+required files prevent a successful final check. Language changes are explicit;
+repair does not silently replace your settings.
 
-The Call of Duty 2 campaign works the same way: the host runs the mission and up to 3 friends join it.
+**0.6 download links will appear only after an actual prerelease is built and
+published.** Do not combine a 0.5.4 installer with arbitrary new DLLs and assume
+that the full suite is installed. GitHub is the primary release location; MEGA
+mirrors must identify the same version and checksums.
 
-1. Start Call of Duty 2 (single player) and open **Co-op** in the main menu.
-2. **Host:** click **Host game**, then start or load a mission as usual (New Game, Mission Select, Resume).
-3. **Everyone else:** click **Join <name>** (Steam friends) or type the host's IP and click **Join**. Your game loads the host's mission by itself.
+For local development payloads and exact commands see
+[development installation](docs/development-0.6.md).
 
-- **Steam:** same as in Call of Duty 1 (no ports to open; Steam shows "Playing Spacewar"). Friends can also join from the Steam friends list (right-click the host → **Join Game**).
-- **By IP:** connections use **UDP port 28962** (the host opens it on their router when playing over the internet, or uses a virtual network such as Radmin VPN or ZeroTier).
-- Teammates see each other (standing, crouching, prone, with the weapon in hand), shoot, ride the host's vehicles, show up on the compass and revive each other.
-- The pause menu does not stop the game while teammates are connected. The **Co-op** window (also from the pause menu) has **Friendly fire** (the host decides) and **Disconnect**.
-- Console: `coop2host`, `coop2join <ip>`, `coop2join steam:<SteamID>`, `coop2leave`, `set coop2_friendlyfire 1`.
-- Uninstall: delete `ddraw.dll`, `cod2coop.dll`, `steam_api.dll` and `main\zz_coop2.iwd` from the Call of Duty 2 folder (and remove `.bak` from `ddraw.dll.bak` or `steam_api.dll.bak` if there are any).
+<details>
+<summary>Repair, backups and rollback</summary>
 
-## Troubleshooting
+Use the setup's check/repair operation for a damaged installation. Replacing a
+file with another file of the same size is detected by its hash. Installation
+attempts keep a transaction journal and restore changed files on failure.
 
-- **After "Host game" there is no New Game / Load Game / Credits in the menu.**
-  That was a menu bug while hosting: update to a current build (see
-  [docs/menu-hosting-fix.md](docs/menu-hosting-fix.md)). It is fixed in the menu
-  that ships with the installer.
-- **Linux / Proton: the game crashes or the launcher wants to repair the install.**
-  See [Linux (Proton / Wine)](#linux-proton--wine) above and
-  [docs/linux.md](docs/linux.md).
-- **Steam is not available, only IP joining.** Without a running Steam inside the
-  Proton prefix the mod logs `steam: no disponible ... solo por IP`. IP joining
-  still works (UDP 28960).
-- **A dialog mentions `WIN_IMPROPER_QUIT` (the last game did not end properly).**
-  Click **Nein** to start normally or **Ja** for safe mode; **Abbrechen** does not
-  start the game. The game keeps a marker file `__CoDSP` next to `CoDSP.exe`
-  while it runs and removes it on a normal exit — killing the process leaves it
-  behind. This is the stock game, not the mod; see
-  [docs/linux.md](docs/linux.md#after-a-crash-the-improper-quit-prompt).
+The Linux backend exposes `--rollback latest` (or a recorded transaction ID).
+Keep the generated backups until you have checked the new installation.
 
-## Uninstall
+</details>
 
-Delete `ddraw.dll`, `codcoop_core.dll`, `steam_api.dll`, `main\pakz_coop.pk3`, `uo\pakz_coop.pk3` and the `codcoop_tmp` folder from the game folder. If there are `.bak` files (`ddraw.dll.bak`, `steam_api.dll.bak`), remove the `.bak` from their names.
+<details>
+<summary>Linux startup and display fixes</summary>
 
-United Offensive (if you installed it from the ready package): delete `CoDUOSP.exe`, `CoDUOMP.exe`, `uo_gamex86.dll`, `uo_cgamex86.dll`, `uo_uix86.dll` and the `uo` folder. `CoDUOSP.exe.bak` (if present) is the previous exe.
+Wine must load the mod's `ddraw.dll` using `WINEDLLOVERRIDES="ddraw=n,b"`.
+Older OpenGL engines can overflow on modern extension strings. The launcher
+sets `__GL_ExtensionStringVersion=15000` and `MESA_EXTENSION_MAX_YEAR=2003`.
+See [Linux / Proton details](docs/linux.md).
 
-## How it works
+</details>
 
-Under the hood, CoD1's single player is a Quake 3 server and client in the same process. The mod replaces `ddraw.dll` to hook into the game: the host runs the real mission and the others connect to its server as clients, over UDP or through the Steam network. Technical notes (in Spanish) are in [notes/ARQUITECTURA.md](notes/ARQUITECTURA.md).
+## Development status
 
-## Building
+The release gate is **complete tested campaigns**, not merely successful map
+loads. Native Windows 10/11 tests, Steam with separate accounts, all campaign
+playthroughs and the extra mechanics must be recorded before a stable release.
 
-You need 32-bit MinGW-w64 (i686), Python 3 and the 32-bit `steam_api.dll` from the Steamworks SDK.
+- [Implementation and test handoff](docs/HANDOFF-0.6.md)
+- [Campaign inventory and compatibility](docs/campaign-compatibility.md)
+- [YAP compatibility and pinned source](docs/yap-compatibility.md)
+- [English / German changelog](CHANGELOG.md)
 
-1. Put a copy of the game in `game\` (not included in the repo) and set the MinGW and `steam_api.dll` paths in `build.bat`.
-2. Run `build.bat`. It builds `build\ddraw.dll`, `build\codcoop_core.dll`, `build\cod2coop.dll`, `game\main\pakz_coop.pk3` and the installer `build\Install CoD Coop.exe`. For Call of Duty 2, put a copy of it in `game2\`: the build also copies the mod there and makes `game2\main\zz_coop2.iwd`.
+Tests deliberately distinguish connection/mechanics smoke tests from actual
+mission completion. They use isolated game copies and do not modify your live
+installation. Missing tests remain open; no platform or campaign is certified
+by inference from Wine or a screenshot.
 
-## License
+## Building and tests
 
-[MIT](LICENSE). Call of Duty belongs to Activision and `steam_api.dll` belongs to Valve: they are not part of this code.
+On Linux install the 32-bit MinGW-w64 toolchain, then run:
+
+```sh
+./build.sh
+python3 -m unittest discover -s tests -v
+g++ -std=c++17 tests/test_suite_protocol.cpp -o build/test_suite_protocol
+./build/test_suite_protocol
+```
+
+The Python tooling requires Python 3.10 or later. Graphical development tools
+use PySide6. See [development commands](docs/development-0.6.md) for native
+checker tests, isolated Wine tests, payload building and AppImage packaging.
+
+<details>
+<summary>Architecture and research tools</summary>
+
+The host runs the game's own single-player server. The loader bridges its
+loopback networking to remote clients and supplies state normally shared in
+process memory. The core can be reloaded during development; incompatible code
+or content requires matching participants.
+
+[Ghidra and REA](https://github.com/morluto/rea) help investigate specific engine
+functions and failures. [Co-op Anything](https://github.com/cranebeaker/coop-anything)
+provides testing and reverse-engineering methods. Using these tools does not
+itself prove compatibility: behavior must be tested in real game clients.
+
+Original technical notes: [architecture](notes/ARQUITECTURA.md).
+
+</details>
+
+## Credits and licenses
+
+Maintained fork of [TheTiranix/CoDCoop](https://github.com/TheTiranix/CoDCoop).
+CoDCoop source: [MIT](LICENSE). YAP is a separate
+[GPL-3.0 component](third_party/yap/LICENSE); retain its source/version information
+and license when packaging. Credits for SP Improved, United Fronts and their
+included community content remain with their authors. Call of Duty belongs to
+Activision; Steam components belong to Valve.

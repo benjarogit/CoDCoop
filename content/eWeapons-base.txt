@@ -1,0 +1,11 @@
+YAP optional base weapon layer / optionale Waffen-Basisebene
+
+This directory intentionally contains no weapon JSON definitions. YAP reads
+this optional executable-directory layer first, then uo/eWeapons, then the
+selected variant's eWeapons overrides. The pinned campaign definitions remain
+in those profile directories. Do not copy United Fronts overrides here.
+
+Dieser Ordner enthält absichtlich keine Waffen-JSON-Dateien. YAP liest diese
+optionale Basisebene zuerst, danach uo/eWeapons und zuletzt die Definitionen
+der gewählten Variante. Die festgelegten Kampagnenwerte bleiben in diesen
+Profilordnern. United-Fronts-Definitionen gehören nicht in diese Basisebene.

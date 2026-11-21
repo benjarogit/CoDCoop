@@ -1,0 +1,67 @@
+{
+  "schema": 1,
+  "language": "en",
+  "ready_archive": {
+    "size": 1036938510,
+    "sha256": "c5f22a300a4186ad07755e704606bde9e2dfc9fbb3c15ac214ea7d96ec5b2f3d"
+  },
+  "files": {
+    "Main/localized_english_pak0.pk3": {
+      "sha256": "337e86f0b1341fa6316789c8dcf0014df9c631a458b3e981e53d99815ec50779",
+      "source": "owned_main_baseline",
+      "size": 167895169
+    },
+    "Main/localized_english_pak1.pk3": {
+      "sha256": "35aae87aa440bbb1b9b7a9620bf811fdb3614f589a3af99b04f1479f3c800415",
+      "source": "owned_main_baseline",
+      "size": 126070475
+    },
+    "Main/localized_english_pak3.pk3": {
+      "sha256": "4b388466e6aa6a6bd14e354b0a8195cda897914f3d67cda0bec4adc3bf40d9a0",
+      "source": "owned_main_baseline",
+      "size": 8501
+    },
+    "Main/localized_english_pak5.pk3": {
+      "sha256": "d55073400da20f8a10cfdcc0e18997e56ce5a498f2e14d0756cf0bbd794d56c2",
+      "source": "owned_main_baseline",
+      "size": 9544
+    },
+    "uo/localized_english_pakuo00.pk3": {
+      "sha256": "38fa7e0813fb3d82c51a2809ac85ec059ef0673478a31bd237d466521bc200b0",
+      "source": "v0.5.4_ready",
+      "size": 123141455
+    },
+    "uo/localized_english_pakuo01.pk3": {
+      "sha256": "fe31114cfa1e7323c6d9788642d9cd831cb47a58458b016797df23308a63ed0c",
+      "source": "v0.5.4_ready",
+      "size": 72866
+    },
+    "uo/localized_english_pakuo02.pk3": {
+      "sha256": "dc86f634c4123a98448c876331aff56ed5c9786760a743401f3bf543f2781ca5",
+      "source": "v0.5.4_ready",
+      "size": 3772796
+    }
+  },
+  "content_evidence": {
+    "Main/localized_english_pak1.pk3": {
+      "member": "localizedstrings/english/airfield.str",
+      "text": "Draw enemy fire while the rest of the team steals a German plane."
+    },
+    "uo/localized_english_pakuo00.pk3": {
+      "member": "localizedstrings/english/gmi_menu.str",
+      "text": "Select Smoke Grenade:"
+    }
+  },
+  "excluded_german_overlays": [
+    "Main/localized_english_pak2.pk3",
+    "Main/localized_english_pak6.pk3"
+  ],
+  "validation_scope": "English string contents inspected. Representative Main/pak0 English training voice samples decoded offline; no exhaustive speech audit. File names alone are not language evidence.",
+  "audio_evidence": {
+    "package": "Main/localized_english_pak0.pk3",
+    "member": "sound/Voiceovers/US/Training/Training_Foley_02.wav",
+    "wav_sha256": "6de7d99ee3187c96b95fa10b095e77b642b3b2747e57f005216e346f9053bc46",
+    "method": "Offline PocketSphinx 5.0.4 English ASR, 16 kHz mono PCM",
+    "transcript": "before starting the obstacle course read each of these important signs and do what they tell you"
+  }
+}

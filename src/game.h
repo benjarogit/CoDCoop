@@ -4,6 +4,7 @@
 #include <windows.h>
 #include <cstdint>
 #include <cstring>
+#include "dobj_abi.h"
 
 struct netadr_t {
     int type;
@@ -186,9 +187,9 @@ inline uint8_t* XAnimAllocInfo(uint8_t* tree, int anim)  // devuelve info+0x10. 
     asm volatile("push %2\n\tcall *%3\n\tadd $4, %%esp" : "=a"(r), "+d"(tree) : "r"(anim), "r"((void*)0x481df0) : "ecx", "memory");
     return r;
 }
-inline void Com_ServerDObjFree(int ent)  // ECX = ent
+inline void Com_ServerDObjFree(int ent, bool clearInfos = true)
 {
-    asm volatile("call *%1" : "+c"(ent) : "r"((void*)A(0x4310f0, 0x432f20)) : "eax", "edx", "memory");
+    native_dobj::Free(A(0x4310f0, 0x432f20), ent, clearInfos);
 }
 inline uint8_t* XAnimCreateTree(uint8_t* xanim)  // EBX = XAnim*
 {

@@ -1,0 +1,12 @@
+SP Improved optional YAP overrides / optionale YAP-Definitionen
+
+The reviewed SP Improved 1.5 package contains no eWeapons JSON overrides.
+YAP retains the pinned uo/eWeapons definitions for this variant. Original
+SP Improved campaign scripts and rules remain in the campaign package and
+its reviewed compatibility overlays. No replacement weapon values are added.
+
+Das geprüfte Paket SP Improved 1.5 enthält keine eWeapons-JSON-Definitionen.
+YAP verwendet für diese Variante die festgelegten Werte aus uo/eWeapons.
+Die ursprünglichen Kampagnenskripte und Regeln bleiben im Modpaket und den
+geprüften Kompatibilitätsanpassungen erhalten. Es werden keine abweichenden
+Waffenwerte ergänzt.

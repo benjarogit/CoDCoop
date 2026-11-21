@@ -1,0 +1,3700 @@
+{
+  "air_models": {
+    "o_ge_prp_stukabomb": {
+      "member": "xmodel/o_ge_prp_stukabomb",
+      "package": "uo/pakuo04.pk3",
+      "sha256": "3c7e44ffe5a3c4c47b08c466041ff9ac6b23d7e2eda216f6c9ccad5823ddcc26"
+    },
+    "v_br_air_spitfire": {
+      "member": "xmodel/v_br_air_spitfire",
+      "package": "uo/pakuo04.pk3",
+      "sha256": "c1c9ae23d72e5b07955c8c3eb2c43c2fa6f08b1409520613478d76fd721b2fc2"
+    },
+    "v_rs_air_il2": {
+      "member": "xmodel/v_rs_air_il2",
+      "package": "uo/pakuo04.pk3",
+      "sha256": "6dd044143a33c3efa7e3a88216662e47e73456f306c14a45b3578570a1863b93"
+    },
+    "v_us_air_p47": {
+      "member": "xmodel/v_us_air_p47",
+      "package": "uo/pakuo04.pk3",
+      "sha256": "1a7266a0028ff3068e6af7ab98065691176e7c0ea608a494037b638acc9631ee"
+    },
+    "vehicle_plane_stuka": {
+      "member": "xmodel/vehicle_plane_stuka",
+      "package": "Main/pak0.pk3",
+      "sha256": "2925508bbc61d93708cff00d2db09a20314163c8987f8ec09dc30a086019e078"
+    },
+    "vehicle_tank_panzeriv_machinegun": {
+      "member": "xmodel/vehicle_tank_PanzerIV_machinegun",
+      "package": "Main/pak0.pk3",
+      "sha256": "fc5a6d23d4c5f289523a42a23dead56456169847e0f219515a1277c31f5523d3"
+    }
+  },
+  "families": {
+    "american": {
+      "active_campaign_menu": true,
+      "enum": {
+        "0": null,
+        "1": "carbinem1s",
+        "10": "bazooka",
+        "11": "thompsonm1",
+        "12": "thompson28",
+        "2": "m1carbine",
+        "21": "colt",
+        "22": "binoculars",
+        "3": "m1garand",
+        "31": "fraggrenade",
+        "32": "satchelcharge",
+        "33": "land_mine",
+        "34": "smokegrenade",
+        "4": "springfielda1_un",
+        "5": "springfield",
+        "6": "thompson",
+        "7": "greaser",
+        "8": "bar",
+        "9": "mg30cal"
+      },
+      "menu_slots": {
+        "grenade": {
+          "choices": {
+            "0": {
+              "label": "@MENU_NONE",
+              "weapon": null
+            },
+            "31": {
+              "label": "@WEAPON_M2FRAGGRENADE",
+              "weapon": "fraggrenade"
+            },
+            "32": {
+              "label": "@GMI_WEAPON_SATCHEL",
+              "weapon": "satchelcharge"
+            },
+            "33": {
+              "label": "@UF_WEAPON_LANDMINE",
+              "weapon": "land_mine"
+            },
+            "34": {
+              "label": "@GMI_WEAPON_SMOKEGRENADE",
+              "weapon": "smokegrenade"
+            }
+          },
+          "cvar": "sp_americangrenade",
+          "menu_evidence": [
+            {
+              "source": "ui/options_mod.menu",
+              "visibility": {
+                "cvar": "sp_campaign",
+                "operator": "showcvar",
+                "values": [
+                  "2"
+                ]
+              }
+            },
+            {
+              "source": "ui/victoryscreen.menu",
+              "visibility": {
+                "cvar": "faction",
+                "operator": "showcvar",
+                "values": [
+                  "american"
+                ]
+              }
+            }
+          ]
+        },
+        "pistol": {
+          "choices": {
+            "0": {
+              "label": "@MENU_NONE",
+              "weapon": null
+            },
+            "21": {
+              "label": "@WEAPON_COLT45",
+              "weapon": "colt"
+            },
+            "22": {
+              "label": "@GMI_WEAPON_BINOCULARS_ARTILLERY",
+              "weapon": "binoculars"
+            }
+          },
+          "cvar": "sp_americanpistol",
+          "menu_evidence": [
+            {
+              "source": "ui/options_mod.menu",
+              "visibility": {
+                "cvar": "sp_campaign",
+                "operator": "showcvar",
+                "values": [
+                  "2"
+                ]
+              }
+            },
+            {
+              "source": "ui/victoryscreen.menu",
+              "visibility": {
+                "cvar": "faction",
+                "operator": "showcvar",
+                "values": [
+                  "american"
+                ]
+              }
+            }
+          ]
+        },
+        "primary": {
+          "choices": {
+            "0": {
+              "label": "@MENU_NONE",
+              "weapon": null
+            },
+            "1": {
+              "label": "@UF_WEAPON_M1CARBINE",
+              "weapon": "carbinem1s"
+            },
+            "10": {
+              "label": "@GMI_WEAPON_BAZOOKA",
+              "weapon": "bazooka"
+            },
+            "11": {
+              "label": "@UF_WEAPON_THOMPSONM1",
+              "weapon": "thompsonm1"
+            },
+            "12": {
+              "label": "@UF_WEAPON_THOMPSONM1928",
+              "weapon": "thompson28"
+            },
+            "2": {
+              "label": "@WEAPON_M1A1CARBINE",
+              "weapon": "m1carbine"
+            },
+            "3": {
+              "label": "@WEAPON_M1GARAND",
+              "weapon": "m1garand"
+            },
+            "4": {
+              "label": "@UF_WEAPON_UNSCOPEDSPRINGFIELD",
+              "weapon": "springfielda1_un"
+            },
+            "5": {
+              "label": "@WEAPON_SPRINGFIELD",
+              "weapon": "springfield"
+            },
+            "6": {
+              "label": "@WEAPON_THOMPSON",
+              "weapon": "thompson"
+            },
+            "7": {
+              "label": "@UF_WEAPON_GREASEGUN",
+              "weapon": "greaser"
+            },
+            "8": {
+              "label": "@WEAPON_BAR",
+              "weapon": "bar"
+            },
+            "9": {
+              "label": "@GMI_WEAPON_30CAL",
+              "weapon": "mg30cal"
+            }
+          },
+          "cvar": "sp_us1",
+          "menu_evidence": [
+            {
+              "source": "ui/options_mod.menu",
+              "visibility": {
+                "cvar": "sp_campaign",
+                "operator": "showcvar",
+                "values": [
+                  "2"
+                ]
+              }
+            },
+            {
+              "source": "ui/victoryscreen.menu",
+              "visibility": {
+                "cvar": "faction",
+                "operator": "showcvar",
+                "values": [
+                  "american"
+                ]
+              }
+            }
+          ]
+        },
+        "secondary": {
+          "choices": {
+            "0": {
+              "label": "@MENU_NONE",
+              "weapon": null
+            },
+            "1": {
+              "label": "@UF_WEAPON_M1CARBINE",
+              "weapon": "carbinem1s"
+            },
+            "10": {
+              "label": "@GMI_WEAPON_BAZOOKA",
+              "weapon": "bazooka"
+            },
+            "11": {
+              "label": "@UF_WEAPON_THOMPSONM1",
+              "weapon": "thompsonm1"
+            },
+            "12": {
+              "label": "@UF_WEAPON_THOMPSONM1928",
+              "weapon": "thompson28"
+            },
+            "2": {
+              "label": "@WEAPON_M1A1CARBINE",
+              "weapon": "m1carbine"
+            },
+            "3": {
+              "label": "@WEAPON_M1GARAND",
+              "weapon": "m1garand"
+            },
+            "4": {
+              "label": "@UF_WEAPON_UNSCOPEDSPRINGFIELD",
+              "weapon": "springfielda1_un"
+            },
+            "5": {
+              "label": "@WEAPON_SPRINGFIELD",
+              "weapon": "springfield"
+            },
+            "6": {
+              "label": "@WEAPON_THOMPSON",
+              "weapon": "thompson"
+            },
+            "7": {
+              "label": "@UF_WEAPON_GREASEGUN",
+              "weapon": "greaser"
+            },
+            "8": {
+              "label": "@WEAPON_BAR",
+              "weapon": "bar"
+            },
+            "9": {
+              "label": "@GMI_WEAPON_30CAL",
+              "weapon": "mg30cal"
+            }
+          },
+          "cvar": "sp_us2",
+          "menu_evidence": [
+            {
+              "source": "ui/options_mod.menu",
+              "visibility": {
+                "cvar": "sp_campaign",
+                "operator": "showcvar",
+                "values": [
+                  "2"
+                ]
+              }
+            },
+            {
+              "source": "ui/victoryscreen.menu",
+              "visibility": {
+                "cvar": "faction",
+                "operator": "showcvar",
+                "values": [
+                  "american"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "slots": {
+        "grenade": "sp_americangrenade",
+        "pistol": "sp_americanpistol",
+        "primary": "sp_us1",
+        "secondary": "sp_us2"
+      }
+    },
+    "british": {
+      "active_campaign_menu": true,
+      "enum": {
+        "0": null,
+        "1": "enfield",
+        "10": "piat",
+        "11": "mannlicher",
+        "2": "enfieldscoped",
+        "21": "webley",
+        "22": "colt",
+        "23": "welrod",
+        "24": "binoculars",
+        "3": "delisle",
+        "31": "MK1britishfrag",
+        "32": "satchelcharge",
+        "33": "land_mine",
+        "34": "smokegrenade",
+        "4": "sten",
+        "5": "sten_silenced",
+        "6": "stenmk5",
+        "7": "thompson28",
+        "8": "bren",
+        "9": "lewisgn"
+      },
+      "menu_slots": {
+        "grenade": {
+          "choices": {
+            "0": {
+              "label": "@MENU_NONE",
+              "weapon": null
+            },
+            "31": {
+              "label": "@WEAPON_MK2FRAGGRENADE",
+              "weapon": "MK1britishfrag"
+            },
+            "32": {
+              "label": "@GMI_WEAPON_SATCHEL",
+              "weapon": "satchelcharge"
+            },
+            "33": {
+              "label": "@UF_WEAPON_LANDMINE",
+              "weapon": "land_mine"
+            },
+            "34": {
+              "label": "@GMI_WEAPON_SMOKEGRENADE",
+              "weapon": "smokegrenade"
+            }
+          },
+          "cvar": "sp_britishgrenade",
+          "menu_evidence": [
+            {
+              "source": "ui/options_mod.menu",
+              "visibility": {
+                "cvar": "sp_campaign",
+                "operator": "showcvar",
+                "values": [
+                  "0"
+                ]
+              }
+            },
+            {
+              "source": "ui/victoryscreen.menu",
+              "visibility": {
+                "cvar": "faction",
+                "operator": "showcvar",
+                "values": [
+                  "british"
+                ]
+              }
+            }
+          ]
+        },
+        "pistol": {
+          "choices": {
+            "0": {
+              "label": "@MENU_NONE",
+              "weapon": null
+            },
+            "21": {
+              "label": "@GMI_WEAPON_WEBLEY",
+              "weapon": "webley"
+            },
+            "22": {
+              "label": "@WEAPON_COLT45",
+              "weapon": "colt"
+            },
+            "23": {
+              "label": "@UF_WEAPON_WELROD",
+              "weapon": "welrod"
+            },
+            "24": {
+              "label": "@GMI_WEAPON_BINOCULARS_ARTILLERY",
+              "weapon": "binoculars"
+            }
+          },
+          "cvar": "sp_britishpistol",
+          "menu_evidence": [
+            {
+              "source": "ui/options_mod.menu",
+              "visibility": {
+                "cvar": "sp_campaign",
+                "operator": "showcvar",
+                "values": [
+                  "0"
+                ]
+              }
+            },
+            {
+              "source": "ui/victoryscreen.menu",
+              "visibility": {
+                "cvar": "faction",
+                "operator": "showcvar",
+                "values": [
+                  "british"
+                ]
+              }
+            }
+          ]
+        },
+        "primary": {
+          "choices": {
+            "0": {
+              "label": "@MENU_NONE",
+              "weapon": null
+            },
+            "1": {
+              "label": "@WEAPON_LEEENFIELD",
+              "weapon": "enfield"
+            },
+            "10": {
+              "label": "@UF_WEAPON_PIAT",
+              "weapon": "piat"
+            },
+            "2": {
+              "label": "@UF_WEAPON_SCOPEDLEEENFIELD",
+              "weapon": "enfieldscoped"
+            },
+            "3": {
+              "label": "@UF_WEAPON_DELISLE",
+              "weapon": "delisle"
+            },
+            "4": {
+              "label": "@WEAPON_STEN",
+              "weapon": "sten"
+            },
+            "5": {
+              "label": "@GMI_WEAPON_SILENCED_STEN",
+              "weapon": "sten_silenced"
+            },
+            "6": {
+              "label": "@UF_WEAPON_STENMK5",
+              "weapon": "stenmk5"
+            },
+            "7": {
+              "label": "@UF_WEAPON_THOMPSONM1928",
+              "weapon": "thompson28"
+            },
+            "8": {
+              "label": "@WEAPON_BREN",
+              "weapon": "bren"
+            }
+          },
+          "cvar": "sp_britishweapon1",
+          "menu_evidence": [
+            {
+              "source": "ui/options_mod.menu",
+              "visibility": {
+                "cvar": "sp_campaign",
+                "operator": "showcvar",
+                "values": [
+                  "0"
+                ]
+              }
+            },
+            {
+              "source": "ui/victoryscreen.menu",
+              "visibility": {
+                "cvar": "faction",
+                "operator": "showcvar",
+                "values": [
+                  "british"
+                ]
+              }
+            }
+          ]
+        },
+        "secondary": {
+          "choices": {
+            "0": {
+              "label": "@MENU_NONE",
+              "weapon": null
+            },
+            "1": {
+              "label": "@WEAPON_LEEENFIELD",
+              "weapon": "enfield"
+            },
+            "10": {
+              "label": "@UF_WEAPON_PIAT",
+              "weapon": "piat"
+            },
+            "2": {
+              "label": "@UF_WEAPON_SCOPEDLEEENFIELD",
+              "weapon": "enfieldscoped"
+            },
+            "3": {
+              "label": "@UF_WEAPON_DELISLE",
+              "weapon": "delisle"
+            },
+            "4": {
+              "label": "@WEAPON_STEN",
+              "weapon": "sten"
+            },
+            "5": {
+              "label": "@GMI_WEAPON_SILENCED_STEN",
+              "weapon": "sten_silenced"
+            },
+            "6": {
+              "label": "@UF_WEAPON_STENMK5",
+              "weapon": "stenmk5"
+            },
+            "7": {
+              "label": "@UF_WEAPON_THOMPSONM1928",
+              "weapon": "thompson28"
+            },
+            "8": {
+              "label": "@WEAPON_BREN",
+              "weapon": "bren"
+            }
+          },
+          "cvar": "sp_britishweapon2",
+          "menu_evidence": [
+            {
+              "source": "ui/options_mod.menu",
+              "visibility": {
+                "cvar": "sp_campaign",
+                "operator": "showcvar",
+                "values": [
+                  "0"
+                ]
+              }
+            },
+            {
+              "source": "ui/victoryscreen.menu",
+              "visibility": {
+                "cvar": "faction",
+                "operator": "showcvar",
+                "values": [
+                  "british"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "slots": {
+        "grenade": "sp_britishgrenade",
+        "pistol": "sp_britishpistol",
+        "primary": "sp_britishweapon1",
+        "secondary": "sp_britishweapon2"
+      }
+    },
+    "german": {
+      "active_campaign_menu": true,
+      "enum": {
+        "0": null,
+        "1": "kar98k",
+        "10": "fg42",
+        "11": "mg34",
+        "12": "mg42",
+        "13": "panzerfaust",
+        "14": "panzerschreck",
+        "15": "flamethrower",
+        "16": "g41",
+        "2": "kar98k_sniper",
+        "21": "luger",
+        "22": "p38",
+        "23": "mauser_c96",
+        "24": "binoculars",
+        "3": "gewehr43",
+        "31": "Stielhandgranate",
+        "32": "satchelcharge",
+        "33": "land_mine",
+        "34": "smokegrenade",
+        "4": "gewehr43_scoped",
+        "5": "mp38",
+        "6": "mp40",
+        "7": "mp41",
+        "8": "mp44",
+        "9": "bubbles"
+      },
+      "menu_slots": {
+        "grenade": {
+          "choices": {
+            "0": {
+              "label": "@MENU_NONE",
+              "weapon": null
+            },
+            "31": {
+              "label": "@WEAPON_GERMANGRENADE",
+              "weapon": "Stielhandgranate"
+            },
+            "32": {
+              "label": "@GMI_WEAPON_SATCHEL",
+              "weapon": "satchelcharge"
+            },
+            "33": {
+              "label": "@UF_WEAPON_LANDMINE",
+              "weapon": "land_mine"
+            },
+            "34": {
+              "label": "@GMI_WEAPON_SMOKEGRENADE",
+              "weapon": "smokegrenade"
+            }
+          },
+          "cvar": "sp_germangrenade",
+          "menu_evidence": [
+            {
+              "source": "ui/options_mod.menu",
+              "visibility": {
+                "cvar": "sp_campaign",
+                "operator": "showcvar",
+                "values": [
+                  "3"
+                ]
+              }
+            },
+            {
+              "source": "ui/victoryscreen.menu",
+              "visibility": {
+                "cvar": "faction",
+                "operator": "showcvar",
+                "values": [
+                  "german"
+                ]
+              }
+            }
+          ]
+        },
+        "pistol": {
+          "choices": {
+            "0": {
+              "label": "@MENU_NONE",
+              "weapon": null
+            },
+            "21": {
+              "label": "@WEAPON_LUGER",
+              "weapon": "luger"
+            },
+            "22": {
+              "label": "@UF_WEAPON_P38",
+              "weapon": "p38"
+            },
+            "23": {
+              "label": "@UF_WEAPON_MAUSERC96",
+              "weapon": "mauser_c96"
+            },
+            "24": {
+              "label": "@GMI_WEAPON_BINOCULARS_ARTILLERY",
+              "weapon": "binoculars"
+            }
+          },
+          "cvar": "sp_germanpistol",
+          "menu_evidence": [
+            {
+              "source": "ui/options_mod.menu",
+              "visibility": {
+                "cvar": "sp_campaign",
+                "operator": "showcvar",
+                "values": [
+                  "3"
+                ]
+              }
+            },
+            {
+              "source": "ui/victoryscreen.menu",
+              "visibility": {
+                "cvar": "faction",
+                "operator": "showcvar",
+                "values": [
+                  "german"
+                ]
+              }
+            }
+          ]
+        },
+        "primary": {
+          "choices": {
+            "0": {
+              "label": "@MENU_NONE",
+              "weapon": null
+            },
+            "1": {
+              "label": "@WEAPON_KAR98K",
+              "weapon": "kar98k"
+            },
+            "10": {
+              "label": "@WEAPON_FG42",
+              "weapon": "fg42"
+            },
+            "11": {
+              "label": "@GMI_WEAPON_MG34",
+              "weapon": "mg34"
+            },
+            "12": {
+              "label": "@UF_WEAPON_MG42",
+              "weapon": "mg42"
+            },
+            "13": {
+              "label": "@WEAPON_PANZERFAUST",
+              "weapon": "panzerfaust"
+            },
+            "14": {
+              "label": "@GMI_WEAPON_PANZERSCHRECK",
+              "weapon": "panzerschreck"
+            },
+            "15": {
+              "label": "@GMI_WEAPON_FLAMMENWERFER",
+              "weapon": "flamethrower"
+            },
+            "16": {
+              "label": "@UF_WEAPON_GEWEHR41",
+              "weapon": "g41"
+            },
+            "2": {
+              "label": "@WEAPON_SCOPEDKAR98K",
+              "weapon": "kar98k_sniper"
+            },
+            "3": {
+              "label": "@GMI_WEAPON_GEWEHR43",
+              "weapon": "gewehr43"
+            },
+            "4": {
+              "label": "@UF_WEAPON_SCOPEDGEWEHR43",
+              "weapon": "gewehr43_scoped"
+            },
+            "5": {
+              "label": "@UF_WEAPON_MP38",
+              "weapon": "mp38"
+            },
+            "6": {
+              "label": "@WEAPON_MP40",
+              "weapon": "mp40"
+            },
+            "7": {
+              "label": "@UF_WEAPON_MP41",
+              "weapon": "mp41"
+            },
+            "8": {
+              "label": "@WEAPON_MP44",
+              "weapon": "mp44"
+            },
+            "9": {
+              "label": "@UF_WEAPON_UNSCOPEDFG42",
+              "weapon": "bubbles"
+            }
+          },
+          "cvar": "sp_ge1",
+          "menu_evidence": [
+            {
+              "source": "ui/options_mod.menu",
+              "visibility": {
+                "cvar": "sp_campaign",
+                "operator": "showcvar",
+                "values": [
+                  "3"
+                ]
+              }
+            },
+            {
+              "source": "ui/victoryscreen.menu",
+              "visibility": {
+                "cvar": "faction",
+                "operator": "showcvar",
+                "values": [
+                  "german"
+                ]
+              }
+            }
+          ]
+        },
+        "secondary": {
+          "choices": {
+            "0": {
+              "label": "@MENU_NONE",
+              "weapon": null
+            },
+            "1": {
+              "label": "@WEAPON_KAR98K",
+              "weapon": "kar98k"
+            },
+            "10": {
+              "label": "@WEAPON_FG42",
+              "weapon": "fg42"
+            },
+            "11": {
+              "label": "@GMI_WEAPON_MG34",
+              "weapon": "mg34"
+            },
+            "12": {
+              "label": "@UF_WEAPON_MG42",
+              "weapon": "mg42"
+            },
+            "13": {
+              "label": "@WEAPON_PANZERFAUST",
+              "weapon": "panzerfaust"
+            },
+            "14": {
+              "label": "@GMI_WEAPON_PANZERSCHRECK",
+              "weapon": "panzerschreck"
+            },
+            "15": {
+              "label": "@GMI_WEAPON_FLAMMENWERFER",
+              "weapon": "flamethrower"
+            },
+            "16": {
+              "label": "@UF_WEAPON_GEWEHR41",
+              "weapon": "g41"
+            },
+            "2": {
+              "label": "@WEAPON_SCOPEDKAR98K",
+              "weapon": "kar98k_sniper"
+            },
+            "3": {
+              "label": "@GMI_WEAPON_GEWEHR43",
+              "weapon": "gewehr43"
+            },
+            "4": {
+              "label": "@UF_WEAPON_SCOPEDGEWEHR43",
+              "weapon": "gewehr43_scoped"
+            },
+            "5": {
+              "label": "@UF_WEAPON_MP38",
+              "weapon": "mp38"
+            },
+            "6": {
+              "label": "@WEAPON_MP40",
+              "weapon": "mp40"
+            },
+            "7": {
+              "label": "@UF_WEAPON_MP41",
+              "weapon": "mp41"
+            },
+            "8": {
+              "label": "@WEAPON_MP44",
+              "weapon": "mp44"
+            },
+            "9": {
+              "label": "@UF_WEAPON_UNSCOPEDFG42",
+              "weapon": "bubbles"
+            }
+          },
+          "cvar": "sp_ge2",
+          "menu_evidence": [
+            {
+              "source": "ui/options_mod.menu",
+              "visibility": {
+                "cvar": "sp_campaign",
+                "operator": "showcvar",
+                "values": [
+                  "3"
+                ]
+              }
+            },
+            {
+              "source": "ui/victoryscreen.menu",
+              "visibility": {
+                "cvar": "faction",
+                "operator": "showcvar",
+                "values": [
+                  "german"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "slots": {
+        "grenade": "sp_germangrenade",
+        "pistol": "sp_germanpistol",
+        "primary": "sp_ge1",
+        "secondary": "sp_ge2"
+      }
+    },
+    "italian": {
+      "active_campaign_menu": true,
+      "enum": {
+        "0": null,
+        "1": "carcano",
+        "2": "mab",
+        "21": "beretta",
+        "22": "binoculars",
+        "3": "breda",
+        "31": "satchelcharge",
+        "32": "land_mine",
+        "33": "smokegrenade",
+        "4": "pnzrshr"
+      },
+      "menu_slots": {
+        "grenade": {
+          "choices": {
+            "0": {
+              "label": "@MENU_NONE",
+              "weapon": null
+            },
+            "31": {
+              "label": "@GMI_WEAPON_SATCHEL",
+              "weapon": "satchelcharge"
+            },
+            "32": {
+              "label": "@UF_WEAPON_LANDMINE",
+              "weapon": "land_mine"
+            },
+            "33": {
+              "label": "@GMI_WEAPON_SMOKEGRENADE",
+              "weapon": "smokegrenade"
+            }
+          },
+          "cvar": "sp_italiangrenade",
+          "menu_evidence": [
+            {
+              "source": "ui/options_mod.menu",
+              "visibility": {
+                "cvar": "sp_campaign",
+                "operator": "showcvar",
+                "values": [
+                  "4"
+                ]
+              }
+            },
+            {
+              "source": "ui/victoryscreen.menu",
+              "visibility": {
+                "cvar": "faction",
+                "operator": "showcvar",
+                "values": [
+                  "italian"
+                ]
+              }
+            }
+          ]
+        },
+        "pistol": {
+          "choices": {
+            "0": {
+              "label": "@MENU_NONE",
+              "weapon": null
+            },
+            "21": {
+              "label": "@UF_WEAPON_BERETTA",
+              "weapon": "beretta"
+            },
+            "22": {
+              "label": "@GMI_WEAPON_BINOCULARS_ARTILLERY",
+              "weapon": "binoculars"
+            }
+          },
+          "cvar": "sp_italianpistol",
+          "menu_evidence": [
+            {
+              "source": "ui/options_mod.menu",
+              "visibility": {
+                "cvar": "sp_campaign",
+                "operator": "showcvar",
+                "values": [
+                  "4"
+                ]
+              }
+            },
+            {
+              "source": "ui/victoryscreen.menu",
+              "visibility": {
+                "cvar": "faction",
+                "operator": "showcvar",
+                "values": [
+                  "italian"
+                ]
+              }
+            }
+          ]
+        },
+        "primary": {
+          "choices": {
+            "0": {
+              "label": "@MENU_NONE",
+              "weapon": null
+            },
+            "1": {
+              "label": "@UF_WEAPON_CARCANO",
+              "weapon": "carcano"
+            },
+            "2": {
+              "label": "@UF_WEAPON_MAB",
+              "weapon": "mab"
+            },
+            "3": {
+              "label": "@UF_WEAPON_BREDA",
+              "weapon": "breda"
+            }
+          },
+          "cvar": "sp_italianweapon1",
+          "menu_evidence": [
+            {
+              "source": "ui/options_mod.menu",
+              "visibility": {
+                "cvar": "sp_campaign",
+                "operator": "showcvar",
+                "values": [
+                  "4"
+                ]
+              }
+            },
+            {
+              "source": "ui/victoryscreen.menu",
+              "visibility": {
+                "cvar": "faction",
+                "operator": "showcvar",
+                "values": [
+                  "italian"
+                ]
+              }
+            }
+          ]
+        },
+        "secondary": {
+          "choices": {
+            "0": {
+              "label": "@MENU_NONE",
+              "weapon": null
+            },
+            "1": {
+              "label": "@UF_WEAPON_CARCANO",
+              "weapon": "carcano"
+            },
+            "2": {
+              "label": "@UF_WEAPON_MAB",
+              "weapon": "mab"
+            },
+            "3": {
+              "label": "@UF_WEAPON_BREDA",
+              "weapon": "breda"
+            }
+          },
+          "cvar": "sp_italianweapon2",
+          "menu_evidence": [
+            {
+              "source": "ui/options_mod.menu",
+              "visibility": {
+                "cvar": "sp_campaign",
+                "operator": "showcvar",
+                "values": [
+                  "4"
+                ]
+              }
+            },
+            {
+              "source": "ui/victoryscreen.menu",
+              "visibility": {
+                "cvar": "faction",
+                "operator": "showcvar",
+                "values": [
+                  "italian"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "slots": {
+        "grenade": "sp_italiangrenade",
+        "pistol": "sp_italianpistol",
+        "primary": "sp_italianweapon1",
+        "secondary": "sp_italianweapon2"
+      }
+    },
+    "polish": {
+      "active_campaign_menu": false,
+      "enum": {
+        "0": null,
+        "1": "wz29",
+        "2": "wz28",
+        "21": "binoculars",
+        "3": "pnzrshr",
+        "31": "satchelcharge",
+        "32": "land_mine"
+      },
+      "menu_slots": {
+        "grenade": {
+          "choices": {
+            "0": {
+              "label": "@MENU_NONE",
+              "weapon": null
+            },
+            "31": {
+              "label": "@GMI_WEAPON_SATCHEL",
+              "weapon": "satchelcharge"
+            },
+            "32": {
+              "label": "@UF_WEAPON_LANDMINE",
+              "weapon": "land_mine"
+            }
+          },
+          "cvar": "sp_polishgrenade",
+          "menu_evidence": [
+            {
+              "source": "ui/options_mod.menu",
+              "visibility": {
+                "cvar": "sp_campaign",
+                "operator": "showcvar",
+                "values": [
+                  "5"
+                ]
+              }
+            }
+          ]
+        },
+        "pistol": {
+          "choices": {
+            "0": {
+              "label": "@MENU_NONE",
+              "weapon": null
+            },
+            "21": {
+              "label": "@GMI_WEAPON_BINOCULARS_ARTILLERY",
+              "weapon": "binoculars"
+            }
+          },
+          "cvar": "sp_polishpistol",
+          "menu_evidence": [
+            {
+              "source": "ui/options_mod.menu",
+              "visibility": {
+                "cvar": "sp_campaign",
+                "operator": "showcvar",
+                "values": [
+                  "5"
+                ]
+              }
+            }
+          ]
+        },
+        "primary": {
+          "choices": {
+            "0": {
+              "label": "@MENU_NONE",
+              "weapon": null
+            },
+            "1": {
+              "label": "wz. 29",
+              "weapon": "wz29"
+            },
+            "2": {
+              "label": "wz. 1928 LMG",
+              "weapon": "wz28"
+            },
+            "3": {
+              "label": "wz. 35 Anti-Tank Rifle",
+              "weapon": "pnzrshr"
+            }
+          },
+          "cvar": "sp_polishweapon1",
+          "menu_evidence": [
+            {
+              "source": "ui/options_mod.menu",
+              "visibility": {
+                "cvar": "sp_campaign",
+                "operator": "showcvar",
+                "values": [
+                  "5"
+                ]
+              }
+            }
+          ]
+        },
+        "secondary": {
+          "choices": {
+            "0": {
+              "label": "@MENU_NONE",
+              "weapon": null
+            },
+            "1": {
+              "label": "wz. 29",
+              "weapon": "wz29"
+            },
+            "2": {
+              "label": "wz. 1928 LMG",
+              "weapon": "wz28"
+            },
+            "3": {
+              "label": "wz. 35 Anti-Tank Rifle",
+              "weapon": "pnzrshr"
+            }
+          },
+          "cvar": "sp_polishweapon2",
+          "menu_evidence": [
+            {
+              "source": "ui/options_mod.menu",
+              "visibility": {
+                "cvar": "sp_campaign",
+                "operator": "showcvar",
+                "values": [
+                  "5"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "slots": {
+        "grenade": "sp_polishgrenade",
+        "pistol": "sp_polishpistol",
+        "primary": "sp_polishweapon1",
+        "secondary": "sp_polishweapon2"
+      }
+    },
+    "russian": {
+      "active_campaign_menu": true,
+      "enum": {
+        "0": null,
+        "1": "mosin_nagant",
+        "2": "mosin_nagant_sniper",
+        "21": "tt33",
+        "22": "binoculars",
+        "3": "svt40",
+        "31": "RGD-33russianfrag",
+        "32": "satchelcharge",
+        "33": "land_mine",
+        "34": "smokegrenade",
+        "4": "ppsh",
+        "5": "ppsh43",
+        "6": "dp28_un",
+        "7": "ppshv2"
+      },
+      "menu_slots": {
+        "grenade": {
+          "choices": {
+            "0": {
+              "label": "@MENU_NONE",
+              "weapon": null
+            },
+            "31": {
+              "label": "@WEAPON_RUSSIANGRENADE",
+              "weapon": "RGD-33russianfrag"
+            },
+            "32": {
+              "label": "@GMI_WEAPON_SATCHEL",
+              "weapon": "satchelcharge"
+            },
+            "33": {
+              "label": "@UF_WEAPON_LANDMINE",
+              "weapon": "land_mine"
+            },
+            "34": {
+              "label": "@GMI_WEAPON_SMOKEGRENADE",
+              "weapon": "smokegrenade"
+            }
+          },
+          "cvar": "sp_russiangrenade",
+          "menu_evidence": [
+            {
+              "source": "ui/options_mod.menu",
+              "visibility": {
+                "cvar": "sp_campaign",
+                "operator": "showcvar",
+                "values": [
+                  "1"
+                ]
+              }
+            },
+            {
+              "source": "ui/victoryscreen.menu",
+              "visibility": {
+                "cvar": "faction",
+                "operator": "showcvar",
+                "values": [
+                  "russian"
+                ]
+              }
+            }
+          ]
+        },
+        "pistol": {
+          "choices": {
+            "0": {
+              "label": "@MENU_NONE",
+              "weapon": null
+            },
+            "21": {
+              "label": "@GMI_WEAPON_TT33",
+              "weapon": "tt33"
+            },
+            "22": {
+              "label": "@GMI_WEAPON_BINOCULARS_ARTILLERY",
+              "weapon": "binoculars"
+            }
+          },
+          "cvar": "sp_russianpistol",
+          "menu_evidence": [
+            {
+              "source": "ui/options_mod.menu",
+              "visibility": {
+                "cvar": "sp_campaign",
+                "operator": "showcvar",
+                "values": [
+                  "1"
+                ]
+              }
+            },
+            {
+              "source": "ui/victoryscreen.menu",
+              "visibility": {
+                "cvar": "faction",
+                "operator": "showcvar",
+                "values": [
+                  "russian"
+                ]
+              }
+            }
+          ]
+        },
+        "primary": {
+          "choices": {
+            "0": {
+              "label": "@MENU_NONE",
+              "weapon": null
+            },
+            "1": {
+              "label": "@WEAPON_MOSINNAGANT",
+              "weapon": "mosin_nagant"
+            },
+            "2": {
+              "label": "@WEAPON_SCOPEDMOSINNAGANT",
+              "weapon": "mosin_nagant_sniper"
+            },
+            "3": {
+              "label": "@GMI_WEAPON_SVT40",
+              "weapon": "svt40"
+            },
+            "4": {
+              "label": "@WEAPON_PPSH",
+              "weapon": "ppsh"
+            },
+            "5": {
+              "label": "@UF_WEAPON_PPS43",
+              "weapon": "ppsh43"
+            },
+            "6": {
+              "label": "@GMI_WEAPON_DP28",
+              "weapon": "dp28_un"
+            },
+            "7": {
+              "label": "@UF_WEAPON_PPSHV2",
+              "weapon": "ppshv2"
+            }
+          },
+          "cvar": "sp_russianweapon1",
+          "menu_evidence": [
+            {
+              "source": "ui/options_mod.menu",
+              "visibility": {
+                "cvar": "sp_campaign",
+                "operator": "showcvar",
+                "values": [
+                  "1"
+                ]
+              }
+            },
+            {
+              "source": "ui/victoryscreen.menu",
+              "visibility": {
+                "cvar": "faction",
+                "operator": "showcvar",
+                "values": [
+                  "russian"
+                ]
+              }
+            }
+          ]
+        },
+        "secondary": {
+          "choices": {
+            "0": {
+              "label": "@MENU_NONE",
+              "weapon": null
+            },
+            "1": {
+              "label": "@WEAPON_MOSINNAGANT",
+              "weapon": "mosin_nagant"
+            },
+            "2": {
+              "label": "@WEAPON_SCOPEDMOSINNAGANT",
+              "weapon": "mosin_nagant_sniper"
+            },
+            "3": {
+              "label": "@GMI_WEAPON_SVT40",
+              "weapon": "svt40"
+            },
+            "4": {
+              "label": "@WEAPON_PPSH",
+              "weapon": "ppsh"
+            },
+            "5": {
+              "label": "@UF_WEAPON_PPS43",
+              "weapon": "ppsh43"
+            },
+            "6": {
+              "label": "@GMI_WEAPON_DP28",
+              "weapon": "dp28_un"
+            },
+            "7": {
+              "label": "@UF_WEAPON_PPSHV2",
+              "weapon": "ppshv2"
+            }
+          },
+          "cvar": "sp_russianweapon2",
+          "menu_evidence": [
+            {
+              "source": "ui/options_mod.menu",
+              "visibility": {
+                "cvar": "sp_campaign",
+                "operator": "showcvar",
+                "values": [
+                  "1"
+                ]
+              }
+            },
+            {
+              "source": "ui/victoryscreen.menu",
+              "visibility": {
+                "cvar": "faction",
+                "operator": "showcvar",
+                "values": [
+                  "russian"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "slots": {
+        "grenade": "sp_russiangrenade",
+        "pistol": "sp_russianpistol",
+        "primary": "sp_russianweapon1",
+        "secondary": "sp_russianweapon2"
+      }
+    }
+  },
+  "ignored_invalid_archives": [
+    {
+      "package": "Main/pakb.pk3",
+      "sha256": "36a9e7f1c95b82ffb99743e0c5c4ce95d83c9a430aac59f84ef3cbfab6145068"
+    }
+  ],
+  "schema": 1,
+  "selection_rules": {
+    "coop": "1\u20134 independently chosen kits; world faction/year/order remains host-owned. Runtime roster transport/application not certified by this catalog.",
+    "force_mode_2": "sp_campaign 0=british,1=russian,2=american,3=german,4=italian,5=polish; Polish is script-only, absent from active campaign menu",
+    "history_year": "Manual processors contain no year/history restriction; automatic authored loadouts do. Do not infer automatic kits from manual enum.",
+    "other_force_modes": "sp_ally_nation, then level.campaign; dutch uses British processor; fallback American",
+    "slots": "Original four independent menu selections; no MG/binocular/smoke exclusion. Same native weapon selected twice does not create two copies."
+  },
+  "sources": [
+    {
+      "member": "maps/_UF_loadout.gsc",
+      "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+      "sha256": "3e03a533edc298d1432db2dfa7771c97c924be2e9da5171339ce539b60bd534e"
+    },
+    {
+      "member": "ui/options_mod.menu",
+      "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+      "sha256": "87028a61588a9505d879e8ce15e230ff50e710909b211afc0344bd2f1c70d0a4"
+    },
+    {
+      "member": "ui/victoryscreen.menu",
+      "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+      "sha256": "a56cd56af4da94bda12e881dc6bd6c5ff97fe8903b57124d862bc13462ea3896"
+    },
+    {
+      "member": "maps/_UF_weapons.gsc",
+      "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+      "sha256": "7eb9e7251df248a50ce2c2b5db4196a9634221f0207e969d4549946b8a4d1fb2"
+    }
+  ],
+  "status": "source-derived-catalog-not-runtime-acceptance",
+  "weapons": {
+    "bar": {
+      "alt_weapon": "bar_slow",
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_bar",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "1624011b183150910dca85abefceee2f007e453aa57e7316c7f218e2398c030c"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_new",
+          "package": "Main/pak0.pk3",
+          "sha256": "be190fa03d3e9fd9427083cdb171d7bad27a71f8467cc161691c1bcdc59575a4"
+        },
+        "worldModel": {
+          "member": "xmodel/weapon_bar",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "78421ecfe0b276d4d20309dd346420816a7750bd7f4b494c12c44794e732d4ce"
+        }
+      },
+      "server_model_fields": [
+        "worldModel"
+      ],
+      "source": {
+        "member": "weapons/sp/BAR",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "0e87dda8f770ff4d54278dc92350616eb50ed8c6a8849e9eca6b8d8c5e28a377"
+      }
+    },
+    "bar_slow": {
+      "alt_weapon": "bar",
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_bar",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "1624011b183150910dca85abefceee2f007e453aa57e7316c7f218e2398c030c"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_new",
+          "package": "Main/pak0.pk3",
+          "sha256": "be190fa03d3e9fd9427083cdb171d7bad27a71f8467cc161691c1bcdc59575a4"
+        },
+        "worldModel": {
+          "member": "xmodel/weapon_bar",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "78421ecfe0b276d4d20309dd346420816a7750bd7f4b494c12c44794e732d4ce"
+        }
+      },
+      "server_model_fields": [
+        "worldModel"
+      ],
+      "source": {
+        "member": "weapons/sp/BAR_slow",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "b0ddead9e261975a601e9a2def3204ef9de23d4adf0bc7fa977d34c04e2a9707"
+      }
+    },
+    "bazooka": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/w_us_prj_bazooka_view",
+          "package": "uo/pakuo04.pk3",
+          "sha256": "50b31e14ef406a2632172461c6f2deb20a909d7ab63881c06f59111b0ad10923"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_new",
+          "package": "Main/pak0.pk3",
+          "sha256": "be190fa03d3e9fd9427083cdb171d7bad27a71f8467cc161691c1bcdc59575a4"
+        },
+        "projectileModel": {
+          "member": "xmodel/weapon_panzerfaust_rocket",
+          "package": "Main/pak0.pk3",
+          "sha256": "2bb77a079c88adf56149b7a8f57f0fe582fbfca7cb5e8d13880771cedce8f1dd"
+        },
+        "worldModel": {
+          "member": "xmodel/w_us_prj_bazooka_world",
+          "package": "uo/pakuo04.pk3",
+          "sha256": "17ecd8dc529d711aa30eb0152add0793dbef00e7e4a0db4eb851efdff7b037f0"
+        }
+      },
+      "server_model_fields": [
+        "worldModel",
+        "projectileModel"
+      ],
+      "source": {
+        "member": "weapons/sp/bazooka",
+        "package": "uo/pakuo07.pk3",
+        "sha256": "6acc6cbace6453eb874c2bda7074e8c189477778d3de8998c00ab1509fa3c304"
+      }
+    },
+    "beretta": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_beretta",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "ac5a2e08f27d0c051ee770ac6491e69d74609402a78464a47259a9af18d933f4"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_new",
+          "package": "Main/pak0.pk3",
+          "sha256": "be190fa03d3e9fd9427083cdb171d7bad27a71f8467cc161691c1bcdc59575a4"
+        },
+        "worldModel": {
+          "member": "xmodel/weapon_beretta",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "fef01343e4747606b78788f269635917755b0cb928f240adb920d810daf67c65"
+        }
+      },
+      "server_model_fields": [
+        "worldModel"
+      ],
+      "source": {
+        "member": "weapons/sp/beretta",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "56fbdf6bed8f2d8e3c5dc6fdb576c0caf992299e87c1a6db57af2d8589629729"
+      }
+    },
+    "binoculars": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/w_us_spw_binocular_view",
+          "package": "uo/pakuo04.pk3",
+          "sha256": "65d0a7809b3b1733867d4e24c8b519278fbb309f11770500ebc526808753aacf"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_new",
+          "package": "Main/pak0.pk3",
+          "sha256": "be190fa03d3e9fd9427083cdb171d7bad27a71f8467cc161691c1bcdc59575a4"
+        },
+        "worldModel": {
+          "member": "xmodel/w_us_spw_binocular_world",
+          "package": "uo/pakuo04.pk3",
+          "sha256": "9e181e389f7fa50c36c4bebd869728f214bfb3dc0f9776ceb06f554626fe4c2e"
+        }
+      },
+      "server_model_fields": [
+        "worldModel"
+      ],
+      "source": {
+        "member": "weapons/sp/binoculars",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "3cb534cdfb722936e8cdf8096d81acd02e69011e39ecd0ed6fb0860409918cca"
+      }
+    },
+    "breda": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_breda",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "18ef58df8385adaa25f41e35292ec0e739cd5d991bbddad9a11bdfc261e5421e"
+        },
+        "handModel": {
+          "member": "xmodel/viewhands_enhanced",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "8a1f034c9e77e17e401b2f6ca3740ac0808c8797accc1b89b269c4895477c28c"
+        },
+        "pickupModel": {
+          "member": "xmodel/worldmodel_breda",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "7053810ac778008007143cb9fd0da2aa9055e6a89572ec702e705356be98056b"
+        },
+        "worldModel": {
+          "member": "xmodel/worldmodel_breda",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "7053810ac778008007143cb9fd0da2aa9055e6a89572ec702e705356be98056b"
+        }
+      },
+      "server_model_fields": [
+        "worldModel",
+        "pickupModel"
+      ],
+      "source": {
+        "member": "weapons/sp/breda",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "8ba9ffef4a42540f90ab322342c9db91a7571dd46a7c41a4e5a5aab91e99b5db"
+      }
+    },
+    "bren": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_bren",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "deb42b8d0cfd3ec433bb23ffa00248aaa5816941ae9e22745fff2380f2e417aa"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_new",
+          "package": "Main/pak0.pk3",
+          "sha256": "be190fa03d3e9fd9427083cdb171d7bad27a71f8467cc161691c1bcdc59575a4"
+        },
+        "worldModel": {
+          "member": "xmodel/weapon_bren",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "801b186909c6e0d2b77617ca0cd7f864963086a94069ed859ef3314c9bb5a347"
+        }
+      },
+      "server_model_fields": [
+        "worldModel"
+      ],
+      "source": {
+        "member": "weapons/sp/bren",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "add11886ba52f8b9cadbed8f3f0be1f6d725a204b4ea11f1873fdcf817715d66"
+      }
+    },
+    "bubbles": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_fg42_un",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "6344ba72ea92fce64dcdf5e06eb5b15ba9fff565c9aaf9bdb1bf5bd017fc3fd8"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_sten",
+          "package": "Main/pak0.pk3",
+          "sha256": "390825a13d1cd8ebb4e45c4b085c6a07a70b0aa1bd97d1b334d9f284cae3408c"
+        },
+        "worldModel": {
+          "member": "xmodel/weapon_fg42_un",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "3e1d0a1723409d9190c4c9daa5c2628663934ea159394ea3ba0b7d8dca43b64d"
+        }
+      },
+      "server_model_fields": [
+        "worldModel"
+      ],
+      "source": {
+        "member": "weapons/sp/bubbles",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "81abf4f8634a0fcb40d34d01622610cae446285eda995b60882b112574acfe3d"
+      }
+    },
+    "carbinem1s": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_carbinem1s",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "358159927bb35f2bbe01312d46241fc38ac3938b61546e142b31b450b850c5af"
+        },
+        "handModel": {
+          "member": "xmodel/viewhands_enhanced",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "8a1f034c9e77e17e401b2f6ca3740ac0808c8797accc1b89b269c4895477c28c"
+        },
+        "worldModel": {
+          "member": "xmodel/weapon_carbinem1s",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "99dcfd612a701960079fd5dd10c5b62e29a96028e5b8d7369a1bbdcffd8947b7"
+        }
+      },
+      "server_model_fields": [
+        "worldModel"
+      ],
+      "source": {
+        "member": "weapons/sp/carbinem1s",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "e67038b4aa05adcb7b190feecc6d5169fe26e9b8087e3111a425e8756df30a33"
+      }
+    },
+    "carcano": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_carcano",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "0166fb1903fbbb95b7168e3dcf295e867c1f87819df8a70d4b146799388e3e6d"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_new",
+          "package": "Main/pak0.pk3",
+          "sha256": "be190fa03d3e9fd9427083cdb171d7bad27a71f8467cc161691c1bcdc59575a4"
+        },
+        "worldModel": {
+          "member": "xmodel/weapon_carcano",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "edd26121355fb1c3fa0fca19e33c8df1077feb18fbae17e304f035f6ea9754f9"
+        }
+      },
+      "server_model_fields": [
+        "worldModel"
+      ],
+      "source": {
+        "member": "weapons/sp/carcano",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "a32fd80edcd4a21b6256d6f6853fe50da540ff0447ded59394056477611a7927"
+      }
+    },
+    "colt": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_colt",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "bd8ee4bbf9d63ca7bb2a8e526c073ba495786be2b5823d8e10ca6c02dc8d50f0"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_new",
+          "package": "Main/pak0.pk3",
+          "sha256": "be190fa03d3e9fd9427083cdb171d7bad27a71f8467cc161691c1bcdc59575a4"
+        },
+        "worldModel": {
+          "member": "xmodel/weapon_colt45",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "92647b93233ab48f42418986a1affad8a8f8d2520dc8e55a9eed93603e3d80c6"
+        }
+      },
+      "server_model_fields": [
+        "worldModel"
+      ],
+      "source": {
+        "member": "weapons/sp/colt",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "b3f8ac275a377c9da88fc3e5cbbc9accc72c02a477844fb0da449f9019f3dead"
+      }
+    },
+    "delisle": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_delisle",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "6b23e6a2513f6758630c0b044fac9b123afc52828161ad65404ae5f02f9f73df"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_new",
+          "package": "Main/pak0.pk3",
+          "sha256": "be190fa03d3e9fd9427083cdb171d7bad27a71f8467cc161691c1bcdc59575a4"
+        },
+        "worldModel": {
+          "member": "xmodel/weapon_delisle",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "de0f8bc77fc36fdb2f42df32b234e4c9c8220158d0bd357d5bcaa19cf5ff1dcf"
+        }
+      },
+      "server_model_fields": [
+        "worldModel"
+      ],
+      "source": {
+        "member": "weapons/sp/delisle",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "732f2b0503d47166cfdddb058e393efe8eed97ccff809954048b931eedfe1856"
+      }
+    },
+    "dp28": {
+      "alt_weapon": "dp28_un",
+      "models": {
+        "gunModel": {
+          "member": "xmodel/w_rs_lmg_dp28_view",
+          "package": "uo/pakuo04.pk3",
+          "sha256": "ce0aa24f9eec90f31df870118d2a8f360706a88e59c383f8410f180b3d3177c5"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_new",
+          "package": "Main/pak0.pk3",
+          "sha256": "be190fa03d3e9fd9427083cdb171d7bad27a71f8467cc161691c1bcdc59575a4"
+        },
+        "pickupModel": {
+          "member": "xmodel/w_ru_mac_dp28_drop",
+          "package": "uo/pakuo04.pk3",
+          "sha256": "7b8465df6613e6bda36d8fdf7c8762e8ca8edf48c6fa45be6b3cbdd24bf3f340"
+        },
+        "worldModel": {
+          "member": "xmodel/w_ru_mac_dp28_game",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "37655c3b5b42fae227d92a4219b09357d16cec35164f3fe9d1ce38a0b46774f7"
+        }
+      },
+      "server_model_fields": [
+        "worldModel",
+        "pickupModel"
+      ],
+      "source": {
+        "member": "weapons/sp/dp28",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "108d1058d53b86f0cd80f4df469689855813556b611c4ac40616010311c1144c"
+      }
+    },
+    "dp28_un": {
+      "alt_weapon": "dp28",
+      "models": {
+        "gunModel": {
+          "member": "xmodel/w_rs_lmg_dp28_view",
+          "package": "uo/pakuo04.pk3",
+          "sha256": "ce0aa24f9eec90f31df870118d2a8f360706a88e59c383f8410f180b3d3177c5"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_new",
+          "package": "Main/pak0.pk3",
+          "sha256": "be190fa03d3e9fd9427083cdb171d7bad27a71f8467cc161691c1bcdc59575a4"
+        },
+        "pickupModel": {
+          "member": "xmodel/w_ru_mac_dp28_drop",
+          "package": "uo/pakuo04.pk3",
+          "sha256": "7b8465df6613e6bda36d8fdf7c8762e8ca8edf48c6fa45be6b3cbdd24bf3f340"
+        },
+        "worldModel": {
+          "member": "xmodel/w_ru_mac_dp28_game",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "37655c3b5b42fae227d92a4219b09357d16cec35164f3fe9d1ce38a0b46774f7"
+        }
+      },
+      "server_model_fields": [
+        "worldModel",
+        "pickupModel"
+      ],
+      "source": {
+        "member": "weapons/sp/dp28_un",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "78e78a045afbe9c492104e41a98eff8c1f2274388f23e0c97ec76616dff645d3"
+      }
+    },
+    "enfield": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_enfield",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "d4590f86e369df24df257d7c6641825996e4da5131741afcacc49f66976500fe"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_new",
+          "package": "Main/pak0.pk3",
+          "sha256": "be190fa03d3e9fd9427083cdb171d7bad27a71f8467cc161691c1bcdc59575a4"
+        },
+        "worldModel": {
+          "member": "xmodel/weapon_enfield",
+          "package": "Main/pak0.pk3",
+          "sha256": "7b11c5b590e8a3919604914e3c5a0f933612b94a3697570722eeeeb1b6c0018f"
+        }
+      },
+      "server_model_fields": [
+        "worldModel"
+      ],
+      "source": {
+        "member": "weapons/sp/enfield",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "5c1e6be0d4b7565bc378d06c62af418ef16b085e741be9e3b86dc6f14d04e41a"
+      }
+    },
+    "enfieldscoped": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_enfieldscoped",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "98da625286a690c2db7db35bd5549cd668800af5304c4a2b64165022892d39eb"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_new",
+          "package": "Main/pak0.pk3",
+          "sha256": "be190fa03d3e9fd9427083cdb171d7bad27a71f8467cc161691c1bcdc59575a4"
+        },
+        "worldModel": {
+          "member": "xmodel/weapon_enfieldscoped",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "92f49fe99923434a264e79573cc2978f7006dc092940d59384ffa6325d3f42e9"
+        }
+      },
+      "server_model_fields": [
+        "worldModel"
+      ],
+      "source": {
+        "member": "weapons/sp/enfieldscoped",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "b64f6047da2f4efd16abc8d041222338eedb3b0af0b031ce3ab43c38d05e5794"
+      }
+    },
+    "fg42": {
+      "alt_weapon": "FG42_Auto",
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_fg42",
+          "package": "Main/pak0.pk3",
+          "sha256": "45dd547809a0ee4aba102ff557ad0802c511217da2cb2d6d919b445e3d873d82"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_sten",
+          "package": "Main/pak0.pk3",
+          "sha256": "390825a13d1cd8ebb4e45c4b085c6a07a70b0aa1bd97d1b334d9f284cae3408c"
+        },
+        "worldModel": {
+          "member": "xmodel/weapon_FG42",
+          "package": "Main/pak0.pk3",
+          "sha256": "e8b50e9fd59d0eac099386f70e7e1865f13dd1ad5ef120a8835bff4f4a758d44"
+        }
+      },
+      "server_model_fields": [
+        "worldModel"
+      ],
+      "source": {
+        "member": "weapons/sp/FG42",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "8145607db6a3a0d321b5c4577202eb06d0cd1fac31c8394a5e868710c082d167"
+      }
+    },
+    "fg42_auto": {
+      "alt_weapon": "FG42",
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_fg42",
+          "package": "Main/pak0.pk3",
+          "sha256": "45dd547809a0ee4aba102ff557ad0802c511217da2cb2d6d919b445e3d873d82"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_sten",
+          "package": "Main/pak0.pk3",
+          "sha256": "390825a13d1cd8ebb4e45c4b085c6a07a70b0aa1bd97d1b334d9f284cae3408c"
+        },
+        "worldModel": {
+          "member": "xmodel/weapon_FG42",
+          "package": "Main/pak0.pk3",
+          "sha256": "e8b50e9fd59d0eac099386f70e7e1865f13dd1ad5ef120a8835bff4f4a758d44"
+        }
+      },
+      "server_model_fields": [
+        "worldModel"
+      ],
+      "source": {
+        "member": "weapons/sp/FG42_Auto",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "7d025760b9f6d9ed3d027fd0813a9eb15adc96f85bd2dd1d105c927f2cb746fc"
+      }
+    },
+    "flamethrower": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/w_ge_prj_flamethrower_view",
+          "package": "uo/pakuo04.pk3",
+          "sha256": "a3d9213a8658d16ea437123d7873654830a84389728f8d9e72e471e356261582"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_sten",
+          "package": "Main/pak0.pk3",
+          "sha256": "390825a13d1cd8ebb4e45c4b085c6a07a70b0aa1bd97d1b334d9f284cae3408c"
+        },
+        "pickupModel": {
+          "member": "xmodel/w_ge_prj_flamethrower_pickup",
+          "package": "uo/pakuo04.pk3",
+          "sha256": "117c7b8780d1f7878f1dfd38d0513a3912b5839f658ac458597424afd76aa9ce"
+        },
+        "worldModel": {
+          "member": "xmodel/w_ge_prj_flamethrower_game",
+          "package": "uo/pakuo04.pk3",
+          "sha256": "13824a5dfbc78325953bd6466cb204909bb636dbc84442641034b1298a40d3a8"
+        }
+      },
+      "server_model_fields": [
+        "worldModel",
+        "pickupModel"
+      ],
+      "source": {
+        "member": "weapons/sp/flamethrower",
+        "package": "uo/pakuo07.pk3",
+        "sha256": "bb611dde700525f1fbf0e26ddd23bc09b4aaae9b58ebaad6e6816bed516cbb3f"
+      }
+    },
+    "fraggrenade": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_MK2FragGrenade",
+          "package": "Main/pak0.pk3",
+          "sha256": "9460e9b42edcea6fef2d3d30ec76493a338f0cd6788540d48ee44ef496ff9edc"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_new",
+          "package": "Main/pak0.pk3",
+          "sha256": "be190fa03d3e9fd9427083cdb171d7bad27a71f8467cc161691c1bcdc59575a4"
+        },
+        "projectileModel": {
+          "member": "xmodel/projectile_USGrenade",
+          "package": "Main/pak0.pk3",
+          "sha256": "a8af72b833777166c7aa220953784e1efd23e6a2d204d5b0309e75d0f4bd9688"
+        },
+        "worldModel": {
+          "member": "xmodel/weapon_MK2FragGrenade",
+          "package": "Main/pak0.pk3",
+          "sha256": "68c991279f18b217f23acd20ca53cba4aea2d68b2c8898ec6058b82698208b82"
+        }
+      },
+      "server_model_fields": [
+        "worldModel",
+        "projectileModel"
+      ],
+      "source": {
+        "member": "weapons/sp/fraggrenade",
+        "package": "uo/pakuo07.pk3",
+        "sha256": "a652449c61af8ce73ee01642c790b58087f5281f5dc64ba3794adc3fe7fbc3dc"
+      }
+    },
+    "g41": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_g41",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "0702dccb6591e3fad6e981f199bfb93bc9f14587b2322633498ba6e51466ddde"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_new",
+          "package": "Main/pak0.pk3",
+          "sha256": "be190fa03d3e9fd9427083cdb171d7bad27a71f8467cc161691c1bcdc59575a4"
+        },
+        "worldModel": {
+          "member": "xmodel/weapon_g41",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "af71c56729db4300da1a5b583ca31bb9359a4347be8ee39777d03e81dde0eae6"
+        }
+      },
+      "server_model_fields": [
+        "worldModel"
+      ],
+      "source": {
+        "member": "weapons/sp/g41",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "fbfbfc79bab2043e434c3c5686be4fb21c6414f99e663613bbe4d7c18485d6f1"
+      }
+    },
+    "gewehr43": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/w_ge_rfl_gewehr43_view",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "1b31847e5eef337e2c674f8588e27d99a1502f3f95586ec8bd371cf899d17248"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_new",
+          "package": "Main/pak0.pk3",
+          "sha256": "be190fa03d3e9fd9427083cdb171d7bad27a71f8467cc161691c1bcdc59575a4"
+        },
+        "worldModel": {
+          "member": "xmodel/w_ge_rfl_gewehr43_world",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "f2c6d137c3c2a92321ebedb7ab12ee89a36c215bca529691de68f455e90e9994"
+        }
+      },
+      "server_model_fields": [
+        "worldModel"
+      ],
+      "source": {
+        "member": "weapons/sp/gewehr43",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "f7a650a7f71869a5463313a9dcfd91161aa89c26c935e0c96cdfa388b9c7b8d3"
+      }
+    },
+    "gewehr43_scoped": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_g43_scoped",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "de2668405dfc97bacaac13110b8654d5792132ecdbfe69fc6c8b11e8a29796a0"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_new",
+          "package": "Main/pak0.pk3",
+          "sha256": "be190fa03d3e9fd9427083cdb171d7bad27a71f8467cc161691c1bcdc59575a4"
+        },
+        "worldModel": {
+          "member": "xmodel/weapon_g43_scoped",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "658ba86f8a7a60a7ec1539c790c3ee0300399893a25cf67de2c9b84ebfb9e616"
+        }
+      },
+      "server_model_fields": [
+        "worldModel"
+      ],
+      "source": {
+        "member": "weapons/sp/gewehr43_scoped",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "5d0df48b2bbdbc07d9ab382eb6d5f998a265ba84634b576953f05082d3202b75"
+      }
+    },
+    "greaser": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_greasegun",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "dcb9d3721711b1be6f9c694af453b948e8a3b12092e8364282cd9532fa5e70c5"
+        },
+        "handModel": {
+          "member": "xmodel/viewhands_enhanced",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "8a1f034c9e77e17e401b2f6ca3740ac0808c8797accc1b89b269c4895477c28c"
+        },
+        "worldModel": {
+          "member": "xmodel/weapon_greasegun",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "1fce95a271b5a429901c65bf27ffe0223641244e415a73fbc63fd1890038957c"
+        }
+      },
+      "server_model_fields": [
+        "worldModel"
+      ],
+      "source": {
+        "member": "weapons/sp/greaser",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "a3793a9c7ad4a27da87ffbfff4f85747c3838a2531e137fc1bdff71eff97fc63"
+      }
+    },
+    "kar98k": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_kar98k",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "d4a552d88ebbb524ecdf7f2a08d124418214f8e0f907eea0fcd2da7112dbea1c"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_new",
+          "package": "Main/pak0.pk3",
+          "sha256": "be190fa03d3e9fd9427083cdb171d7bad27a71f8467cc161691c1bcdc59575a4"
+        },
+        "worldModel": {
+          "member": "xmodel/weapon_kAr98",
+          "package": "Main/pak0.pk3",
+          "sha256": "675dd3e1a3fb57c5ff4b5695c228ec0b7f1cb7ab286c0758e30f6d423e2970d7"
+        }
+      },
+      "server_model_fields": [
+        "worldModel"
+      ],
+      "source": {
+        "member": "weapons/sp/kar98k",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "9046062ec4d11b29c5c652b49f38966007646558de1b4cf032e35c77c73a419b"
+      }
+    },
+    "kar98k_sniper": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_kar98kscoped",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "a8049cda5148a094122bd651c6313232637ac88b88217cf38cb3e853418a916c"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_new",
+          "package": "Main/pak0.pk3",
+          "sha256": "be190fa03d3e9fd9427083cdb171d7bad27a71f8467cc161691c1bcdc59575a4"
+        },
+        "worldModel": {
+          "member": "xmodel/weapon_kar98scoped",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "c971c0f6eec50d1bbde4c9e06bd6dccd4f9f8cdb8f60df152eba1aa8967cd0f6"
+        }
+      },
+      "server_model_fields": [
+        "worldModel"
+      ],
+      "source": {
+        "member": "weapons/sp/kar98k_sniper",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "ff016559b8c2c92bf235fafde4fbbfd33b1e64587b7933b5851fca2cbac0f576"
+      }
+    },
+    "land_mine": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_land_mine",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "02bbbd38f169f2b9100faf82c58ba3acfb50566d3854d546557b7988c411f67f"
+        },
+        "handModel": {
+          "member": "xmodel/viewhands_enhanced",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "8a1f034c9e77e17e401b2f6ca3740ac0808c8797accc1b89b269c4895477c28c"
+        },
+        "pickupModel": {
+          "member": "xmodel/worldmodel_land_mine",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "e0f6ecd8121b7712b78058779747d5dd64d04ea8fff54723c590e1676aba052d"
+        },
+        "projectileModel": {
+          "member": "xmodel/noville_dummies",
+          "package": "uo/pakuo04.pk3",
+          "sha256": "d77eea506eb38963429ab9b2cd927f00bc2c0e87d45776508d2ae9cd044104e6"
+        },
+        "worldModel": {
+          "member": "xmodel/gamemodel_land_mine",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "a2a4adcaad13819e615ef85d0a23f93ed2f1eaf914c5662ec47fd07273a74c0c"
+        }
+      },
+      "server_model_fields": [
+        "worldModel",
+        "pickupModel",
+        "projectileModel"
+      ],
+      "source": {
+        "member": "weapons/sp/land_mine",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "a1fabb9d79ef36c9e0ec06e221330c5b2e723ea96218fbfbf2a96ca79540fba7"
+      }
+    },
+    "lewisgn": {
+      "alt_weapon": null,
+      "missing": "weapons/sp/lewisgn",
+      "models": {},
+      "server_model_fields": []
+    },
+    "luger": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_luger",
+          "package": "Main/pak0.pk3",
+          "sha256": "227cf7b732469444faacea5fe4eb8642e56dbdea56f9dd5c9f21553815284e83"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_new",
+          "package": "Main/pak0.pk3",
+          "sha256": "be190fa03d3e9fd9427083cdb171d7bad27a71f8467cc161691c1bcdc59575a4"
+        },
+        "worldModel": {
+          "member": "xmodel/weapon_luger",
+          "package": "Main/pak0.pk3",
+          "sha256": "cf1cc00cf95308827a71290b51f03b5e9a9f6e8354e9f15546b76fa3a425a49a"
+        }
+      },
+      "server_model_fields": [
+        "worldModel"
+      ],
+      "source": {
+        "member": "weapons/sp/luger",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "1a5630ad6121dbf402938361c68d336ff126a0f20384fa0b2833146b42550448"
+      }
+    },
+    "m1carbine": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_m1carbine",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "c2aa75f123bd73060851949362c8764dd16edbc6404063a8e35a38a0eef30c55"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_new",
+          "package": "Main/pak0.pk3",
+          "sha256": "be190fa03d3e9fd9427083cdb171d7bad27a71f8467cc161691c1bcdc59575a4"
+        },
+        "worldModel": {
+          "member": "xmodel/weapon_m1carbine",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "0c5cdfb447374b295d37a135bf986229eb12bdd5545703beb51eb60bf282fde8"
+        }
+      },
+      "server_model_fields": [
+        "worldModel"
+      ],
+      "source": {
+        "member": "weapons/sp/m1carbine",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "a3f5e024c17dd61236596a0103ea2c65d6f747a6dae2b28e0f1fbbc3cc4cdaa4"
+      }
+    },
+    "m1garand": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_m1garand",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "00b137085b7c17d58fee3cbf98427ac3c42dfb435b05b1bde8629b5077b8c515"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_new",
+          "package": "Main/pak0.pk3",
+          "sha256": "be190fa03d3e9fd9427083cdb171d7bad27a71f8467cc161691c1bcdc59575a4"
+        },
+        "worldModel": {
+          "member": "xmodel/weapon_m1garand",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "093e445c1e31e14dc956c7867ba0a4cf4ad0219632207713362f84e352902438"
+        }
+      },
+      "server_model_fields": [
+        "worldModel"
+      ],
+      "source": {
+        "member": "weapons/sp/m1garand",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "6995be3d612c9f99ec67e9e4c0bfe021ff80a7506203af3aa26fba22a9a69138"
+      }
+    },
+    "mab": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_mab",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "14b844be128dbdb3238321b0f7df27f7c84e9d3b31316876312786addbec3400"
+        },
+        "handModel": {
+          "member": "xmodel/viewhands_enhanced",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "8a1f034c9e77e17e401b2f6ca3740ac0808c8797accc1b89b269c4895477c28c"
+        },
+        "worldModel": {
+          "member": "xmodel/weapon_mab",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "636a3c9a4ddb349b40954ba2ca2d43867b0955bbc9e4d355eeda93db50644408"
+        }
+      },
+      "server_model_fields": [
+        "worldModel"
+      ],
+      "source": {
+        "member": "weapons/sp/mab",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "d32cd31f172e5b39fad8a4366e70bffbff47dc478b348c1c350e3880886868fa"
+      }
+    },
+    "mannlicher": {
+      "alt_weapon": null,
+      "missing": "weapons/sp/mannlicher",
+      "models": {},
+      "server_model_fields": []
+    },
+    "mauser_c96": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_mauser_c96",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "788fb6753db919c65d6eb0d98caad5c3ff7701e44ca012c1df3a5dd6ad5ea967"
+        },
+        "handModel": {
+          "member": "xmodel/viewhands_enhanced",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "8a1f034c9e77e17e401b2f6ca3740ac0808c8797accc1b89b269c4895477c28c"
+        },
+        "worldModel": {
+          "member": "xmodel/worldmodel_mauser_c96",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "beb0f245ad7f0fbbf0d461b90b0e1ba2be0a4c9b8f99df41550872cdf4251b3f"
+        }
+      },
+      "server_model_fields": [
+        "worldModel"
+      ],
+      "source": {
+        "member": "weapons/sp/mauser_c96",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "f80cb6c273a8f92f5994ffac1de05f8e1fe2edd8ffc1ff430c5677309d3ae3c4"
+      }
+    },
+    "mg30cal": {
+      "alt_weapon": "mg30Cal_de",
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_30cal_z",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "bcc88590821bcc97cee64c163f08945910a5a6d8c956acf031cefdc0612bd433"
+        },
+        "handModel": {
+          "member": "xmodel/viewhands_enhanced",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "8a1f034c9e77e17e401b2f6ca3740ac0808c8797accc1b89b269c4895477c28c"
+        },
+        "pickupModel": {
+          "member": "xmodel/w_us_mac_30cal_drop",
+          "package": "uo/pakuo04.pk3",
+          "sha256": "eb88fe449901b79d0f5bd3efa07838470df61cca690fab87f7274d0464ee9ab5"
+        },
+        "worldModel": {
+          "member": "xmodel/w_us_mac_30cal_game",
+          "package": "uo/pakuo04.pk3",
+          "sha256": "4c2094384db10ef386c4d074a0fecf540e2f3d7886c4fa4c388bd30f7128a3ee"
+        }
+      },
+      "server_model_fields": [
+        "worldModel",
+        "pickupModel"
+      ],
+      "source": {
+        "member": "weapons/sp/mg30Cal",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "dc9c6693e2037b40fa8368d1b71fe27c09d627eec740ae57f25629c11b2cda1f"
+      }
+    },
+    "mg30cal_de": {
+      "alt_weapon": "mg30Cal",
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_30cal_z",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "bcc88590821bcc97cee64c163f08945910a5a6d8c956acf031cefdc0612bd433"
+        },
+        "handModel": {
+          "member": "xmodel/viewhands_enhanced",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "8a1f034c9e77e17e401b2f6ca3740ac0808c8797accc1b89b269c4895477c28c"
+        },
+        "pickupModel": {
+          "member": "xmodel/w_us_mac_30cal_drop",
+          "package": "uo/pakuo04.pk3",
+          "sha256": "eb88fe449901b79d0f5bd3efa07838470df61cca690fab87f7274d0464ee9ab5"
+        },
+        "worldModel": {
+          "member": "xmodel/w_us_mac_30cal_game",
+          "package": "uo/pakuo04.pk3",
+          "sha256": "4c2094384db10ef386c4d074a0fecf540e2f3d7886c4fa4c388bd30f7128a3ee"
+        }
+      },
+      "server_model_fields": [
+        "worldModel",
+        "pickupModel"
+      ],
+      "source": {
+        "member": "weapons/sp/mg30cal_de",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "4cfec7e5574b07daa22fac8e642f0c2edeedf052b9c2cf5b15cfbb69ade9bf61"
+      }
+    },
+    "mg34": {
+      "alt_weapon": "mg34_de",
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_mg34_z",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "f2974bd710e31d9d1779894d9394bcbfdd489ecf18f5376b5f2b53994cfd270e"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_new",
+          "package": "Main/pak0.pk3",
+          "sha256": "be190fa03d3e9fd9427083cdb171d7bad27a71f8467cc161691c1bcdc59575a4"
+        },
+        "pickupModel": {
+          "member": "xmodel/w_ge_lmg_mg34_drop",
+          "package": "uo/pakuo04.pk3",
+          "sha256": "9948cacdbdea8f028c94dcb4ff8aad6d47ba97a3e0b2c8a54199657e24028b86"
+        },
+        "worldModel": {
+          "member": "xmodel/w_ge_lmg_mg34_world",
+          "package": "uo/pakuo04.pk3",
+          "sha256": "bdd1c12b53296672ca397bbaaa7dc2c5e807272ad523368da29fd816577dc424"
+        }
+      },
+      "server_model_fields": [
+        "worldModel",
+        "pickupModel"
+      ],
+      "source": {
+        "member": "weapons/sp/mg34",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "73e25023e877ad4db30549b90efb6752f1bb6875412acc1cc0747a05e1e792ae"
+      }
+    },
+    "mg34_de": {
+      "alt_weapon": "mg34",
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_mg34_z",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "f2974bd710e31d9d1779894d9394bcbfdd489ecf18f5376b5f2b53994cfd270e"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_new",
+          "package": "Main/pak0.pk3",
+          "sha256": "be190fa03d3e9fd9427083cdb171d7bad27a71f8467cc161691c1bcdc59575a4"
+        },
+        "pickupModel": {
+          "member": "xmodel/w_ge_lmg_mg34_drop",
+          "package": "uo/pakuo04.pk3",
+          "sha256": "9948cacdbdea8f028c94dcb4ff8aad6d47ba97a3e0b2c8a54199657e24028b86"
+        },
+        "worldModel": {
+          "member": "xmodel/w_ge_lmg_mg34_world",
+          "package": "uo/pakuo04.pk3",
+          "sha256": "bdd1c12b53296672ca397bbaaa7dc2c5e807272ad523368da29fd816577dc424"
+        }
+      },
+      "server_model_fields": [
+        "worldModel",
+        "pickupModel"
+      ],
+      "source": {
+        "member": "weapons/sp/mg34_de",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "c27f0d776ec2b98112116bedfecc2af4eea0b74c414035916e8ef698d1bdb53d"
+      }
+    },
+    "mg42": {
+      "alt_weapon": "mg42_de",
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_mg42s",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "0de01b987827552862b4ab1fd1b5a92482d6a41bed55f09f243ff413210517a0"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_new",
+          "package": "Main/pak0.pk3",
+          "sha256": "be190fa03d3e9fd9427083cdb171d7bad27a71f8467cc161691c1bcdc59575a4"
+        },
+        "pickupModel": {
+          "member": "xmodel/gamemodel_mg42",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "c70587421411995c39ce902b2ee43db6fa0d499e58f634eb3a9613c994d087e9"
+        },
+        "worldModel": {
+          "member": "xmodel/gamemodel_mg42",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "c70587421411995c39ce902b2ee43db6fa0d499e58f634eb3a9613c994d087e9"
+        }
+      },
+      "server_model_fields": [
+        "worldModel",
+        "pickupModel"
+      ],
+      "source": {
+        "member": "weapons/sp/mg42",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "4c5f5f19f96d887127859f492fb2abbe0d81b4697fc8562e8aaaf80d33322ea2"
+      }
+    },
+    "mg42_de": {
+      "alt_weapon": "mg42",
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_mg42s",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "0de01b987827552862b4ab1fd1b5a92482d6a41bed55f09f243ff413210517a0"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_new",
+          "package": "Main/pak0.pk3",
+          "sha256": "be190fa03d3e9fd9427083cdb171d7bad27a71f8467cc161691c1bcdc59575a4"
+        },
+        "pickupModel": {
+          "member": "xmodel/gamemodel_mg42",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "c70587421411995c39ce902b2ee43db6fa0d499e58f634eb3a9613c994d087e9"
+        },
+        "worldModel": {
+          "member": "xmodel/gamemodel_mg42",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "c70587421411995c39ce902b2ee43db6fa0d499e58f634eb3a9613c994d087e9"
+        }
+      },
+      "server_model_fields": [
+        "worldModel",
+        "pickupModel"
+      ],
+      "source": {
+        "member": "weapons/sp/mg42_de",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "79969def9c7d9f490656e5455a7a8cdfa1503cf1a16327bf426273382ab12ec1"
+      }
+    },
+    "mk1britishfrag": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_MK1",
+          "package": "Main/pak0.pk3",
+          "sha256": "24f1fe509aaed356dfcb77d964ca4397961843ed2a73c3fa3e3a69ba106a3ec6"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_new",
+          "package": "Main/pak0.pk3",
+          "sha256": "be190fa03d3e9fd9427083cdb171d7bad27a71f8467cc161691c1bcdc59575a4"
+        },
+        "projectileModel": {
+          "member": "xmodel/projectile_BritishGrenade",
+          "package": "Main/pak0.pk3",
+          "sha256": "0b518fca4bbef2b56c1cf2170efedce7214929d7aa2a51a5fe97bc6744a190a4"
+        },
+        "worldModel": {
+          "member": "xmodel/weapon_british_handgrenade",
+          "package": "Main/pak0.pk3",
+          "sha256": "ae43e2c44cd9b029380d39d8d421bce63c9e05888c42983ac3e6508ffddec60b"
+        }
+      },
+      "server_model_fields": [
+        "worldModel",
+        "projectileModel"
+      ],
+      "source": {
+        "member": "weapons/sp/MK1britishfrag",
+        "package": "uo/pakuo07.pk3",
+        "sha256": "9ab40ea80436c4b229e1a6ebf688755c67620fb0cb3018deee2751f2e2526c2c"
+      }
+    },
+    "mosin_nagant": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_nagant",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "ca23dcb0a6ba1d4f20965de021f9a56a099e3153646ce1466caffbf26d44375f"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_new",
+          "package": "Main/pak0.pk3",
+          "sha256": "be190fa03d3e9fd9427083cdb171d7bad27a71f8467cc161691c1bcdc59575a4"
+        },
+        "worldModel": {
+          "member": "xmodel/weapon_mosinnagant",
+          "package": "Main/pak0.pk3",
+          "sha256": "721eb13f11e0efbfcd26198e94718183097f67e1ccfc1ce73841655576b7890a"
+        }
+      },
+      "server_model_fields": [
+        "worldModel"
+      ],
+      "source": {
+        "member": "weapons/sp/mosin_nagant",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "0814cd63b89020eeb9f4d50419c58f08a9dc2391295f693bb847045f1dcb0dd1"
+      }
+    },
+    "mosin_nagant_sniper": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_nagantscoped",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "df3f84597452d78120171e8da88d37f267aaa8d327827f717117dec26b5bce8c"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_new",
+          "package": "Main/pak0.pk3",
+          "sha256": "be190fa03d3e9fd9427083cdb171d7bad27a71f8467cc161691c1bcdc59575a4"
+        },
+        "worldModel": {
+          "member": "xmodel/weapon_mosinnagantscoped",
+          "package": "Main/pak0.pk3",
+          "sha256": "4b534ac4b46ed6da931b94c6077476e45324272781e4a468193da13cdf29ad8e"
+        }
+      },
+      "server_model_fields": [
+        "worldModel"
+      ],
+      "source": {
+        "member": "weapons/sp/mosin_nagant_sniper",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "99bafbbebc750f16933c5534ce9b7d81acff3861bb9939059c696e341bf34a35"
+      }
+    },
+    "mp38": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_mp38",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "5d7587767315a9dbc85675022ac15d99f9184d583f6761185c0beb4d4f240cb7"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_sten",
+          "package": "Main/pak0.pk3",
+          "sha256": "390825a13d1cd8ebb4e45c4b085c6a07a70b0aa1bd97d1b334d9f284cae3408c"
+        },
+        "worldModel": {
+          "member": "xmodel/weapon_mp38",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "03a1ecb5bbd4fe17f44f4f72f1ca667dda8ab2ca958cf7fbc6ce8953cdde1cc5"
+        }
+      },
+      "server_model_fields": [
+        "worldModel"
+      ],
+      "source": {
+        "member": "weapons/sp/mp38",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "e4e47c8428faff69e980e2b741cb5c8835d4b7939bc05254f4b36dee127d7172"
+      }
+    },
+    "mp40": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_mp40",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "924e609eef057f78e4e611fca163bbc734d3cef2010a6940d44c495500fcacb3"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_sten",
+          "package": "Main/pak0.pk3",
+          "sha256": "390825a13d1cd8ebb4e45c4b085c6a07a70b0aa1bd97d1b334d9f284cae3408c"
+        },
+        "worldModel": {
+          "member": "xmodel/weapon_mp40",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "9bc1ab3987c90dfab3ce141792e746ec982f5613c319dcf8de49e868e7c6a0d0"
+        }
+      },
+      "server_model_fields": [
+        "worldModel"
+      ],
+      "source": {
+        "member": "weapons/sp/mp40",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "b4a7ebcfacad5df43fe6142c24aa2fd1918e357df66a49961e1ddd92121a830b"
+      }
+    },
+    "mp41": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_mp41",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "f313498cff7d7df367104ace8e7a382a380bd6306df5caffdb985e680add5ec2"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_sten",
+          "package": "Main/pak0.pk3",
+          "sha256": "390825a13d1cd8ebb4e45c4b085c6a07a70b0aa1bd97d1b334d9f284cae3408c"
+        },
+        "worldModel": {
+          "member": "xmodel/weapon_mp41",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "e193ed21040fef8b64386d10a4b8d9de00dbb012290fe6312e0cd56757a96963"
+        }
+      },
+      "server_model_fields": [
+        "worldModel"
+      ],
+      "source": {
+        "member": "weapons/sp/mp41",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "29096f2f4e586224b4972d443ed23a09cb79282934ed8b94ac80b9d7cbc0aee2"
+      }
+    },
+    "mp44": {
+      "alt_weapon": "mp44_semi",
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_mp44",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "98a660bb49936a0b05907fa52c64a006f26033674eb68f2cbcca3cd61fec1d1e"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_new",
+          "package": "Main/pak0.pk3",
+          "sha256": "be190fa03d3e9fd9427083cdb171d7bad27a71f8467cc161691c1bcdc59575a4"
+        },
+        "worldModel": {
+          "member": "xmodel/weapon_mp44",
+          "package": "Main/pak0.pk3",
+          "sha256": "1347ab888c27a47b4aa6f95fb29eb8ec22f1557455a6540cf8949f48f75f92ee"
+        }
+      },
+      "server_model_fields": [
+        "worldModel"
+      ],
+      "source": {
+        "member": "weapons/sp/mp44",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "2962e97f625fc7e3a85f62c106e7b5d0c9581bc3cdf60622f74c73b1dd35fbcb"
+      }
+    },
+    "mp44_semi": {
+      "alt_weapon": "mp44",
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_mp44",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "98a660bb49936a0b05907fa52c64a006f26033674eb68f2cbcca3cd61fec1d1e"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_new",
+          "package": "Main/pak0.pk3",
+          "sha256": "be190fa03d3e9fd9427083cdb171d7bad27a71f8467cc161691c1bcdc59575a4"
+        },
+        "worldModel": {
+          "member": "xmodel/weapon_mp44",
+          "package": "Main/pak0.pk3",
+          "sha256": "1347ab888c27a47b4aa6f95fb29eb8ec22f1557455a6540cf8949f48f75f92ee"
+        }
+      },
+      "server_model_fields": [
+        "worldModel"
+      ],
+      "source": {
+        "member": "weapons/sp/mp44_semi",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "c86521a674c905712814f4a1ad98549a90d7c9cc9cd483fbd7e34eb86d767fce"
+      }
+    },
+    "p38": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_walther_p38",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "de5d9856040a276db51fe106e34afd402b164dd00597c9161ccf0e011b154d20"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_new",
+          "package": "Main/pak0.pk3",
+          "sha256": "be190fa03d3e9fd9427083cdb171d7bad27a71f8467cc161691c1bcdc59575a4"
+        },
+        "worldModel": {
+          "member": "xmodel/worldmodel_walther_p38",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "da1518d582090e60f84953a84248a527f26b9f6a67dde4c90eb8680b4b365324"
+        }
+      },
+      "server_model_fields": [
+        "worldModel"
+      ],
+      "source": {
+        "member": "weapons/sp/p38",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "8c016af9f116d0c14fb49481b9eaf426b8dde4e34f73236115fd6b8a75795895"
+      }
+    },
+    "panzerfaust": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_panzerfaust",
+          "package": "Main/pak0.pk3",
+          "sha256": "b73f251716f7df7ad64d545e27c000fa5d9071957fb7af987cc1e08ee4c0164c"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_new",
+          "package": "Main/pak0.pk3",
+          "sha256": "be190fa03d3e9fd9427083cdb171d7bad27a71f8467cc161691c1bcdc59575a4"
+        },
+        "projectileModel": {
+          "member": "xmodel/weapon_panzerfaust_rocket",
+          "package": "Main/pak0.pk3",
+          "sha256": "2bb77a079c88adf56149b7a8f57f0fe582fbfca7cb5e8d13880771cedce8f1dd"
+        },
+        "worldModel": {
+          "member": "xmodel/weapon_panzerfaust",
+          "package": "Main/pak0.pk3",
+          "sha256": "79bb59f90715e5cc33135877a361d6166bff8015eb00cbb4b6fad88ef09fe58f"
+        }
+      },
+      "server_model_fields": [
+        "worldModel",
+        "projectileModel"
+      ],
+      "source": {
+        "member": "weapons/sp/panzerfaust",
+        "package": "uo/pakuo07.pk3",
+        "sha256": "25e560f0406c7628a3873c01a03444f8fc6e25abe7cbd6cbbdaf7dca0226dba4"
+      }
+    },
+    "panzerschreck": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/w_ge_prj_panzerschreck_view",
+          "package": "uo/pakuo04.pk3",
+          "sha256": "12b2563b2b0c46f95f2a4abef520094104f9c28384a4e33b37892adc3d6e5f50"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_new",
+          "package": "Main/pak0.pk3",
+          "sha256": "be190fa03d3e9fd9427083cdb171d7bad27a71f8467cc161691c1bcdc59575a4"
+        },
+        "projectileModel": {
+          "member": "xmodel/weapon_panzerfaust_rocket",
+          "package": "Main/pak0.pk3",
+          "sha256": "2bb77a079c88adf56149b7a8f57f0fe582fbfca7cb5e8d13880771cedce8f1dd"
+        },
+        "worldModel": {
+          "member": "xmodel/w_g_prj_panzerschreck_world",
+          "package": "uo/pakuo04.pk3",
+          "sha256": "9bb8fecad641919657617da88396cd681b4c2e857171045795860e78a3769e41"
+        }
+      },
+      "server_model_fields": [
+        "worldModel",
+        "projectileModel"
+      ],
+      "source": {
+        "member": "weapons/sp/panzerschreck",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "e4ba05873f9263c29edd8526fcc0658078bb538c5a9290939f52a6af18dfa7c9"
+      }
+    },
+    "piat": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_piat",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "76882d6760801b9e54bf5377c20f5cf0120f1f2e1717ad568418c4c5dc94b059"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_new",
+          "package": "Main/pak0.pk3",
+          "sha256": "be190fa03d3e9fd9427083cdb171d7bad27a71f8467cc161691c1bcdc59575a4"
+        },
+        "projectileModel": {
+          "member": "xmodel/weapon_panzerfaust_rocket",
+          "package": "Main/pak0.pk3",
+          "sha256": "2bb77a079c88adf56149b7a8f57f0fe582fbfca7cb5e8d13880771cedce8f1dd"
+        },
+        "worldModel": {
+          "member": "xmodel/worldmodel_piat",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "476497bee1dadabeef278a78b9ff3901ff4c64441e9fdddfbee9916d262c6e59"
+        }
+      },
+      "server_model_fields": [
+        "worldModel",
+        "projectileModel"
+      ],
+      "source": {
+        "member": "weapons/sp/piat",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "1f5ac5f323c70af18f8b307fc6a7cd501732b7b4fbb57f0b14cde2ad8cf8f30e"
+      }
+    },
+    "pnzrshr": {
+      "alt_weapon": null,
+      "missing": "weapons/sp/pnzrshr",
+      "models": {},
+      "server_model_fields": []
+    },
+    "ppsh": {
+      "alt_weapon": "ppsh_semi",
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_ppsh",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "d0cc0d07a7be4ccaed9502057a090e32e975eba6125a10fe44627274e5975879"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_sten",
+          "package": "Main/pak0.pk3",
+          "sha256": "390825a13d1cd8ebb4e45c4b085c6a07a70b0aa1bd97d1b334d9f284cae3408c"
+        },
+        "worldModel": {
+          "member": "xmodel/weapon_ppsh",
+          "package": "Main/pak0.pk3",
+          "sha256": "456d028411250dac2cfddf5cc1cca3b411e6e81abf46d5495afba96c3fbd2250"
+        }
+      },
+      "server_model_fields": [
+        "worldModel"
+      ],
+      "source": {
+        "member": "weapons/sp/ppsh",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "bf88ead8484cd3522b6b01cab0b14ed86d5f4777aa27d2af4cd26c3d09c69882"
+      }
+    },
+    "ppsh43": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_pps43",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "31538c11e6ae730722e834a2fde7a9a3818fce239de1a34edab12029f37ae8f9"
+        },
+        "handModel": {
+          "member": "xmodel/viewhands_enhanced",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "8a1f034c9e77e17e401b2f6ca3740ac0808c8797accc1b89b269c4895477c28c"
+        },
+        "worldModel": {
+          "member": "xmodel/weapon_pps43",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "b63e89db159bebf6eb6c53a247d8069d8c9cdf1a8b48b0e358ccc68322ed793c"
+        }
+      },
+      "server_model_fields": [
+        "worldModel"
+      ],
+      "source": {
+        "member": "weapons/sp/ppsh43",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "3425464eb19267c0ce377e0e472459cc32ea27cfd8b00f6c88d5a3e5a095a37b"
+      }
+    },
+    "ppsh_semi": {
+      "alt_weapon": "ppsh",
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_ppsh",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "d0cc0d07a7be4ccaed9502057a090e32e975eba6125a10fe44627274e5975879"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_new",
+          "package": "Main/pak0.pk3",
+          "sha256": "be190fa03d3e9fd9427083cdb171d7bad27a71f8467cc161691c1bcdc59575a4"
+        },
+        "worldModel": {
+          "member": "xmodel/weapon_ppsh",
+          "package": "Main/pak0.pk3",
+          "sha256": "456d028411250dac2cfddf5cc1cca3b411e6e81abf46d5495afba96c3fbd2250"
+        }
+      },
+      "server_model_fields": [
+        "worldModel"
+      ],
+      "source": {
+        "member": "weapons/sp/ppsh_semi",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "430cced3f7ea27cfbf803b633ba6e040fa556d3a2dece9f1d49f6914804cefde"
+      }
+    },
+    "ppshv2": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_ppshv2",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "b03db1c5d12b4e9e6f4a9b849654a3765e242ae7f15cefe40b4caa3eb2c8f94d"
+        },
+        "handModel": {
+          "member": "xmodel/viewhands_enhanced",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "8a1f034c9e77e17e401b2f6ca3740ac0808c8797accc1b89b269c4895477c28c"
+        },
+        "worldModel": {
+          "member": "xmodel/weapon_ppshv2",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "af506ca854bdc932ee25ce6deb9d828378e23ce1dcfbeebbfe7a6b7bf53684e2"
+        }
+      },
+      "server_model_fields": [
+        "worldModel"
+      ],
+      "source": {
+        "member": "weapons/sp/ppshv2",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "323d84d189f3af709be9ded4a45692ca54185db0b210d91dfd40857d4f098600"
+      }
+    },
+    "rgd-33russianfrag": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_rgd33",
+          "package": "Main/pak0.pk3",
+          "sha256": "ea2e184ad60c11cc121f79d853319ad818ad1d4bfe4ed002977aa031ec748bfb"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_new",
+          "package": "Main/pak0.pk3",
+          "sha256": "be190fa03d3e9fd9427083cdb171d7bad27a71f8467cc161691c1bcdc59575a4"
+        },
+        "projectileModel": {
+          "member": "xmodel/projectile_RussianGrenade",
+          "package": "Main/pak0.pk3",
+          "sha256": "8a6b685ba8c9adde6ce060f07ec755b9c3c06aca986887dd4dd8872aee3f297b"
+        },
+        "worldModel": {
+          "member": "xmodel/weapon_russian_handgrenade",
+          "package": "Main/pak0.pk3",
+          "sha256": "25ec453064019ab3158ae7775b5f5eb49fc9eb74f693f68f8e0eaeaf412bbdce"
+        }
+      },
+      "server_model_fields": [
+        "worldModel",
+        "projectileModel"
+      ],
+      "source": {
+        "member": "weapons/sp/RGD-33russianfrag",
+        "package": "uo/pakuo07.pk3",
+        "sha256": "a5fc8f2ad78c25e0c304ba2df373464964a125438be689a856fb5d69ee92f30d"
+      }
+    },
+    "satchelcharge": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/w_us_grn_satchel_view",
+          "package": "uo/pakuo04.pk3",
+          "sha256": "10a630ee25e77da5005d153d3f88fcca675f948e791b206b716fa3d47082063b"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_new",
+          "package": "Main/pak0.pk3",
+          "sha256": "be190fa03d3e9fd9427083cdb171d7bad27a71f8467cc161691c1bcdc59575a4"
+        },
+        "projectileModel": {
+          "member": "xmodel/w_us_grn_satchel_game",
+          "package": "uo/pakuo04.pk3",
+          "sha256": "1b503cca14662f6cf033812d9f8fe578c2b9c46bd2619660dd3e56e8a9b2b459"
+        },
+        "worldModel": {
+          "member": "xmodel/w_us_grn_satchel_game",
+          "package": "uo/pakuo04.pk3",
+          "sha256": "1b503cca14662f6cf033812d9f8fe578c2b9c46bd2619660dd3e56e8a9b2b459"
+        }
+      },
+      "server_model_fields": [
+        "worldModel",
+        "projectileModel"
+      ],
+      "source": {
+        "member": "weapons/sp/satchelcharge",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "6987a8a9b155fe32581a4fd186e12de2c395cd8e8b91fb214517fd6d60ee75b1"
+      }
+    },
+    "smokegrenade": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/w_us_grn_m18_view",
+          "package": "uo/pakuo04.pk3",
+          "sha256": "cccc0dc55bfc1c1091ce61ebb46f73c4d4e644621a1ccefdea6c0418f26cb239"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_new",
+          "package": "Main/pak0.pk3",
+          "sha256": "be190fa03d3e9fd9427083cdb171d7bad27a71f8467cc161691c1bcdc59575a4"
+        },
+        "pickupModel": {
+          "member": "xmodel/w_us_grn_m18_drop_lod1",
+          "package": "uo/pakuo04.pk3",
+          "sha256": "e6320be2d7c00162a529d51b34c595b71ad3cf718b761884603391997ac572ab"
+        },
+        "projectileModel": {
+          "member": "xmodel/w_us_grn_m18_game",
+          "package": "uo/pakuo04.pk3",
+          "sha256": "be4e46b6457711748ad7be1e9908cd1f7e685b4fa76931fac84878ef620c1b28"
+        },
+        "worldModel": {
+          "member": "xmodel/w_us_grn_m18_game",
+          "package": "uo/pakuo04.pk3",
+          "sha256": "be4e46b6457711748ad7be1e9908cd1f7e685b4fa76931fac84878ef620c1b28"
+        }
+      },
+      "server_model_fields": [
+        "worldModel",
+        "pickupModel",
+        "projectileModel"
+      ],
+      "source": {
+        "member": "weapons/sp/smokegrenade",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "1c17466679c3b7ee8d3ec36d1279123c27170257a004c1841fd6a1ebe45146b6"
+      }
+    },
+    "springfield": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_springfield",
+          "package": "Main/pak0.pk3",
+          "sha256": "223b17f252e90eb90cc51d3e0a049586a5a84438861e956974f57f78b187be89"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_new",
+          "package": "Main/pak0.pk3",
+          "sha256": "be190fa03d3e9fd9427083cdb171d7bad27a71f8467cc161691c1bcdc59575a4"
+        },
+        "worldModel": {
+          "member": "xmodel/weapon_springfield",
+          "package": "Main/pak0.pk3",
+          "sha256": "81fae1a89c85d79d2c970fcca9676a551971710588916f576b07135698ac8b5c"
+        }
+      },
+      "server_model_fields": [
+        "worldModel"
+      ],
+      "source": {
+        "member": "weapons/sp/springfield",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "14f158a1b7b75f716777a99b425ede7753f85ec7659e176f2564da4e5d7c110f"
+      }
+    },
+    "springfielda1_un": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_springfielda1_un",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "569d5d8610f67f2e2a394521f66db1927070a556d0b17f6969381b46d150fbba"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_new",
+          "package": "Main/pak0.pk3",
+          "sha256": "be190fa03d3e9fd9427083cdb171d7bad27a71f8467cc161691c1bcdc59575a4"
+        },
+        "worldModel": {
+          "member": "xmodel/weapon_springfielda1_un",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "db04fd8e338b95037bdfec81f6831b8304cabde71832b7cdb6a578b19e392940"
+        }
+      },
+      "server_model_fields": [
+        "worldModel"
+      ],
+      "source": {
+        "member": "weapons/sp/springfielda1_un",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "b2ccda91488f76d18c3174e05da9bc2af4c97100103f92dccd4ca536f0d0fcd0"
+      }
+    },
+    "sten": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/w_br_smg_sten_view",
+          "package": "uo/pakuo04.pk3",
+          "sha256": "85b12a2223b84492700ba77bb935045b2dc32df7559e4ecd77db35a3af31a006"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_sten",
+          "package": "Main/pak0.pk3",
+          "sha256": "390825a13d1cd8ebb4e45c4b085c6a07a70b0aa1bd97d1b334d9f284cae3408c"
+        },
+        "pickupModel": {
+          "member": "xmodel/w_br_smg_sten_drop",
+          "package": "uo/pakuo04.pk3",
+          "sha256": "53e14263feafbded716bf4d9688423195f7eec4412e1cb32147ecf0cc422f6f7"
+        },
+        "worldModel": {
+          "member": "xmodel/w_br_smg_sten_world",
+          "package": "uo/pakuo04.pk3",
+          "sha256": "bf201d293af4b9bdc45235c4444d36ed7072a8b1f0529a518aa4c45753e4bd47"
+        }
+      },
+      "server_model_fields": [
+        "worldModel",
+        "pickupModel"
+      ],
+      "source": {
+        "member": "weapons/sp/sten",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "55e7e25a611e021cdd9ee12cc9bc0788466039dfdeb27eadb6af01334f24a51b"
+      }
+    },
+    "sten_silenced": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/w_br_smg_sten_silenced_view",
+          "package": "uo/pakuo04.pk3",
+          "sha256": "15b564f73ea7b1c1cc8442a69148070e626ae8e6b182f4b02574e3bd3f643f05"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_sten",
+          "package": "Main/pak0.pk3",
+          "sha256": "390825a13d1cd8ebb4e45c4b085c6a07a70b0aa1bd97d1b334d9f284cae3408c"
+        },
+        "pickupModel": {
+          "member": "xmodel/w_br_smg_sten_silenced_drop",
+          "package": "uo/pakuo04.pk3",
+          "sha256": "c4ebaf1d011b6909bf11109590a73af5b4c02cf52488b521c458f9402f210f84"
+        },
+        "worldModel": {
+          "member": "xmodel/w_br_smg_sten_silenced_world",
+          "package": "uo/pakuo04.pk3",
+          "sha256": "0b6127abeb2510d6ca005184a77683d2d07e286c895e053158881cc338301813"
+        }
+      },
+      "server_model_fields": [
+        "worldModel",
+        "pickupModel"
+      ],
+      "source": {
+        "member": "weapons/sp/sten_silenced",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "239373d138e8846ae86dbe866fe28114f62b793500416030bfe043db50cc4661"
+      }
+    },
+    "stenmk5": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_stenmk5",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "c0dd2f5fdcfd3ac834fb92bda4617e394108989a601ed5c82dda517ef029c929"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_sten",
+          "package": "Main/pak0.pk3",
+          "sha256": "390825a13d1cd8ebb4e45c4b085c6a07a70b0aa1bd97d1b334d9f284cae3408c"
+        },
+        "pickupModel": {
+          "member": "xmodel/weapon_stenmk5",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "d9866ed4a78f0dbd8060d55690fa81db580937c425d50bdb3395f0b6a2022cb1"
+        },
+        "worldModel": {
+          "member": "xmodel/weapon_stenmk5",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "d9866ed4a78f0dbd8060d55690fa81db580937c425d50bdb3395f0b6a2022cb1"
+        }
+      },
+      "server_model_fields": [
+        "worldModel",
+        "pickupModel"
+      ],
+      "source": {
+        "member": "weapons/sp/stenmk5",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "ed0e2edfd7d15f8688380490c76561bb39d77fc7d825a963b9c33c8ddec1c531"
+      }
+    },
+    "stielhandgranate": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_nebelhandgrenate",
+          "package": "Main/pak0.pk3",
+          "sha256": "16c573c6b29ec81925e5f44567fb98b104f5152da3265023138268df33c729e7"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_new",
+          "package": "Main/pak0.pk3",
+          "sha256": "be190fa03d3e9fd9427083cdb171d7bad27a71f8467cc161691c1bcdc59575a4"
+        },
+        "projectileModel": {
+          "member": "xmodel/projectile_GermanGrenade",
+          "package": "Main/pak0.pk3",
+          "sha256": "5035b3ae7ce60274441c97ee2d82ea335918bd33ba311104dc1ce8dc6ccf46ee"
+        },
+        "worldModel": {
+          "member": "xmodel/weapon_nebelhandgrenate",
+          "package": "Main/pak0.pk3",
+          "sha256": "a472a11fc925c50a04c8f1f5f929ac1d36f3e633a2c01a2001941b33c1edd3ee"
+        }
+      },
+      "server_model_fields": [
+        "worldModel",
+        "projectileModel"
+      ],
+      "source": {
+        "member": "weapons/sp/Stielhandgranate",
+        "package": "uo/pakuo07.pk3",
+        "sha256": "4a743a3c67e9c6affa05ec9b2373a00bf547fc44a1b333fe650626abfec527a4"
+      }
+    },
+    "stuka_guns": {
+      "alt_weapon": null,
+      "models": {},
+      "server_model_fields": [],
+      "source": {
+        "member": "weapons/sp/stuka_guns",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "29ffe329aa960f852dbd435d3104b6bf7d2998a4683695f565e664fcf63a77f5"
+      }
+    },
+    "svt40": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/w_rs_rfl_svt40_view",
+          "package": "uo/pakuo04.pk3",
+          "sha256": "a82f26313c2bdb8549fcfcebbb21562a9193be1da3a85ae264d5aca1e4bcb27f"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_new",
+          "package": "Main/pak0.pk3",
+          "sha256": "be190fa03d3e9fd9427083cdb171d7bad27a71f8467cc161691c1bcdc59575a4"
+        },
+        "pickupModel": {
+          "member": "xmodel/w_ru_rfl_svt40_game",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "cd67eadb27f508bdb81011e86a0153dc19ee1ed4842702eaf9d99e4fc71c19d5"
+        },
+        "worldModel": {
+          "member": "xmodel/w_ru_rfl_svt40_game",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "cd67eadb27f508bdb81011e86a0153dc19ee1ed4842702eaf9d99e4fc71c19d5"
+        }
+      },
+      "server_model_fields": [
+        "worldModel",
+        "pickupModel"
+      ],
+      "source": {
+        "member": "weapons/sp/svt40",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "6ecdd81757b79aaf845fd03f77deb0873b1375f0fb1911806ac739829750ca1f"
+      }
+    },
+    "thompson": {
+      "alt_weapon": "thompson_semi",
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_thompson",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "4907ae56aa7c8ec248925f3cb365b765cd6a958ebe03bffc825b8fe883fe2b07"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_new",
+          "package": "Main/pak0.pk3",
+          "sha256": "be190fa03d3e9fd9427083cdb171d7bad27a71f8467cc161691c1bcdc59575a4"
+        },
+        "worldModel": {
+          "member": "xmodel/weapon_thompson",
+          "package": "Main/pak0.pk3",
+          "sha256": "090d24de2b28db3dcc1c9a953b94d58f68d7fcc3addead3ac29c4b2b919a08ec"
+        }
+      },
+      "server_model_fields": [
+        "worldModel"
+      ],
+      "source": {
+        "member": "weapons/sp/thompson",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "b30321e083d77c0037289689808fc58cc8d628f130c1ceae1008bfaeb8d10c73"
+      }
+    },
+    "thompson28": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_thompson28",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "de0b7167ea8b42d56cc03b6e782b43836cfbed114d20c30255a333ae7503ec3e"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_new",
+          "package": "Main/pak0.pk3",
+          "sha256": "be190fa03d3e9fd9427083cdb171d7bad27a71f8467cc161691c1bcdc59575a4"
+        },
+        "worldModel": {
+          "member": "xmodel/weapon_thompson28",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "f3b9a4ce1a235e1838d4929c6bcb3e023d6f09724b559dcae7000030db72e319"
+        }
+      },
+      "server_model_fields": [
+        "worldModel"
+      ],
+      "source": {
+        "member": "weapons/sp/thompson28",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "71d05ef9a8140536351678cd238834d85839c3e97d7564fe07bca93f06c2bcb6"
+      }
+    },
+    "thompson_semi": {
+      "alt_weapon": "thompson",
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_thompson",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "4907ae56aa7c8ec248925f3cb365b765cd6a958ebe03bffc825b8fe883fe2b07"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_new",
+          "package": "Main/pak0.pk3",
+          "sha256": "be190fa03d3e9fd9427083cdb171d7bad27a71f8467cc161691c1bcdc59575a4"
+        },
+        "worldModel": {
+          "member": "xmodel/weapon_thompson",
+          "package": "Main/pak0.pk3",
+          "sha256": "090d24de2b28db3dcc1c9a953b94d58f68d7fcc3addead3ac29c4b2b919a08ec"
+        }
+      },
+      "server_model_fields": [
+        "worldModel"
+      ],
+      "source": {
+        "member": "weapons/sp/thompson_semi",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "a6f255245bf23c7c8580d23a1f69e7fb387693cbcf5e045d48606b1be99d96c5"
+      }
+    },
+    "thompsonm1": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_thompsonm1",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "c299b9ced0c6b4c2a4695252cd75012361cf26a2d5cd098b843f5851ef6c0b2a"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_new",
+          "package": "Main/pak0.pk3",
+          "sha256": "be190fa03d3e9fd9427083cdb171d7bad27a71f8467cc161691c1bcdc59575a4"
+        },
+        "worldModel": {
+          "member": "xmodel/weapon_thompsonm1",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "f48203235a555a9cba6c594d90f8870f61a770cc058569d9aedb29fd72017cdf"
+        }
+      },
+      "server_model_fields": [
+        "worldModel"
+      ],
+      "source": {
+        "member": "weapons/sp/thompsonm1",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "e9b5ae1c5a7a461845daa01e14e7fd2d8d8cb51e9eb2ca75208a705fc79ef124"
+      }
+    },
+    "tt33": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/w_rs_pst_tt33_view",
+          "package": "uo/pakuo04.pk3",
+          "sha256": "d35a58b592035509360fa4776c0e38b2cb044918cd64670710e0fe4789ca60c6"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_new",
+          "package": "Main/pak0.pk3",
+          "sha256": "be190fa03d3e9fd9427083cdb171d7bad27a71f8467cc161691c1bcdc59575a4"
+        },
+        "pickupModel": {
+          "member": "xmodel/w_ru_pst_tt33_game",
+          "package": "uo/pakuo04.pk3",
+          "sha256": "995dc9400510047e152c5baf5815b9af0ac22317c640e6089c1619e529b678ec"
+        },
+        "worldModel": {
+          "member": "xmodel/w_ru_pst_tt33_game",
+          "package": "uo/pakuo04.pk3",
+          "sha256": "995dc9400510047e152c5baf5815b9af0ac22317c640e6089c1619e529b678ec"
+        }
+      },
+      "server_model_fields": [
+        "worldModel",
+        "pickupModel"
+      ],
+      "source": {
+        "member": "weapons/sp/tt33",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "607e81c6c791b90d057275e69ea42be7319f9d235e325b939c7a6c5eedb2d27e"
+      }
+    },
+    "webley": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/w_br_pst_webley_view",
+          "package": "uo/pakuo04.pk3",
+          "sha256": "9c4168025764e42be163072ab7871c5f2e1c28e70b4098478944c67375f9610c"
+        },
+        "handModel": {
+          "member": "xmodel/viewmodel_hands_new",
+          "package": "Main/pak0.pk3",
+          "sha256": "be190fa03d3e9fd9427083cdb171d7bad27a71f8467cc161691c1bcdc59575a4"
+        },
+        "worldModel": {
+          "member": "xmodel/w_br_pst_webley_world",
+          "package": "uo/pakuo04.pk3",
+          "sha256": "8b5b19c0d6c6bfe91970e86813bbb9719804f3dedd4ba1222c3bc391ab88b29a"
+        }
+      },
+      "server_model_fields": [
+        "worldModel"
+      ],
+      "source": {
+        "member": "weapons/sp/webley",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "190ad5e5b73afc77847e35ba396f94af0a75c7dfaa119ce02f750ed2245c048a"
+      }
+    },
+    "welrod": {
+      "alt_weapon": null,
+      "models": {
+        "gunModel": {
+          "member": "xmodel/viewmodel_welrod",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "4104f42c5608c2273929452b6598943ec9943ce98bb8f38e29e93aa16f011fc6"
+        },
+        "handModel": {
+          "member": "xmodel/viewhands_enhanced",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "8a1f034c9e77e17e401b2f6ca3740ac0808c8797accc1b89b269c4895477c28c"
+        },
+        "worldModel": {
+          "member": "xmodel/worldmodel_welrod",
+          "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+          "sha256": "68b64ad558f1b0da76320a3aa52a6cf36f3103c9269eccd9b2dcb61978ed4294"
+        }
+      },
+      "server_model_fields": [
+        "worldModel"
+      ],
+      "source": {
+        "member": "weapons/sp/welrod",
+        "package": "UnitedFronts/ZUnitedFronts_1.1_beta.pk3",
+        "sha256": "b0cb68ae2dd6880d73e29b75873e268acda1f279c25ec7a1658f8b29995aea80"
+      }
+    },
+    "wz28": {
+      "alt_weapon": null,
+      "missing": "weapons/sp/wz28",
+      "models": {},
+      "server_model_fields": []
+    },
+    "wz29": {
+      "alt_weapon": null,
+      "missing": "weapons/sp/wz29",
+      "models": {},
+      "server_model_fields": []
+    }
+  },
+  "world_authority": [
+    "sp_ally",
+    "sp_axis",
+    "sp_ally_nation",
+    "sp_year",
+    "sp_history",
+    "sp_order"
+  ]
+}

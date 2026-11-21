@@ -1,38 +1,13 @@
 #!/usr/bin/env python3
-"""Install Call of Duty Coop + United Offensive 1.51 into a Call of Duty folder on Linux.
+"""Install or repair a complete, pinned CoDCoop 0.6 campaign suite.
 
-The easy way: download "Call of Duty - UO Coop Ready.zip" from MEGA, extract it,
-and run this script from the extracted folder (it finds the game itself):
+Development packages require an existing game and a target-OS payload:
+    python3 tools/install-linux.py --game PATH --suite-source PAYLOAD
+    python3 tools/install-linux.py --game PATH --check
+    python3 tools/install-linux.py --game PATH --rollback
 
-    python3 install-linux.py
-
-    # or point it at the folder / the ZIP
-    python3 install-linux.py --game "/path/to/Call of Duty"
-    python3 install-linux.py --archive "Call of Duty - UO Coop Ready.zip"
-
-It copies the ready game/ tree (United Offensive 1.51 + the mod) into the game
-folder. Nothing is mounted and no Windows patch wizard is involved.
-
-Other ways:
-
-    # from the ready ZIP, without extracting it first
-    python3 install-linux.py --game "..." --archive "Call of Duty - UO Coop Ready.zip"
-
-    # from a folder that contains game/ (for example the extracted ZIP)
-    python3 install-linux.py --game "..." --source "/path/to/Call of Duty - UO Coop Ready"
-
-    # mod only, from the latest GitHub release (old behaviour)
-    python3 install-linux.py --game "..." --release
-
-    # mod only, from a local build/ produced by ./build.sh
-    python3 install-linux.py --game "..." --build build
-
-    # only check an existing installation
-    python3 install-linux.py --game "..." --check
-
-Nothing is written without a backup: an existing file is copied to <name>.bak first.
-Call of Duty 1.5 (CoDSP.exe, 1,716,224 bytes) is required and checked before
-anything is written.
+The graphical installer imports this same backend. A legacy 0.5.4 archive may
+supply base data, but never constitutes a successful complete 0.6 installation.
 """
 import argparse
 import hashlib
@@ -48,6 +23,7 @@ import urllib.request
 import zipfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from frozen_runtime import external_environment
 try:
     from extract_installer import resources  # noqa: E402  (same folder, optional)
 except Exception:  # pragma: no cover - only needed for --release
@@ -61,8 +37,8 @@ API_URL = "https://api.github.com/repos/%s/releases" % REPO
 # The ready package (United Offensive 1.51 + mod) lives on MEGA. The link is in
 # README.md / docs/linux.md; override it here if you mirror the file:
 READY_URL = os.environ.get("COD_READY_URL", "")
-READY_SIZE = 0       # 0 = do not check (the ZIP is rebuilt from time to time)
-READY_SHA = ""
+READY_SIZE = 1036938510
+READY_SHA = "c5f22a300a4186ad07755e704606bde9e2dfc9fbb3c15ac214ea7d96ec5b2f3d"
 
 EXE_SIZE = 1716224          # Call of Duty 1.5 (CoDSP.exe)
 EXE_SHA = "c755c7da411c87039ade462a2299402c3c4ca5c4fc4f1ae5cea6e25b05c69f47"
@@ -73,8 +49,8 @@ EXE_SHA = "c755c7da411c87039ade462a2299402c3c4ca5c4fc4f1ae5cea6e25b05c69f47"
 GERMAN_URL = os.environ.get(
     "COD_GERMAN_URL",
     "https://github.com/%s/releases/download/%%s/CoD-UO-German-Language.zip" % REPO)
-GERMAN_SIZE = 0             # 0 = do not check
-GERMAN_SHA = ""
+GERMAN_SIZE = 657419767
+GERMAN_SHA = "5f1113e82aa11c12c3769275a5048a5e3d0fe5e38fb5929c1305883cdf515b5c"
 
 # Optional extras: Singleplayer Improved 1.5, United Fronts 1.1 beta and the
 # official UO map pack. One ZIP, because the map pack is already part of the
@@ -82,8 +58,8 @@ GERMAN_SHA = ""
 EXTRAS_URL = os.environ.get(
     "COD_EXTRAS_URL",
     "https://github.com/%s/releases/download/%%s/CoD-SP-Extras.zip" % REPO)
-EXTRAS_SIZE = 0             # 0 = do not check
-EXTRAS_SHA = ""
+EXTRAS_SIZE = 922302300
+EXTRAS_SHA = "9630d73e2e87331f8a115816cfda38636c10917211419a11d0d72b49c1366d3c"
 
 # Graphics presets written into config.cfg (Call of Duty 1 / United Offensive).
 # Values follow the PCGamingWiki fixes: max model detail, no LOD pop-up and
@@ -310,7 +286,7 @@ def offer_spacewar():
         return
     for cmd in (["xdg-open", url], ["steam", url]):
         try:
-            subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=external_environment())
             say("asked Steam to install Spacewar (" + url + ")")
             return
         except FileNotFoundError:
@@ -319,37 +295,57 @@ def offer_spacewar():
 
 
 def download(url, dest, expected_sha=None, expected_size=None):
-    """Download with a .part file; verify size and sha256 when they are known."""
-    say("downloading %s" % url)
-    req = urllib.request.Request(url, headers={"User-Agent": "cod-coop-linux-installer"})
+    """Resume a pinned download; never promote partial or unverified bytes."""
+    if not expected_sha or not expected_size:
+        raise ValueError("a pinned SHA-256 and size are required for downloads")
+    os.makedirs(os.path.dirname(os.path.abspath(dest)), exist_ok=True)
+    if os.path.isfile(dest) and os.path.getsize(dest) == expected_size and sha256(dest) == expected_sha:
+        return dest
     part = dest + ".part"
-    total = 0
-    done = 0
-    with urllib.request.urlopen(req, timeout=60) as r, open(part, "wb") as f:
-        total = int(r.headers.get("Content-Length") or 0)
-        last = -5
-        while True:
-            chunk = r.read(1 << 20)
-            if not chunk:
-                break
-            f.write(chunk)
-            done += len(chunk)
-            if total:
-                pct = done * 100 // total
-                if pct >= last + 5:
-                    say("  %3d%%  %6.1f / %6.1f MB" % (pct, done / 1048576.0, total / 1048576.0))
-                    last = pct
-    if total:
-        say("  100%%  %6.1f MB" % (done / 1048576.0))
-    size = os.path.getsize(part)
-    if expected_size and size != expected_size:
+    offset = os.path.getsize(part) if os.path.isfile(part) else 0
+    if offset > expected_size:
         os.unlink(part)
-        die("download is %d bytes, expected %d - delete the cache and try again" % (size, expected_size))
-    if expected_sha:
-        got = sha256(part)
-        if got != expected_sha:
-            os.unlink(part)
-            die("download sha256 %s does not match %s" % (got, expected_sha))
+        offset = 0
+    if offset == expected_size:
+        if sha256(part) == expected_sha:
+            os.replace(part, dest)
+            return dest
+        os.unlink(part)
+        offset = 0
+    headers = {"User-Agent": "cod-coop-suite-installer/0.6"}
+    if offset:
+        headers["Range"] = "bytes=%d-" % offset
+    say("Downloading %s%s" % (url, " (resuming)" if offset else ""))
+    req = urllib.request.Request(url, headers=headers)
+    with urllib.request.urlopen(req, timeout=60) as r:
+        partial = r.status == 206
+        if partial:
+            content_range = r.headers.get("Content-Range", "")
+            if not content_range.startswith("bytes %d-" % offset):
+                raise ValueError("server returned an invalid resume range")
+        elif r.status != 200:
+            raise ValueError("unexpected download response: %s" % r.status)
+        if not partial:
+            offset = 0  # A server ignoring Range must replace, never append.
+        done, last = offset, -5
+        with open(part, "ab" if partial else "wb") as f:
+            while True:
+                chunk = r.read(1 << 20)
+                if not chunk:
+                    break
+                done += len(chunk)
+                if done > expected_size:
+                    raise ValueError("download exceeds the pinned size")
+                f.write(chunk)
+                pct = done * 100 // expected_size
+                if pct >= last + 5:
+                    say("  %d%%" % pct)
+                    last = pct
+    if os.path.getsize(part) != expected_size:
+        raise ValueError("download incomplete; rerun to resume")
+    if sha256(part) != expected_sha:
+        os.unlink(part)
+        raise ValueError("download checksum mismatch; partial download removed")
     os.replace(part, dest)
     return dest
 
@@ -659,7 +655,7 @@ def mega_download(dest):
         say("Then run this script again with --archive <downloaded.zip>.")
         return None
     say("downloading with mega-get (this can take a while, ~1.1 GiB)")
-    subprocess.check_call([exe, READY_URL, dest])
+    subprocess.check_call([exe, READY_URL, dest], env=external_environment())
     # mega-get writes the file with the name from MEGA; find it.
     for name in os.listdir(dest):
         if name.lower().endswith(".zip"):
@@ -724,7 +720,7 @@ def ask_yes(prompt, default=True):
 
 def _run(cmd, timeout=5):
     try:
-        return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout).stdout
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=external_environment()).stdout
     except (OSError, subprocess.SubprocessError):
         return ""
 
@@ -852,15 +848,15 @@ def print_detection(found, info):
 
 
 def wizard_options(args, info, found, game):
-    de = (os.environ.get("LANG", "") or "").lower().startswith("de")
+    de = False  # English is the documented default; --language de is explicit.
     opts = {
-        "language": "de" if de else "en",
+        "language": "en",
         "name": os.environ.get("USER") or os.environ.get("LOGNAME") or "Player",
         "resolution": info["resolution"],
         "fullscreen": True,
         "fov": recommended_fov(info["resolution"]),
         "quality": info["quality"],
-        "extras": set(),
+        "extras": {"sp", "uf"},
     }
     if args.language:
         opts["language"] = args.language
@@ -925,19 +921,9 @@ def wizard_options(args, info, found, game):
     opts["quality"] = choice
 
     say("")
-    say("Zusatzinhalte (optional, nur fuer Einzelspieler):")
-    say("  1) Singleplayer Improved 1.5  - ueberarbeitete Kampagne")
-    say("  2) United Fronts 1.1 beta     - grosse Kampagnen-Ueberholung")
-    say("  3) UO Map Pack                - offizielle Zusatz-Maps")
-    say("  Ein Paket mit allen dreien ist ~980 MB gross.")
-    if opts["extras"]:
-        default = "j"
-    else:
-        default = "n"
-    if ask_yes("Zusatzinhalte installieren?", default):
-        opts["extras"] = {"sp", "uf", "mappack"}
-    else:
-        opts["extras"] = set()
+    say("Full Coop suite: SP Improved and United Fronts are required.")
+    say("The UO Map Pack is a separate multiplayer addition.")
+    opts["extras"] = {"sp", "uf"}
     return opts
 
 
@@ -1552,216 +1538,475 @@ def finish_install(game, args, opts, cache, dry, extra_bases=()):
                 os.remove(marker_path)
 
 
-def main():
-    ap = argparse.ArgumentParser(description="Install CoD Coop + United Offensive 1.51 on Linux")
-    ap.add_argument("--game", help="the Call of Duty folder (with CoDSP.exe); default: auto-detect")
-    ap.add_argument("--archive", metavar="ZIP", help="the ready ZIP (Call of Duty - UO Coop Ready.zip)")
-    ap.add_argument("--source", metavar="DIR", help="a folder with game/ (for example the extracted ZIP)")
-    ap.add_argument("--release", nargs="?", const="", metavar="TAG",
-                    help="mod only: install from a GitHub release (default tag: latest)")
-    ap.add_argument("--build", metavar="DIR", help="mod only: install the DLLs from a local build (see ./build.sh)")
-    ap.add_argument("--pak", metavar="FILE", help="menu pak for --build (default: game/Main/pakz_coop.pk3)")
-    ap.add_argument("--mega", action="store_true", help="download the ready ZIP with mega-get if it is installed")
-    ap.add_argument("--check", action="store_true", help="only verify the installation")
-    ap.add_argument("--dry-run", action="store_true", help="show what would be copied")
-    ap.add_argument("--allow-incomplete", action="store_true", help="install even if CoDSP.exe is not 1.5")
-    ap.add_argument("--force", action="store_true", help="ignore checksum warnings")
-    ap.add_argument("--yes", "-y", action="store_true", help="accept all defaults (no questions)")
-    ap.add_argument("--language", choices=["de", "en"], help="game language (default: system language)")
-    ap.add_argument("--name", help="player name (default: your user name)")
-    ap.add_argument("--resolution", help="for example 1920x1080 (default: your desktop)")
-    ap.add_argument("--fov", type=int, choices=FOVS, help="field of view (default 80)")
-    ap.add_argument("--quality", choices=["auto", "niedrig", "mittel", "hoch"],
-                    help="graphics preset (default: detected from the PC)")
-    ap.add_argument("--german-archive", metavar="ZIP", help="German language pack as ZIP")
-    ap.add_argument("--german-source", metavar="DIR", help="extracted German language pack")
-    ap.add_argument("--extras", metavar="LIST",
-                    help="optional singleplayer extras: all, none, sp, uf, mappack")
-    ap.add_argument("--extras-archive", metavar="ZIP", help="extras pack as ZIP (CoD-SP-Extras.zip)")
-    ap.add_argument("--extras-source", metavar="DIR", help="extracted extras pack")
-    group = ap.add_mutually_exclusive_group()
-    group.add_argument("--fullscreen", dest="fullscreen", action="store_true", default=None,
-                       help="start fullscreen (default)")
-    group.add_argument("--windowed", dest="fullscreen", action="store_false",
-                       help="start in a window")
-    args = ap.parse_args()
 
-    if args.game:
-        game = os.path.abspath(os.path.expanduser(args.game))
-        if not os.path.isdir(game):
-            die("no such folder: %s" % game)
+# 0.6 suite entry point. Legacy helpers above remain reusable, but an old
+# mod-only package is never reported as a complete 0.6 installation.
+def protected_user_file(rel):
+    parts = rel.replace('\\', '/').lower().split('/')
+    return ('save' in parts or 'saves' in parts or 'players' in parts or
+            parts[-1].endswith(('.sav', '.svg')) or
+            parts[-1] in ('config.cfg', 'config_mp.cfg', 'uoconfig.cfg', 'autoexec.cfg'))
+
+
+class InstallTransaction:
+    """Keep original bytes once per touched path and roll back failed installs."""
+    def __init__(self, game):
+        from pathlib import Path
+        self.game = Path(game).resolve()
+        self.root = self.game / 'coop' / 'backups' / (time.strftime('%Y%m%d-%H%M%S') + '-' + str(os.getpid()))
+        self.entries = {}
+        if not self.root.resolve().is_relative_to(self.game):
+            raise ValueError('backup path escapes the game folder')
+
+    def destination(self, rel):
+        path = self.game
+        for part in rel.replace('\\', '/').split('/'):
+            if path.is_dir():
+                matches = [p for p in path.iterdir() if p.name.lower() == part.lower()]
+                if len(matches) > 1:
+                    raise ValueError('ambiguous installation path: ' + rel)
+                path = matches[0] if matches else path / part
+            else:
+                path = path / part
+        return path
+
+    def remember(self, rel):
+        from pathlib import PurePosixPath
+        rel = rel.replace('\\', '/')
+        path = PurePosixPath(rel)
+        if path.is_absolute() or '..' in path.parts or not path.parts or ':' in rel:
+            raise ValueError('unsafe installation path: ' + rel)
+        dst = self.destination(rel)
+        if not dst.resolve().is_relative_to(self.game):
+            raise ValueError('installation path escapes through symlink: ' + rel)
+        if rel in self.entries:
+            return dst
+        existed = dst.exists()
+        if existed and not dst.is_file():
+            raise ValueError('destination is not a regular file: ' + rel)
+        self.entries[rel] = existed
+        if existed:
+            saved = self.root / 'files' / rel
+            saved.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(dst, saved)
+        self.root.mkdir(parents=True, exist_ok=True)
+        (self.root / 'journal.json').write_text(json.dumps({'entries': self.entries, 'state': 'running'}, indent=2))
+        return dst
+
+    def copy(self, src, rel, preserve=True):
+        dst = self.destination(rel)
+        if preserve and protected_user_file(rel):
+            say(('  preserved  ' if dst.exists() else '  skipped package personal file  ') + rel)
+            return
+        if dst.is_file() and sha256(dst) == sha256(src):
+            return
+        dst = self.remember(rel)
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst)
+        if sha256(src) != sha256(dst):
+            raise OSError('copy verification failed: ' + rel)
+        say('  installed  ' + rel)
+
+    def rollback(self):
+        for rel, existed in reversed(list(self.entries.items())):
+            dst = self.destination(rel)
+            if existed:
+                shutil.copy2(self.root / 'files' / rel, dst)
+            elif dst.is_file():
+                dst.unlink()
+        self.complete('rolled-back')
+
+    def complete(self, state='complete'):
+        if self.entries:
+            (self.root / 'journal.json').write_text(json.dumps({'entries': self.entries, 'state': state}, indent=2))
+
+
+def rollback_installation(game, backup_id='latest'):
+    """Restore the selected successful transaction, never touch unrelated files."""
+    from pathlib import Path, PurePosixPath
+    game = Path(game).resolve()
+    backups = game / 'coop/backups'
+    candidates = list(backups.glob('*/journal.json')) if backups.is_dir() else []
+    candidates = [p for p in candidates if json.loads(p.read_text()).get('state') == 'complete']
+    if backup_id == 'latest':
+        if not candidates:
+            raise ValueError('no completed installation backup exists')
+        journal = max(candidates, key=lambda p: p.stat().st_mtime_ns)
     else:
-        found = detect_games()
-        if not found:
-            die("Call of Duty was not found automatically.\n"
-                "       Pass the folder with CoDSP.exe: --game \"/path/to/Call of Duty\"")
-        if len(found) == 1:
-            game = found[0]
-            say("game: %s (detected)" % game)
-        elif is_interactive():
-            say("Mehrere Call-of-Duty-Installationen gefunden:")
-            for i, d in enumerate(found, 1):
-                say("  %d) %s" % (i, d))
-            choice = ask("Welche Installation? [1-%d] (1): " % len(found), "1")
-            try:
-                game = found[int(choice) - 1]
-            except (ValueError, IndexError):
-                die("no valid choice - pass --game")
-        else:
-            # started with "curl ... | sh": no keyboard to ask, take the first (a real
-            # installation, because those are sorted first) and say which one it is
-            game = found[0]
-            say("game: %s (detected)" % game)
-            for d in found[1:]:
-                say("      also found: %s (use --game to install there instead)" % d)
+        if not re.fullmatch(r'[A-Za-z0-9_-]+', backup_id):
+            raise ValueError('invalid backup identifier')
+        journal = backups / backup_id / 'journal.json'
+        if journal not in candidates:
+            raise ValueError('unknown completed installation backup')
+    data = json.loads(journal.read_text())
+    entries = data.get('entries')
+    if not isinstance(entries, dict):
+        raise ValueError('invalid backup journal')
+    tx = InstallTransaction(game)
+    tx.root = journal.parent
+    # Rollback of a completed update never discards settings changed since then.
+    tx.entries = {rel: existed for rel, existed in entries.items() if not protected_user_file(rel)}
+    for rel, existed in tx.entries.items():
+        parts = PurePosixPath(rel)
+        if not isinstance(existed, bool) or parts.is_absolute() or '..' in parts.parts or ':' in rel or '\\' in rel:
+            raise ValueError('unsafe backup journal entry')
+        dest = tx.destination(rel)
+        if not dest.resolve().is_relative_to(game):
+            raise ValueError('backup destination escapes game folder')
+        saved = tx.root / 'files' / rel
+        if existed and (not saved.is_file() or not saved.resolve().is_relative_to(tx.root.resolve())):
+            raise ValueError('backup file missing or unsafe: ' + rel)
+    tx.rollback()
+    say('Installation restored from backup: ' + journal.parent.name)
 
-    here = os.path.dirname(os.path.abspath(__file__))
-    tmp = None
-    manifest = None
 
-    if args.check:
-        src = args.source or (args.archive and extract_archive(os.path.abspath(os.path.expanduser(args.archive))))
-        if src:
-            tree = find_game_tree(src)
-            manifest = load_manifest(tree) if tree else None
-        return check(game, manifest)
+def suite_validator():
+    from pathlib import Path
+    candidates = [Path(__file__).with_name('coop_suite.py'),
+                  Path(getattr(sys, '_MEIPASS', '.')) / 'coop_suite.py']
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    raise ValueError('coop_suite.py is missing; use the complete 0.6 development package')
 
-    exe = find(game, "CoDSP.exe")
-    if not exe:
-        die("CoDSP.exe not found in %s - is this the Call of Duty folder?" % game)
-    size = os.path.getsize(exe)
 
-    # What the installer found, and the options (language, name, graphics).
-    info = system_info()
-    opts = wizard_options(args, info, found if not args.game else [game], game)
-    print_summary(game, opts, info)
-    if not args.yes and is_interactive() and not args.dry_run:
-        if not ask_yes("Installieren?", True):
-            say("Abgebrochen - es wurde nichts geaendert.")
+def run_suite_validator(action, game):
+    import importlib.util
+    spec = importlib.util.spec_from_file_location('coop_suite_validator', suite_validator())
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.main([action, '--game', str(game)])
+
+
+def safe_extract(path):
+    from pathlib import Path
+    tmp = tempfile.mkdtemp(prefix='cod-coop-suite-')
+    try:
+        root = Path(tmp).resolve()
+        with zipfile.ZipFile(path) as archive:
+            for entry in archive.infolist():
+                name = entry.filename.replace('\\', '/')
+                if not (root / name).resolve().is_relative_to(root) or ':' in name:
+                    raise ValueError('unsafe archive entry: ' + name)
+                if (entry.external_attr >> 16) & 0o170000 == 0o120000:
+                    raise ValueError('archive symlinks are not supported: ' + name)
+            archive.extractall(tmp)
+        return tmp
+    except BaseException:
+        shutil.rmtree(tmp, ignore_errors=True)
+        raise
+
+
+def write_suite_launchers(game, transaction):
+    """Every public launcher prepares the guarded profile before starting."""
+    from pathlib import Path
+    default_variant = json.loads((Path(game) / 'coop/variants.json').read_text()).get('default_variant', 'sp_improved')
+    if default_variant not in ('cod1', 'uo', 'sp_improved', 'united_fronts'):
+        raise ValueError('unknown default campaign variant')
+    profiles = [(default_variant, 'Start-CoD-Coop'), ('cod1', 'Start-CoD-Classic'), ('uo', 'Start-UO-Coop'),
+                ('sp_improved', 'Start-SP-Improved'), ('united_fronts', 'Start-United-Fronts')]
+    for variant, stem in profiles:
+        text = ('#!/bin/sh\nset -eu\nDIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)\n'
+                'if [ -x "$DIR/coop/launcher/CoD-Coop-Launcher" ]; then\n'
+                '  exec "$DIR/coop/launcher/CoD-Coop-Launcher" --game "$DIR" --variant ' + variant + ' "$@"\n'
+                'fi\nexec python3 "$DIR/coop/launch-gui.py" --game "$DIR" --variant ' + variant + ' "$@"\n')
+        path = transaction.remember(stem + '.sh')
+        path.write_text(text)
+        path.chmod(0o755)
+
+        text = ('@echo off\r\ncd /d "%~dp0"\r\n'
+                'if not exist "%~dp0coop\\launcher\\CoD-Coop-Launcher.exe" (echo Windows launcher is missing. Repair with a Windows 0.6 package. & exit /b 2)\r\n'
+                'start "" "%~dp0coop\\launcher\\CoD-Coop-Launcher.exe" --game "%~dp0" --variant ' + variant + '\r\n')
+        transaction.remember(stem + '.bat').write_bytes(text.encode('ascii'))
+
+
+def remove_obsolete_owned_files(game, overlay, transaction):
+    """Retire only unchanged publisher-owned overlays and launcher libraries."""
+    from pathlib import Path, PurePosixPath
+    old_path = Path(game) / 'coop/runtime-lock.json'
+    new_path = Path(overlay) / 'coop/runtime-lock.json'
+    if not old_path.is_file() or not new_path.is_file():
+        return
+    old = json.loads(old_path.read_text()).get('files', {})
+    new = json.loads(new_path.read_text()).get('files', {})
+    new_names = {name.lower() for name in new}
+    for rel, expected in old.items():
+        lower = rel.lower()
+        generated = ((lower.endswith('.pk3') and 'codcoop' in lower.rsplit('/', 1)[-1]) or
+                     lower.startswith('coop/launcher/'))
+        if not generated or lower in new_names or protected_user_file(rel):
+            continue
+        parts = PurePosixPath(rel)
+        if parts.is_absolute() or '..' in parts.parts or ':' in rel or '\\' in rel:
+            raise ValueError('unsafe previous payload path')
+        dest = transaction.destination(rel)
+        if not dest.resolve().is_relative_to(transaction.game):
+            raise ValueError('previous payload path escapes game folder')
+        if dest.is_file() and sha256(dest) == expected:
+            transaction.remember(rel).unlink()
+            say('  retired previous owned file  ' + rel)
+
+
+def canonical_english_files(game):
+    """Validate the explicit English source inventory, never guess by filename."""
+    from pathlib import Path, PurePosixPath
+    base = Path(game) / 'coop/languages/en'
+    manifest = base / 'manifest.json'
+    if not manifest.is_file():
+        return None
+    data = json.loads(manifest.read_text())
+    if data.get('schema') != 1 or data.get('language') != 'en' or not data.get('files'):
+        raise ValueError('invalid canonical English inventory')
+    result = []
+    for relative, item in data['files'].items():
+        parts = PurePosixPath(relative)
+        if not re.fullmatch(r'(?:Main|uo)/localized_english_[A-Za-z0-9_]+\.pk3', relative):
+            raise ValueError('unsafe canonical English path: ' + relative)
+        digest = item.get('sha256') if isinstance(item, dict) else None
+        source = base / relative
+        if not re.fullmatch('[0-9a-f]{64}', digest or '') or not source.is_file() or sha256(source) != digest:
+            raise ValueError('canonical English file missing or changed: ' + relative)
+        result.append((source, relative))
+    return result
+
+
+def remove_active_localizations(game, transaction):
+    from pathlib import Path
+    for folder in ('Main', 'uo'):
+        root = Path(find(str(game), folder) or Path(game)/folder)
+        if not root.is_dir():
+            continue
+        for path in root.iterdir():
+            if path.is_file() and path.name.lower().startswith('localized_') and path.suffix.lower() == '.pk3':
+                transaction.remember(folder + '/' + path.name).unlink()
+
+
+def require_original_campaign_source(game, overlay, offline_source=None):
+    """The UO Ready ZIP cannot supply missing original CoD mission packages."""
+    from pathlib import Path
+    manifest = json.loads((Path(overlay)/'coop/variants.json').read_text())
+    locations = [Path(game), Path(overlay)]
+    if offline_source:
+        base = find_game_tree(str(offline_source))
+        if base: locations.append(Path(base))
+    missing=[]
+    for item in manifest.get('required', []):
+        if item.get('kind') != 'base_content' or item.get('engine') != 'cod1': continue
+        relative=item['path']
+        if not re.fullmatch(r'Main/pak[0-9a-z]+\.pk3', relative):
+            raise ValueError('invalid original CoD base inventory')
+        found=False
+        for location in locations:
+            candidate=location
+            for component in relative.split('/'):
+                candidate=Path(find(str(candidate),component) or candidate/component)
+            found=found or candidate.is_file()
+        if not found: missing.append(relative)
+    if missing:
+        raise ValueError('Original CoD campaign content is missing: '+', '.join(missing)+
+                         '. Restore your complete owned CoD 1.5 installation or use a verified full suite payload; the UO Ready ZIP does not contain this base game data.')
+
+
+def remove_known_invalid_placeholder(game, overlay, transaction):
+    from pathlib import Path
+    manifest=json.loads((Path(overlay)/'coop/variants.json').read_text())
+    item=manifest.get('ignored_placeholder', {})
+    if item.get('path') != 'Main/pakb.pk3' or item.get('size') != 1: return
+    file=Path(target(str(game),'Main/pakb.pk3'))
+    if file.is_file() and file.stat().st_size==1 and sha256(file)==item.get('sha256'):
+        transaction.remember('Main/pakb.pk3').unlink()
+        say('  removed known invalid one-byte pakb placeholder (backed up)')
+
+
+def suite_main(argv=None):
+    from pathlib import Path
+    parser = argparse.ArgumentParser(description='CoDCoop 0.6 full-suite setup (development)')
+    parser.add_argument('--game', help='existing Call of Duty installation')
+    parser.add_argument('--suite-source', type=Path, help='complete pinned 0.6 overlay laid out as a game root')
+    parser.add_argument('--source', type=Path, help='offline base package directory containing game/')
+    parser.add_argument('--archive', type=Path, help='pinned v0.5.4 base archive (used only as base game data)')
+    parser.add_argument('--extras-source', type=Path, help='offline directory containing sp_improved and UnitedFronts')
+    parser.add_argument('--extras-archive', type=Path, help='pinned SP extras archive')
+    parser.add_argument('--german-archive', type=Path, help='pinned German language archive')
+    parser.add_argument('--check', action='store_true')
+    parser.add_argument('--rollback', nargs='?', const='latest', help='restore a completed installation backup (default: latest)')
+    parser.add_argument('--repair', action='store_true', help='preserve all personal settings')
+    parser.add_argument('--configure', action='store_true', help='explicitly apply the chosen settings to existing configs')
+    parser.add_argument('--dry-run', action='store_true')
+    parser.add_argument('--yes', '-y', action='store_true')
+    parser.add_argument('--language', choices=('en', 'de'), default='en')
+    parser.add_argument('--name', default=os.environ.get('USER', 'Player'))
+    parser.add_argument('--resolution', default='1920x1080')
+    parser.add_argument('--fov', type=int, default=96)
+    parser.add_argument('--quality', choices=tuple(QUALITY), default='hoch')
+    parser.add_argument('--fullscreen', action='store_true', default=True)
+    parser.add_argument('--windowed', dest='fullscreen', action='store_false')
+    args = parser.parse_args(argv)
+    detected = detect_games() if not args.game else []
+    if not args.game:
+        if len(detected) != 1:
+            parser.error('specify --game; found %d installations' % len(detected))
+        args.game = detected[0]
+    game = Path(args.game).expanduser().resolve()
+    if not game.is_dir() or not find(str(game), 'CoDSP.exe'):
+        parser.error('--game must contain an existing CoDSP.exe')
+    if args.rollback:
+        try:
+            rollback_installation(game, args.rollback)
             return 0
-
-    source_tree = None
-    if args.archive:
-        tmp = extract_archive(os.path.abspath(os.path.expanduser(args.archive)))
-        source_tree = find_game_tree(tmp)
-        if not source_tree:
-            die("no game/ folder with CoDUOSP.exe in %s" % args.archive)
-    elif args.source:
-        base = os.path.abspath(os.path.expanduser(args.source))
-        source_tree = find_game_tree(base)
-        if not source_tree:
-            die("no game/ folder with CoDUOSP.exe in %s" % base)
-    elif args.mega:
-        tmp = tempfile.mkdtemp(prefix="cod-coop-mega-")
-        zip_path = mega_download(tmp)
-        if not zip_path:
+        except (OSError, ValueError) as error:
+            say('ROLLBACK FAILED: ' + str(error))
             return 2
-        if READY_SIZE and os.path.getsize(zip_path) != READY_SIZE:
-            die("download is %d bytes, expected %d" % (os.path.getsize(zip_path), READY_SIZE))
-        if READY_SHA and not READY_SHA.startswith("REPLACE") and sha256(zip_path) != READY_SHA:
-            die("download sha256 does not match")
-        source_tree = find_game_tree(extract_archive(zip_path))
-        if not source_tree:
-            die("no game/ folder in the downloaded ZIP")
-    elif os.path.isdir(os.path.join(here, "game")) and os.path.exists(os.path.join(here, "game", "CoDUOSP.exe")):
-        source_tree = os.path.join(here, "game")
-        say("source: %s (ready package next to this script)" % source_tree)
-
-    # CoD 1.5: the ready package brings the 1.5 CoDSP.exe, so it is installed with
-    # the rest (the previous one is kept as .bak). Only the mod-only paths need it.
-    have15 = size == EXE_SIZE
-    pkg_exe = os.path.join(source_tree, "CoDSP.exe") if source_tree else None
-    if not have15 and pkg_exe and os.path.exists(pkg_exe) and os.path.getsize(pkg_exe) == EXE_SIZE:
-        say("CoDSP.exe: %d bytes -> the ready package installs 1.5 (%d bytes)" % (size, EXE_SIZE))
-        have15 = True
-    if have15 and size == EXE_SIZE:
-        say("CoDSP.exe: 1.5 (%d bytes)" % size)
-    elif not have15 and not args.allow_incomplete:
-        exe_help(game, size)
+    if args.check:
+        return run_suite_validator('check', game)
+    if not args.suite_source:
+        parser.error('--suite-source is required until a complete 0.6 release is published; 0.5.4 is not a complete suite')
+    overlay = args.suite_source.expanduser().resolve()
+    if overlay == game or overlay.is_relative_to(game) or not (overlay / 'coop/variants.json').is_file():
+        parser.error('--suite-source must be a separate 0.6 payload containing coop/variants.json')
+    launcher_name = 'CoD-Coop-Launcher.exe' if os.name == 'nt' else 'CoD-Coop-Launcher'
+    if not (overlay / 'coop/launcher' / launcher_name).is_file():
+        parser.error('the suite payload is missing the native launcher for this operating system')
+    if not re.fullmatch(r'[1-9][0-9]{2,4}x[1-9][0-9]{2,4}', args.resolution):
+        parser.error('resolution must look like 1920x1080')
+    if not 60 <= args.fov <= 130 or any(c in args.name for c in '\r\n";'):
+        parser.error('invalid FOV or player name')
+    if args.repair and args.configure:
+        parser.error('--repair preserves settings; do not combine it with --configure')
+    say('CoDCoop 0.6 development setup: full suite, English/German, original + UO + SP Improved + United Fronts + YAP.')
+    say('Target: %s\nOverlay: %s\nGame language: %s' % (game, overlay, args.language))
+    say('Base/extras downloads, when required: 1,036,938,510 / 922,302,300 bytes. German: 657,419,767 bytes.')
+    try:
+        require_original_campaign_source(game, overlay, args.source)
+    except (OSError, ValueError, TypeError, KeyError) as error:
+        say('INSTALLATION FAILED: '+str(error))
         return 2
-
-    # Language pack, settings and extras run after the game files, otherwise the
-    # ready package's English paks would overwrite the German ones.
-    cache = os.path.join(os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache")), "cod-coop")
-
-    if source_tree:
-        manifest = load_manifest(source_tree)
-        todo = list(iter_files(source_tree))
-        say("source: %s (%d files)" % (source_tree, len(todo)))
-        if manifest:
-            say("manifest: %s" % os.path.join(os.path.dirname(source_tree), "manifest.json"))
-        say("")
-        install(game, todo, args.dry_run, args.force, known=False, manifest=manifest)
-        finish_install(game, args, opts, cache, args.dry_run,
-                       [os.path.dirname(source_tree)])
-        if not args.dry_run:
-            say("")
-            offer_spacewar()
-        say("""
-Done. In the game: Co-op -> Host game -> Back -> New Game.
-Friends: same CoD 1.5 and same mod version, then Host IP -> Join, or Steam invites.
-
-United Offensive 1.51 is included: start CoDUOSP.exe. The game's own version
-label may still say 1.41 - the 1.51 patch does not change the exe, only the
-paks/DLLs (uo/version.inf says 1.51).
-
-Steam invites (cross-platform) need all three:
-  * Steam running and signed in on both PCs
-  * Spacewar (AppID 480) installed once - the installer offers it, or: steam://install/480
-  * on Linux the game has to be started through Steam (Add a Non-Steam Game ->
-    CoDSP.exe, force Proton); on Windows starting it normally is enough
-
-Launch Options of that Steam entry (Linux):
-  WINEDLLOVERRIDES="ddraw=n,b" __GL_ExtensionStringVersion=15000 MESA_EXTENSION_MAX_YEAR=2003 %command%
-  (WINEDLLOVERRIDES is required - without it Wine uses its own ddraw.dll and the
-   mod is not loaded: no Co-op entry, no codcoop.log)
-
-First start: if Call of Duty asks whether the computer changed, click "Ja" once.
-See docs/linux.md for the exact steps.
-""")
+    if args.dry_run:
+        say('DRY RUN: no files changed and no downloads started. Final validation is required for installation success.')
         return 0
+    if not args.yes and not ask_yes('Install the complete suite? Existing settings and saves are preserved.', True):
+        return 0
+    cache = Path(os.environ.get('XDG_CACHE_HOME', Path.home() / '.cache')) / 'cod-coop' / 'v0.5.4'
+    temporary = []
+    try:
+        tx = InstallTransaction(game)
+    except ValueError as error:
+        say('INSTALLATION FAILED: ' + str(error))
+        return 2
+    try:
+        sources = []
+        if args.source:
+            base = find_game_tree(str(args.source))
+            if not base:
+                raise ValueError('offline source contains no game/ directory')
+            sources.append(Path(base))
+        elif args.archive or not find(str(game), 'CoDUOSP.exe'):
+            archive = args.archive or cache / 'Call-of-Duty-UO-Coop-Ready.zip'
+            if not args.archive:
+                download('https://github.com/%s/releases/download/v0.5.4/Call-of-Duty-UO-Coop-Ready.zip' % REPO,
+                         str(archive), READY_SHA, READY_SIZE)
+            if archive.stat().st_size != READY_SIZE or sha256(archive) != READY_SHA:
+                raise ValueError('base archive does not match the pinned v0.5.4 base')
+            extracted = safe_extract(archive)
+            temporary.append(extracted)
+            base = find_game_tree(extracted)
+            if not base:
+                raise ValueError('base archive contains no game/ directory')
+            sources.append(Path(base))
+        # A complete overlay may already include the campaign packages.
+        missing_extras = not all((game / rel).is_file() or (overlay / rel).is_file() for rel in
+                                ('sp_improved/sp_improved_1.5.pk3', 'UnitedFronts/ZUnitedFronts_1.1_beta.pk3'))
+        if args.extras_source:
+            extra = find_extras_tree(str(args.extras_source))
+            if not extra:
+                raise ValueError('extras source contains no campaign variants')
+            sources.append(Path(extra))
+        elif args.extras_archive or missing_extras:
+            archive = args.extras_archive or cache / 'CoD-SP-Extras.zip'
+            if not args.extras_archive:
+                download(EXTRAS_URL % 'v0.5.4', str(archive), EXTRAS_SHA, EXTRAS_SIZE)
+            if archive.stat().st_size != EXTRAS_SIZE or sha256(archive) != EXTRAS_SHA:
+                raise ValueError('extras archive does not match the pinned version')
+            extracted = safe_extract(archive)
+            temporary.append(extracted)
+            extra = find_extras_tree(extracted)
+            if not extra:
+                raise ValueError('extras archive contains no campaign variants')
+            sources.append(Path(extra))
+        remove_obsolete_owned_files(game, overlay, tx)
+        remove_known_invalid_placeholder(game, overlay, tx)
+        sources.append(overlay)  # Always replace old 0.5 binaries with the pinned 0.6 payload last.
+        # Materialize only package-owned files; never import user saves/configs.
+        for source in sources:
+            for path in sorted(source.rglob('*')):
+                if not path.is_file():
+                    continue
+                rel = path.relative_to(source).as_posix()
+                if path.is_symlink():
+                    raise ValueError('package symlink is not allowed: ' + rel)
+                if rel.startswith(('coop/backups/', 'coop/install.json', 'coop/profile.ini')):
+                    continue
+                tx.copy(path, rel)
+        english_files = canonical_english_files(game)
+        if args.language == 'de' and (english_files is not None or not german_installed(str(game))):
+            archive = args.german_archive or cache / 'CoD-UO-German-Language.zip'
+            if not args.german_archive:
+                download(GERMAN_URL % 'v0.5.4', str(archive), GERMAN_SHA, GERMAN_SIZE)
+            if archive.stat().st_size != GERMAN_SIZE or sha256(archive) != GERMAN_SHA:
+                raise ValueError('German archive does not match the pinned version')
+            extracted = safe_extract(archive)
+            temporary.append(extracted)
+            german = find_german_tree(extracted)
+            if not german:
+                raise ValueError('German archive contains no language files')
+            if english_files is not None:
+                remove_active_localizations(game, tx)
+            for path in sorted(Path(german).rglob('*.pk3')):
+                rel = path.relative_to(german).as_posix()
+                if 'localized_' in path.name:
+                    original = game / rel
+                    english_copy = game / 'coop/languages/en' / rel
+                    if english_files is None and original.is_file() and not english_copy.exists():
+                        tx.copy(original, 'coop/languages/en/' + rel, preserve=False)
+                    tx.copy(path, rel)
+            marker = tx.remember('Main/.cod-coop-german')
+            marker.parent.mkdir(parents=True, exist_ok=True)
+            marker.write_text('de\n')
+        if args.language == 'en' and english_files is not None:
+            remove_active_localizations(game, tx)
+            for path, relative in english_files:
+                tx.copy(path, relative, preserve=False)
+            marker = tx.remember('Main/.cod-coop-german')
+            marker.unlink(missing_ok=True)
+        elif args.language == 'en' and german_installed(str(game)):
+            raise ValueError('Verified English localization inventory is missing; use a complete canonical suite payload to change language')
+        # Existing settings are preserved unless the person explicitly requests reconfiguration.
+        if not args.repair and (args.configure or not Path(target(str(game), 'Main/config.cfg')).exists()):
+            for rel in ('Main/config.cfg', 'Main/config_mp.cfg', 'uo/config.cfg', 'uo/config_mp.cfg'):
+                tx.remember(rel)
+            opts = vars(args).copy()
+            write_settings(str(game), opts, False)
+        write_suite_launchers(game, tx)
+        for rel in ('coop/install.json', 'coop/profile.ini'):
+            tx.remember(rel)
+        # seal verifies every pinned byte and writes the receipt/profile in the
+        # same invocation. Later launches/checks independently rehash content.
+        if run_suite_validator('seal', game) != 0:
+            raise ValueError('full-suite validation failed; no successful installation receipt was accepted')
+        tx.complete()
+        say('INSTALLATION COMPLETE: required suite files verified. Gameplay acceptance is tracked separately.')
+        return 0
+    except (Exception, KeyboardInterrupt) as exc:
+        say('INSTALLATION FAILED: %s\nRestoring files changed by this attempt.' % exc)
+        tx.rollback()
+        return 2
+    finally:
+        for path in temporary:
+            shutil.rmtree(path, ignore_errors=True)
 
-    # Mod-only fallbacks (old behaviour).
-    if args.build:
-        source = from_build(args.build)
-        alt = build_extras(args.build, args.pak and os.path.abspath(os.path.expanduser(args.pak)))
-        say("source: %s (local build)" % source)
-    else:
-        if args.pak:
-            die("--pak only applies to --build")
-        if resources is None:
-            die("extract_installer.py is missing - use --archive or --source")
-        cache = os.path.join(os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache")), "cod-coop")
-        source, tag = from_release(args.release, cache)
-        alt = {}
-        say("source: %s" % tag)
 
-    todo = plan(game, source, alt)
-    say("")
-    install(game, todo, args.dry_run, args.force, known=not args.build)
-    finish_install(game, args, opts, cache, args.dry_run)
-    if not args.dry_run:
-        say("")
-        offer_spacewar()
-    say("""
-Done. In the game: Co-op -> Host game -> Back -> New Game.
-Friends: same CoD 1.5 and same mod version, then Host IP -> Join, or Steam invites.
-
-Steam invites (cross-platform) need all three:
-  * Steam running and signed in on both PCs
-  * Spacewar (AppID 480) installed once - the installer offers it, or: steam://install/480
-  * on Linux the game has to be started through Steam (Add a Non-Steam Game ->
-    CoDSP.exe, force Proton); on Windows starting it normally is enough
-
-Launch Options of that Steam entry (Linux):
-  WINEDLLOVERRIDES="ddraw=n,b" __GL_ExtensionStringVersion=15000 MESA_EXTENSION_MAX_YEAR=2003 %command%
-  (WINEDLLOVERRIDES is required - without it Wine uses its own ddraw.dll and the
-   mod is not loaded: no Co-op entry, no codcoop.log)
-
-First start: if Call of Duty asks whether the computer changed, click "Ja" once.
-See docs/linux.md for the exact steps.
-""")
-    return 0
+def main(argv=None):
+    return suite_main(argv)
 
 
 if __name__ == "__main__":
