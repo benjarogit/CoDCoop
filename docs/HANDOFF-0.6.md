@@ -55,8 +55,16 @@ published v0.5.4 binaries have not been replaced.
   read-only/protocol-rejection operations pass. Exact bundles and source graph:
   `run/worker9-recovery-handoff.json`. This does not certify native Windows
   gameplay. See `docs/session-recovery.md`.
-- **Current default tests:**213 cases,193 pass and20 opt-in native skips:
-  `run/unit-protocol9-current.log`. Passing Python tests do not replace the
+- **Native package selection:** source inventory now matches verified ASCII
+  uppercase native PathCmp ordering; CoD1 `sp_`/`zz_` aliases are handled
+  separately from UO. Regeneration changed metadata order only: no shipping
+  script provider or map count changed. Actual QA search-path evidence exposed
+  a previously shadowed Brecourt test overlay; its aborted/timeout runs are not
+  mission passes. See `docs/development-0.6.md` for addresses and reproduction.
+  Production overlay names were not changed on speculation.
+- **Current default tests:**218 cases,198 pass and20 opt-in native skips:
+  `run/unit-protocol9-native-order.log`;24 pure C++ fixtures additionally pass
+  ASan/UBSan. Passing Python tests do not replace the
   outstanding mission/platform acceptance matrix.
 
 - **User decision / Nutzerentscheidung:** every UF player chooses their own
