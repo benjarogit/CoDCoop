@@ -212,17 +212,25 @@ def clear_command_files(game):
 
 
 def stop_owned(game, process, joining):
-    if process is None or process.poll() is not None:
+    if process is None or getattr(process,'_coop_stop_reported',False) is True:
         return
+    if process.poll() is not None:
+        process._coop_stop_reported=True
+        event('game_stopped',pid=process.pid,code=process.returncode,forced=False)
+        return
+    forced=False
     deadline = time.monotonic() + 3
     while not send_command(game, 'quit', joining) and time.monotonic() < deadline:
         time.sleep(.1)
     try:
         process.wait(timeout=8)
     except subprocess.TimeoutExpired:
+        forced=True
         process.terminate()
         try: process.wait(timeout=5)
         except subprocess.TimeoutExpired: process.kill(); process.wait()
+    process._coop_stop_reported=True
+    event('game_stopped',pid=process.pid,code=process.returncode,forced=forced)
 
 
 def supervise(args):
@@ -415,6 +423,7 @@ def supervise(args):
                     event('exited', code=current.returncode)
                     return current.returncode
                 if restart is not None and current.returncode == 0:
+                    stop_owned(game,current,bool(host))
                     spec = recovery_spec(restart)
                     variant, host, hosting, port = spec['variant'], spec['host'], spec['hosting'], spec['port']
                     next_map, difficulty = spec['map'], spec['difficulty']

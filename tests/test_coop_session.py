@@ -97,14 +97,18 @@ class SessionRecoveryRegressionTests(unittest.TestCase):
 
     def test_owned_unresponsive_process_is_killed_after_graceful_attempts(self):
         process = mock.Mock()
+        process.pid=12345
+        process.returncode=None
+        process.kill.side_effect=lambda:setattr(process,'returncode',-9)
         process.poll.return_value = None
         process.wait.side_effect = [subprocess.TimeoutExpired('fixture-game', 8),
                                     subprocess.TimeoutExpired('fixture-game', 5), 0]
-        with mock.patch.object(session, 'send_command', return_value=True) as command:
+        with mock.patch.object(session, 'send_command', return_value=True) as command, mock.patch.object(session,'event') as event:
             session.stop_owned(Path('/fixture'), process, False)
         command.assert_called_once_with(Path('/fixture'), 'quit', False)
         process.terminate.assert_called_once_with()
         process.kill.assert_called_once_with()
+        event.assert_called_once_with('game_stopped',pid=12345,code=-9,forced=True)
 
     def test_retry_consumes_failed_switch_before_launching_target(self):
         """Exercise the real supervisor loop with owned fake processes only.
