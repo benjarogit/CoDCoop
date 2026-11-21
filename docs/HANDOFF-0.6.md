@@ -2,7 +2,7 @@
 
 Date / Datum: 2026-11-21. Development branch: `feat/0.6.0-coop-suite`.
 Starting point: `801dfd4` (published v0.5.4 assets are unchanged).
-Local source checkpoints: `4a6d36f`, `3288c23` (WIP, not pushed or released).
+Local source checkpoints: `4a6d36f`, `3288c23`, `7b1428f` (WIP, not pushed or released).
 
 ## Latest state / Neuester Stand — protocol9, dev.4
 
@@ -38,15 +38,23 @@ published v0.5.4 binaries have not been replaced.
   with130s background verification, visible native waiting and one explicit
   Retry. Invalid content cancels safely after the deadline; a synthetic new
   JOIN is rejected before slot allocation while the two real players remain
-  active. Source-mode result: `run/switch-protocol9-bundled/result.json`
-  (archive being created). This is a process transition, not a campaign
+  active. Immutable source-mode evidence:
+  `run/switch-delayed130-source-pass-1795297970968175765/` (486 files plus
+  SHA256 index). This is a process transition, not a campaign
   playthrough. The frozen source graph in the result defines exactly what ran.
 - **Launcher follow-ups:** launch now sets the original difficulty/maximumHP
   pair (1200/600/300/200); both native engines passed hard training with
   deliberately poisoned prior HP configuration. Source recovery Retry now
   restarts an owned committed-recovery process using the validated same session
   specification. Source tests pass; native committed recovery and new frozen
-  bundles remain pending. See `docs/session-recovery.md`.
+  gameplay validation remain pending. New frozen Linux worker
+  `d77e43f154066e50838f0b6f487af2ae127b5b28e65da99a4ef7240516aa72e7`
+  and Windows worker
+  `cb1c2b3b27a7445a83b03bef760eff07aa6ed97b00601fc4b6abc14bb29c795d`
+  contain both fixes:63 focused source tests and10 actual frozen seal/prepare/
+  read-only/protocol-rejection operations pass. Exact bundles and source graph:
+  `run/worker9-recovery-handoff.json`. This does not certify native Windows
+  gameplay. See `docs/session-recovery.md`.
 - **Current default tests:**213 cases,193 pass and20 opt-in native skips:
   `run/unit-protocol9-current.log`. Passing Python tests do not replace the
   outstanding mission/platform acceptance matrix.

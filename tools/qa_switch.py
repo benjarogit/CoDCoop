@@ -404,9 +404,8 @@ def main(argv=None):
             # value. The target host must create a real live world and wait for
             # the original two-player party before its explicit Retry is sent.
             original=runner.read_text()
-            target_exe='CoDSP.exe' if args.to_variant=='cod1' else 'CoDUOSP.exe'
             gate_code=('import os,sys,time\nfrom pathlib import Path\n'
-                       'if Path(sys.argv[1]).name.lower()=='+repr(target_exe.lower())+' and "+coopjoin" in sys.argv:\n'
+                       'if "+coopjoin" in sys.argv and any(sys.argv[i:i+3]==["+set","coop_expected_players","2"] for i in range(len(sys.argv))):\n'
                        '    deadline=time.monotonic()+240\n'
                        '    while not Path('+repr(str(recovery_gate))+').exists():\n'
                        '        if time.monotonic()>deadline: raise SystemExit("QA target joiner gate timed out")\n'
@@ -498,15 +497,19 @@ def main(argv=None):
                 native=read_state(folders[0]) or {}
                 if (state.get('variant')==args.to_variant and state.get('map')==args.to_map and
                         state.get('role')=='host' and state.get('render_ready') is True and
-                        state.get('live_players')==1 and native.get('expected_players')==2 and
+                        state.get('live_players',0)<=1 and native.get('expected_players')==2 and
+                        native.get('snapshot_num',0)>0 and
                         any(e.get('phase')=='reconnecting' for e in supervisors[0].events)):
                     return state
             waiting=wait_for(live_waiting_host,supervisors,args.timeout,'real target host waiting for committed peer',folders)
             waiting_pid=supervisors[0].game_pids()[-1]
             os.kill(waiting_pid,0)
             live_before=read_state(folders[0]);time.sleep(2);live_after=read_state(folders[0])
-            if not live_before or not live_after or live_after.get('server_time',0)<=live_before.get('server_time',0):
-                raise RuntimeError('target host was not executing a native world before recovery Retry')
+            # The normal pregame gate correctly pauses mission time until the
+            # full party arrives. Require an actual rendered native snapshot
+            # and continuing Core execution, without closing that UI for QA.
+            if not live_before or not live_after or live_after.get('tick',0)<=live_before.get('tick',0):
+                raise RuntimeError('target host was not executing before recovery Retry')
             supervisors[0].control('retry',variant='../invalid',map='wrong',difficulty=0,players=1,host='invalid')
             wait_for(lambda:len(supervisors[0].game_pids())>=3,supervisors,args.timeout,
                      'explicit recovery Retry restarts the live owned target host',folders)
