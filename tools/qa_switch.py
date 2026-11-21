@@ -406,7 +406,7 @@ def main(argv=None):
             original=runner.read_text()
             gate_code=('import os,sys,time\nfrom pathlib import Path\n'
                        'if "+coopjoin" in sys.argv and any(sys.argv[i:i+3]==["+set","coop_expected_players","2"] for i in range(len(sys.argv))):\n'
-                       '    deadline=time.monotonic()+240\n'
+                       '    deadline=time.monotonic()+'+repr(max(240,args.timeout*2))+'\n'
                        '    while not Path('+repr(str(recovery_gate))+').exists():\n'
                        '        if time.monotonic()>deadline: raise SystemExit("QA target joiner gate timed out")\n'
                        '        time.sleep(.1)\n')
@@ -515,10 +515,16 @@ def main(argv=None):
                      'explicit recovery Retry restarts the live owned target host',folders)
             if supervisors[0].game_pids()[-1]==waiting_pid:
                 raise RuntimeError('recovery Retry reused the waiting native process')
+            replacement=wait_for(live_waiting_host,supervisors,args.timeout,
+                'replacement rendered host still requires the committed two-player party',folders)
+            replacement_native=read_state(folders[0]) or {}
+            if replacement_native.get('tick',0)<=live_after.get('tick',0):
+                raise RuntimeError('replacement readiness came from a stale native process')
             recovery_gate.write_text('explicit host recovery Retry observed\n')
             results['committed_host_retry']={'scope':'real target host; target joiner runner deliberately delayed',
                 'waiting_runtime':waiting,'waiting_pid':waiting_pid,'replacement_pid':supervisors[0].game_pids()[-1],
-                'native_before':live_before,'native_after':live_after}
+                'native_before':live_before,'native_after':live_after,
+                'replacement_runtime':replacement,'replacement_native':replacement_native}
             results['checks'].append('explicit committed recovery Retry replaces a live native host without changing the committed map, skill or two-player party')
         after = wait_for(lambda: runtime_ready(folders, args.to_variant, args.to_map), supervisors, args.timeout,
                          'both players reconnect to target campaign/map', folders)
