@@ -44,6 +44,10 @@ class SwitchGateTests(unittest.TestCase):
     def test_memory_reads_actual_engine_value(self):
         self.assertEqual(qa.hunk_value('"com_hunkMegs" is:"^7256^7" default:"128"'),256)
         with self.assertRaises(ValueError): qa.hunk_value("requested --hunkmegs 512")
+    def test_health_requires_actual_named_engine_response(self):
+        self.assertEqual(qa.maxhealth_value('"g_player_maxhealth" is:"^7300^7" default:"600"'),300)
+        with self.assertRaises(ValueError): qa.maxhealth_value('requested +set g_player_maxhealth 300')
+        with self.assertRaises(ValueError): qa.maxhealth_value('"health" is:"300"')
     def test_missing_query_fails(self):
         with self.assertRaises(ValueError): qa.difficulty_value('g_gameskill was passed on command line')
 

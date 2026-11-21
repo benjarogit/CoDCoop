@@ -97,6 +97,13 @@ def hunk_value(text):
     return int(matches[-1])
 
 
+def maxhealth_value(text):
+    text=re.sub(r'\^[0-9]', '', text)
+    matches=re.findall(r'(?im)"?g_player_maxhealth"?\s+(?:is|ist)\s*:\s*"?([0-9]+)\b',text)
+    if not matches: raise ValueError('engine did not report g_player_maxhealth')
+    return int(matches[-1])
+
+
 def assess_runner_environment(environ, expected_prefix, bundle):
     if environ.get('WINEPREFIX') != str(expected_prefix):
         raise ValueError('external runner lost the isolated Wine prefix')
@@ -548,6 +555,12 @@ def main(argv=None):
             raise RuntimeError('requested difficulty not active on both engines: ' + str(skills))
         results['difficulty_queries'] = skills
         results['checks'].append('both engines report requested target difficulty')
+        health=[query_engine_number(f,n!=0,supervisors,20,'g_player_maxhealth','qa-switch-maxhealth.txt',maxhealth_value)
+                for n,f in enumerate(folders)]
+        if any(item['value']!=(1200,600,300,200)[args.difficulty] for item in health):
+            raise RuntimeError('engine maximum health differs from the original difficulty preset')
+        results['maxhealth_queries']=health
+        results['checks'].append('both engines report the original maximum-health value for the requested difficulty')
         memory=[query_hunkmegs(f,n != 0,supervisors,20) for n,f in enumerate(folders)]
         if any(item['value'] != args.hunkmegs for item in memory):
             raise RuntimeError('engine memory differs from the declared production setting')
