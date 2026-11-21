@@ -13,8 +13,10 @@ set -eu
 
 # "curl ... | sh" hands the script a pipe as stdin, so every question would be
 # answered by the end of the download. Switch back to the terminal when there
-# is one; with --yes the installer stays non-interactive anyway.
-if [ ! -t 0 ] && [ -r /dev/tty ]; then
+# is one; with --yes the installer stays non-interactive anyway. No terminal at
+# all (ssh without -t, cron, a launcher): keep the pipe and use the defaults
+# instead of failing to open /dev/tty.
+if [ ! -t 0 ] && (exec </dev/tty) 2>/dev/null; then
     exec </dev/tty
 fi
 
