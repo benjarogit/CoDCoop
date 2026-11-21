@@ -13,13 +13,14 @@ What you need
   its Co-op menu. The compass does not show teammates there yet.
 
 Install (Windows)
-- Extract the ready package ("Call of Duty - UO Coop Ready.zip") and run
-  "Install CoD Coop.exe" from that folder. It finds the game (Steam, AnkerGames,
-  registry or portable), checks that CoDSP.exe is 1.5, and copies everything:
-  United Offensive 1.51, the paks and the mod. Existing files are kept as .bak.
+- Run "Install CoD Coop.exe" and accept the game folder. It finds the game
+  (Steam, AnkerGames, registry or portable), installs Call of Duty 1.5 if your
+  CoDSP.exe is another version (the old one stays as CoDSP.exe.bak) and copies
+  United Offensive 1.51 with the paks and the mod into it. Existing files are
+  kept as .bak.
+- If the ready package is not next to the exe, the installer downloads it once
+  (about 1 GB) and unpacks it itself.
 - No disc image has to be mounted and no UO/patch wizard is involved.
-- The installer is also in the game folder afterwards; the ready files live in
-  game\ next to it, so you can install again at any time.
 - First start: if Call of Duty asks whether the computer changed (WIN_COMPUTER_CHANGE
   or "your configuration has changed"), click "Ja" once. The game stores the hardware
   it detected and does not ask again.
@@ -84,10 +85,10 @@ Over the internet by IP
   or ZeroTier) and the IP that program gives the host.
 
 Linux (Proton/Wine)
-- Extract the same package and run, from that folder:
-    python3 install-linux.py --game "/path/to/Call of Duty"
-  It copies game\ into the game folder the same way (the game folder is the one with
-  CoDSP.exe). Add --check to verify an installation. See docs/linux.md.
+- One command, nothing to unpack:
+    curl -fsSL https://raw.githubusercontent.com/benjarogit/CoDCoop/master/tools/install.sh | sh
+  From the extracted package instead: ./install-linux.sh
+  Add --check to verify an installation. See docs/linux.md.
 
 Uninstall
 - Delete from the game folder: ddraw.dll, codcoop_core.dll, steam_api.dll,

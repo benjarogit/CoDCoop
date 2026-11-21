@@ -14,30 +14,34 @@ Three things matter on Linux: the launcher has to keep the modified files, the
 driver must not report more OpenGL extensions than the 2003 engine can hold, and
 Steam — if you want the friend list — has to be reachable inside the prefix.
 
-## 0. Installing the ready package
+## 0. Install (one command)
 
-The download is one ZIP, already containing **United Offensive 1.51** and the mod.
-Nothing has to be mounted, no UO installer and no patch wizard:
+Nothing has to be prepared: no CoD patch, no disc image, no UO installer, no
+unpacking. One command downloads the package (about 1 GB) and installs
+everything:
 
-1. Download **Call of Duty - UO Coop Ready.zip** (about 1 GB, link in the
-   [README](../README.md#install)) and extract it.
-2. Make sure **Call of Duty 1.5** is installed (`CoDSP.exe`, 1,716,224 bytes).
-3. In the extracted folder run:
+```sh
+curl -fsSL https://raw.githubusercontent.com/benjarogit/CoDCoop/master/tools/install.sh | sh
+```
 
-   ```sh
-   python3 install-linux.py
-   ```
+It finds the game folder itself (all Steam libraries, AnkerGames, current
+folder), installs **Call of Duty 1.5** if `CoDSP.exe` is another version (the old
+one stays as `CoDSP.exe.bak`) and copies **United Offensive 1.51** plus the mod
+into it. Existing files are kept as `<name>.bak`.
 
-   It finds the game itself (Steam libraries, AnkerGames, current folder) and asks
-   if there is more than one. With `--game "/path/to/Call of Duty"` you choose it
-   yourself, with `--check` you only verify an existing installation.
+Useful variants:
 
-4. The script copies `game/` into the game folder: the UO paks, the 1.51 DLLs, the
-   no-CD `CoDUOSP.exe`, the mod DLLs and the menus. Existing files are kept as
-   `<name>.bak`; `CoDSP.exe` itself is never touched.
+```sh
+# check an installation
+curl -fsSL .../tools/install.sh | sh -s -- --check
 
-You can also copy the contents of `game/` into the game folder by hand — the
-installer is only a convenience. The game folder is the one with `CoDSP.exe`.
+# choose the folder yourself / show what would happen
+curl -fsSL .../tools/install.sh | sh -s -- --game "/path/to/Call of Duty" --dry-run
+```
+
+Already downloaded the ZIP? Extract it and run `./install-linux.sh` or
+`python3 install-linux.py` in that folder — it uses the local `game/` and does
+not download anything.
 
 ## 1. "Buffer overrun detected!" right after the intro
 
