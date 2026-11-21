@@ -28,7 +28,10 @@ int main() {
     p.ack=true;clock=99;std::memcpy(cmd,&clock,4);cmd[6]=98;assert(Gate(p,cmd)&&!p.commandSeen);
     clock=102;std::memcpy(cmd,&clock,4);assert(!Gate(p,cmd)&&p.commandSeen);
     cmd[6]=5;assert(!Gate(p,cmd)&&cmd[6]==5); // normal user switch resumes after actual command + ACK
-    for(auto bad:{"springfield;quit","../bar","BAR","bar\nquit",""})assert(!Name(bad));
+    assert(Name("rgd-33russianfrag"));
+    assert(DefinitionMatches("rgd-33russianfrag","rgd-33russianfrag","rgd-33russianfrag"));
+    assert(!DefinitionMatches("rgd-33russianfrag","rgd-33russianfrag","rgd_33russianfrag"));
+    for(auto bad:{"springfield;quit","../bar","BAR","bar\nquit","bar quit","bar\\quit","bar/quit","bar\"quit",""})assert(!Name(bad));
     char unterminated[64];memset(unterminated,'a',sizeof unterminated);assert(!Name(unterminated));
     r.weapon=0;r.flags=0;assert(!Valid(r,1,3));r.flags=SEED;strcpy(r.name,"none");assert(Valid(r,1,3));
 }

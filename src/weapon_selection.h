@@ -19,7 +19,9 @@ inline bool Newer(uint32_t a,uint32_t b) {return a&&(!b||int32_t(a-b)>0);}
 inline bool Name(const char* s) {
     if(!s||!*s)return false;
     unsigned i=0;
-    for(;i<64&&s[i];++i) if(!((s[i]>='a'&&s[i]<='z')||(s[i]>='0'&&s[i]<='9')||s[i]=='_'))return false;
+    // Stock UO includes rgd-33russianfrag. '-' is a native name character;
+    // command separators, whitespace and path syntax remain invalid.
+    for(;i<64&&s[i];++i) if(!((s[i]>='a'&&s[i]<='z')||(s[i]>='0'&&s[i]<='9')||s[i]=='_'||s[i]=='-'))return false;
     return i>0&&i<64;
 }
 inline bool Valid(const Request& r,unsigned slot,uint32_t ticket) {
