@@ -521,6 +521,10 @@ def main(argv=None):
             replacement_native=read_state(folders[0]) or {}
             if replacement_native.get('tick',0)<=live_after.get('tick',0):
                 raise RuntimeError('replacement readiness came from a stale native process')
+            for saved_file in results['save']:
+                path=Path(saved_file['path'])
+                if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest()!=saved_file['sha256']:
+                    raise RuntimeError('committed recovery Retry changed the previous campaign save')
             recovery_gate.write_text('explicit host recovery Retry observed\n')
             results['committed_host_retry']={'scope':'real target host; target joiner runner deliberately delayed',
                 'waiting_runtime':waiting,'waiting_pid':waiting_pid,'replacement_pid':supervisors[0].game_pids()[-1],
