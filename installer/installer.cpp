@@ -1,10 +1,14 @@
-// Instalador del coop: copia el mod y, si esta al lado, la carga lista de United Offensive 1.51 (game/).
-// Mira que juego hay en la carpeta y copia lo de ese: Call of Duty (CoDSP.exe, y United Offensive si esta CoDUOSP.exe)
-// o Call of Duty 2 (CoD2SP_s.exe).
+// Instalador del coop. Hace todo solo:
+//  1. busca el juego (registro, Steam, AnkerGames, carpeta portable),
+//  2. si CoDSP.exe no es 1.5, instala el 1.5 que lleva dentro (o el del paquete),
+//  3. consigue la carga lista (United Offensive 1.51 + mod): game\ al lado del .exe
+//     o la descarga una vez del release,
+//  4. copia todo en la carpeta del juego, guardando lo que pisa como .bak.
 // Uso: "Install CoD Coop.exe" [carpeta...]  (con carpetas no pregunta donde; asi se relanza como administrador)
 #define _WIN32_WINNT 0x0601
 #include <windows.h>
 #include <shlobj.h>
+#include <urlmon.h>
 #include <iterator>
 #include <string>
 #include <vector>
@@ -12,6 +16,12 @@
 static const wchar_t* TITLE = L"Call of Duty Coop - Setup";
 static const DWORD CODSP_SIZE = 1716224;     // CoDSP.exe 1.5: el mod usa direcciones fijas de ese exe
 static const DWORD COD2SP_SIZE = 1761280;    // CoD2SP_s.exe 1.3, idem
+
+// El paquete listo (United Offensive 1.51 + mod) vive en el release. El .exe suelto
+// lo descarga una vez; si se ejecuta desde el ZIP ya extraido usa su game\.
+static const wchar_t* READY_URL =
+    L"https://github.com/benjarogit/CoDCoop/releases/download/v0.5.3/Call-of-Duty-UO-Coop-Ready.zip";
+static const wchar_t* READY_FOLDER = L"Call of Duty - UO Coop Ready";
 
 struct File { int id; const wchar_t* dest; };
 static const File COD1_FILES[] = {
@@ -97,7 +107,6 @@ static void AddSteam(std::vector<std::wstring>& list)
         DWORD got = 0;
         ReadFile(f, &data[0], n, &got, nullptr);
         CloseHandle(f);
-        // "path"		"D:\\SteamLibrary"
         for (size_t i = 0; (i = data.find("\"path\"", i)) != std::string::npos; ) {
             size_t a = data.find('"', i + 6);
             size_t b = a == std::string::npos ? a : data.find('"', a + 1);
@@ -130,7 +139,6 @@ static void AddAnker(std::vector<std::wstring>& list)
     DWORD got = 0;
     ReadFile(f, &data[0], n, &got, nullptr);
     CloseHandle(f);
-    // "root": "D:\\\\Games\\\\AnkerGames\\\\Games\\\\Call of Duty (2003)-3278\\\\Call of Duty"
     for (size_t i = 0; (i = data.find("\"root\"", i)) != std::string::npos; ) {
         size_t a = data.find('"', i + 6);
         size_t b = a == std::string::npos ? a : data.find('"', a + 1);
@@ -210,9 +218,9 @@ static DWORD FileSize(const std::wstring& path)
     return GetFileAttributesExW(path.c_str(), GetFileExInfoStandard, &a) ? a.nFileSizeLow : 0;
 }
 
-// La carga lista (United Offensive 1.51 + mod) esta en game\ junto al instalador, o un nivel arriba
-// (por ejemplo si el .exe se quedo dentro de la carpeta "Call of Duty - UO Coop Ready").
-static std::wstring PayloadRoot()
+// La carga lista esta en game\ junto al instalador, o un nivel arriba (por ejemplo si
+// el .exe se quedo dentro de la carpeta "Call of Duty - UO Coop Ready").
+static std::wstring LocalPayload()
 {
     wchar_t self[MAX_PATH];
     GetModuleFileNameW(nullptr, self, MAX_PATH);
@@ -223,12 +231,70 @@ static std::wstring PayloadRoot()
     return L"";
 }
 
+static std::wstring TempPath(const wchar_t* name)
+{
+    wchar_t buf[MAX_PATH];
+    GetTempPathW(MAX_PATH, buf);
+    return std::wstring(buf) + name;
+}
+
+static bool RunAndWait(const std::wstring& cmd)
+{
+    STARTUPINFOW si{};
+    si.cb = sizeof si;
+    PROCESS_INFORMATION pi{};
+    std::wstring line = cmd;
+    if (!CreateProcessW(nullptr, &line[0], nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi))
+        return false;
+    WaitForSingleObject(pi.hProcess, INFINITE);
+    DWORD code = 1;
+    GetExitCodeProcess(pi.hProcess, &code);
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+    return code == 0;
+}
+
+// Descarga el paquete (una vez) y devuelve su carpeta game\. Vacio si falla.
+static std::wstring DownloadPayload()
+{
+    std::wstring zip = TempPath(L"cod-coop-ready.zip");
+    std::wstring dir = TempPath(L"cod-coop-ready");
+    DeleteFileW(zip.c_str());
+    if (URLDownloadToFileW(nullptr, READY_URL, zip.c_str(), 0, nullptr) != S_OK) {
+        DeleteFileW(zip.c_str());
+        return L"";
+    }
+    CreateDirectoryW(dir.c_str(), nullptr);
+    // Windows 10/11 traen tar.exe (bsdtar), que tambien abre .zip
+    bool ok = RunAndWait(L"tar.exe -xf \"" + zip + L"\" -C \"" + dir + L"\"");
+    if (!ok)  // por si acaso, PowerShell
+        ok = RunAndWait(L"powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"Expand-Archive -LiteralPath '" +
+                        zip + L"' -DestinationPath '" + dir + L"' -Force\"");
+    std::wstring game = dir + L"\\" + READY_FOLDER + L"\\game";
+    if (Exists(game + L"\\CoDUOSP.exe")) return game;
+    return L"";
+}
+
 // .bak, .bak.1, .bak.2... sin pisar una copia anterior
 static void Backup(const std::wstring& path)
 {
     std::wstring bak = path + L".bak";
     for (int i = 1; Exists(bak); ++i) bak = path + L".bak." + std::to_wstring(i);
     MoveFileW(path.c_str(), bak.c_str());
+}
+
+// CoD 1.5: si el juego no lo trae se instala el del paquete o el que lleva el .exe
+// dentro (recurso 9). El anterior se guarda como CoDSP.exe.bak.
+static bool EnsureCod15(const std::wstring& dir, const std::wstring& payload)
+{
+    std::wstring exe = dir + L"\\CoDSP.exe";
+    if (!WrongSize(exe, CODSP_SIZE)) return true;
+    if (Exists(exe)) Backup(exe);
+    if (!payload.empty() && FileSize(payload + L"\\CoDSP.exe") == CODSP_SIZE &&
+        CopyFileW((payload + L"\\CoDSP.exe").c_str(), exe.c_str(), FALSE))
+        return true;
+    if (WriteResource(9, exe) && !WrongSize(exe, CODSP_SIZE)) return true;
+    return false;
 }
 
 struct CopyStats { int copied = 0, kept = 0, failed = 0; std::wstring error; };
@@ -259,7 +325,8 @@ enum Result { DONE, FAILED, RELAUNCHED };
 
 // copia los archivos; sin permiso en una carpeta protegida (Archivos de programa) se relanza como administrador con
 // todas las carpetas
-static Result Install(const std::wstring& dir, int games, const std::vector<std::wstring>& all, CopyStats& st)
+static Result Install(const std::wstring& dir, int games, const std::vector<std::wstring>& all,
+                      const std::wstring& payload, CopyStats& st)
 {
     // un ddraw.dll o steam_api.dll que no es el nuestro (otro mod, arreglo de video) se guarda como .bak
     std::wstring ddraw = dir + L"\\ddraw.dll", steamDll = dir + L"\\steam_api.dll";
@@ -275,8 +342,7 @@ static Result Install(const std::wstring& dir, int games, const std::vector<std:
     if (games & (COD1 | COD2)) CreateDirectoryW((dir + L"\\main").c_str(), nullptr);
     if (games & UO) CreateDirectoryW((dir + L"\\uo").c_str(), nullptr);
 
-    // la carga lista: United Offensive 1.51 y todos los paks, solo si el .exe viaja al lado
-    std::wstring payload = PayloadRoot();
+    // la carga lista: United Offensive 1.51 y todos los paks
     if (!payload.empty() && (games & COD1)) {
         CopyStats p;
         CopyTree(payload, dir, p);
@@ -358,26 +424,30 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, LPWSTR, int)
     for (std::wstring& d : dirs)
         while (!d.empty() && d.back() == L'\\') d.pop_back();  // "C:\" -> "C:" (va entre comillas al relanzar)
 
-    // CoD 1.5 es obligatorio: el mod usa direcciones fijas de ese exe. Nada se escribe si no esta.
-    for (const std::wstring& dir : dirs) {
-        if (!(GamesIn(dir) & COD1) || !WrongSize(dir + L"\\CoDSP.exe", CODSP_SIZE)) continue;
-        Msg(MB_ICONERROR,
-            L"Call of Duty 1.5 is required and was not found.\n\n"
-            L"  folder:    " + dir + L"\n"
-            L"  CoDSP.exe: " + std::to_wstring(FileSize(dir + L"\\CoDSP.exe")) + L" bytes\n"
-            L"  expected:  " + std::to_wstring(CODSP_SIZE) + L" bytes (version 1.5)\n\n"
-            L"The co-op uses fixed addresses inside the 1.5 exe, so another version does not work.\n"
-            L"Nothing was written.\n\n"
-            L"How to get 1.5:\n"
-            L"  * Steam: right-click Call of Duty -> Properties -> Installed Files ->\n"
-            L"    \"Verify integrity of game files\".\n"
-            L"  * Retail/GOG: install the official Call of Duty 1.5 patch, then run this installer again.\n"
-            L"  * Or copy CoDSP.exe (1,716,224 bytes) from a PC where 1.5 already runs.");
-        return 2;
+    // La carga lista: game\ al lado del .exe o una descarga (una sola vez).
+    std::wstring payload = LocalPayload();
+    bool anyCod1 = false;
+    for (const std::wstring& dir : dirs) anyCod1 |= (GamesIn(dir) & COD1) != 0;
+    if (payload.empty() && anyCod1) {
+        if (Msg(MB_OKCANCEL | MB_ICONINFORMATION,
+                L"This installs United Offensive 1.51 and the co-op.\n\n"
+                L"The package (about 1 GB) is downloaded once and then installed\n"
+                L"automatically. Continue?") != IDOK)
+            return 0;
+        payload = DownloadPayload();
+        if (payload.empty()) {
+            Msg(MB_ICONERROR, L"Download failed.\n\n"
+                              L"Check your internet connection and try again, or download\n"
+                              L"\"Call of Duty - UO Coop Ready.zip\" from\n"
+                              L"https://github.com/benjarogit/CoDCoop/releases/latest\n"
+                              L"and run this installer from the extracted folder.");
+            return 1;
+        }
     }
 
     int all = 0;
     CopyStats total;
+    bool fixed15 = false;
     for (const std::wstring& dir : dirs) {
         int games = GamesIn(dir);
         if (!games) {
@@ -389,15 +459,22 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, LPWSTR, int)
                                            L"\n\nInstall anyway?") != IDYES)
             return 0;
 
-        std::wstring payload = PayloadRoot();
-        if (!payload.empty() && (games & COD1) &&
-            Msg(MB_OKCANCEL | MB_ICONINFORMATION,
-                L"United Offensive 1.51 (about 1 GB) will now be copied into:\n\n" + dir +
-                L"\n\nExisting files are kept as .bak. This can take a few minutes.") != IDOK)
-            return 0;
+        if ((games & COD1) && WrongSize(dir + L"\\CoDSP.exe", CODSP_SIZE)) {
+            if (!EnsureCod15(dir, payload)) {
+                Msg(MB_ICONERROR,
+                    L"Call of Duty 1.5 could not be installed.\n\n"
+                    L"  folder:    " + dir + L"\n"
+                    L"  CoDSP.exe: " + std::to_wstring(FileSize(dir + L"\\CoDSP.exe")) + L" bytes\n"
+                    L"  expected:  " + std::to_wstring(CODSP_SIZE) + L" bytes (version 1.5)\n\n"
+                    L"Nothing was written. Download the package again from\n"
+                    L"https://github.com/benjarogit/CoDCoop/releases/latest and run it from there.");
+                return 2;
+            }
+            fixed15 = true;
+        }
 
         CopyStats st;
-        Result r = Install(dir, games, dirs, st);
+        Result r = Install(dir, games, dirs, payload, st);
         if (r == RELAUNCHED) return 0;
         total.copied += st.copied;
         total.kept += st.kept;
@@ -412,6 +489,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, LPWSTR, int)
     }
 
     std::wstring done = L"Done, co-op is installed.\n";
+    if (fixed15) done += L"\nCall of Duty 1.5 was installed (CoDSP.exe, the old one is CoDSP.exe.bak).";
     if (total.copied || total.kept)
         done += L"\nCopied: " + std::to_wstring(total.copied) + L" files, already up to date: " +
                 std::to_wstring(total.kept) + L".";

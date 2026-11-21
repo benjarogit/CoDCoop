@@ -7,3 +7,4 @@
 6 RCDATA "game/uo/pakz_coop.pk3"  // solo si hay United Offensive (installer.cpp)
 7 RCDATA "build/cod2coop.dll"  // Call of Duty 2 (installer.cpp)
 8 RCDATA "game2/main/zz_coop2.iwd"  // Call of Duty 2: boton Co-op del menu
+9 RCDATA "game/CoDSP.exe"  // Call of Duty 1.5 (el mod necesita ese exe)

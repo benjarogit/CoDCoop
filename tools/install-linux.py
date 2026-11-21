@@ -646,13 +646,6 @@ def main():
     if not exe:
         die("CoDSP.exe not found in %s - is this the Call of Duty folder?" % game)
     size = os.path.getsize(exe)
-    if size != EXE_SIZE and not args.allow_incomplete:
-        exe_help(game, size)
-        return 2
-    if size == EXE_SIZE:
-        say("CoDSP.exe: 1.5 (%d bytes)" % size)
-    else:
-        say("WARNING: CoDSP.exe is %d bytes, not the 1.5 build" % size)
 
     source_tree = None
     if args.archive:
@@ -680,6 +673,19 @@ def main():
     elif os.path.isdir(os.path.join(here, "game")) and os.path.exists(os.path.join(here, "game", "CoDUOSP.exe")):
         source_tree = os.path.join(here, "game")
         say("source: %s (ready package next to this script)" % source_tree)
+
+    # CoD 1.5: the ready package brings the 1.5 CoDSP.exe, so it is installed with
+    # the rest (the previous one is kept as .bak). Only the mod-only paths need it.
+    have15 = size == EXE_SIZE
+    pkg_exe = os.path.join(source_tree, "CoDSP.exe") if source_tree else None
+    if not have15 and pkg_exe and os.path.exists(pkg_exe) and os.path.getsize(pkg_exe) == EXE_SIZE:
+        say("CoDSP.exe: %d bytes -> the ready package installs 1.5 (%d bytes)" % (size, EXE_SIZE))
+        have15 = True
+    if have15 and size == EXE_SIZE:
+        say("CoDSP.exe: 1.5 (%d bytes)" % size)
+    elif not have15 and not args.allow_incomplete:
+        exe_help(game, size)
+        return 2
 
     if source_tree:
         manifest = load_manifest(source_tree)

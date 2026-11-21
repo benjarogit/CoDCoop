@@ -86,7 +86,7 @@ if [ "$INSTALLER" = 1 ]; then
         echo "== Install CoD Coop.exe"
         "$WINDRES" -i installer/installer.rc -o build/installer_res.o
         "$CXX" -std=c++17 -O2 -s -static -mwindows -municode -o "build/Install CoD Coop.exe" \
-            installer/installer.cpp build/installer_res.o -lole32 -lshell32
+            installer/installer.cpp build/installer_res.o -lole32 -lshell32 -lurlmon
         echo "BUILD OK: build/Install CoD Coop.exe"
     fi
 fi
