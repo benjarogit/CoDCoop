@@ -259,3 +259,31 @@ and a genuine remote rejoin. It must not simulate the second mission's start
 click. / Der Gruppentest prüft bewusstes Verlassen, regulären Start der nächsten
 Mission allein beim Host und echten Wiederbeitritt, ohne den zweiten Startklick
 künstlich auszulösen.
+
+### Save and actor eligibility / Spielstand und Missionsakteure
+
+The native-derived actor publication is `coop_actor_api=1`, mode HOST/SOLO/
+JOINER and per-slot `coop_actor_<n>_identity` plus state WAIT/ELIGIBLE/INELIGIBLE.
+HOST identities use the current session, slot, spawn ticket and world tuple;
+SOLO uses `solo|<sv_serverid>|0`. Scripts cannot grant eligibility by writing an
+inventory receipt. Standing1HP is eligible; downed1HP is not. Native publication
+updates on preservation, health, downed/revive and world-ready transitions and
+each Core pump. DLL shutdown invalidates the API and all slots.
+
+Die Freigabe für Missionsaktionen stammt aus dem aktuellen nativen Spieler- und
+Weltzustand. Ein niedergeschlagener Spieler mit1HP erhält keine Freigabe; ein
+stehender Spieler mit1HP bleibt berechtigt. Skriptbelege ersetzen diese Prüfung
+nicht. Beim Entladen des Core werden alle Freigaben ungültig.
+
+```sh
+for name in inventory_preservation saved_remote_patch actor_eligibility; do
+  g++ -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined \
+    "tests/test_${name}.cpp" -o "build/test_${name}" && "build/test_${name}" || exit 1
+done
+python3 -m unittest discover -s tests -v
+```
+
+The full sanitizer list is in `.github/workflows/development.yml`. Targeted
+Brecourt scene tests do not count as a complete Brecourt playthrough. / Die
+vollständige Sanitizer-Liste steht im CI-Workflow. Ein isolierter Brecourt-
+Mechaniktest zählt nicht als durchgespielte Mission.
