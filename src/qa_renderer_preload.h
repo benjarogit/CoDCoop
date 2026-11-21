@@ -10,7 +10,7 @@ inline bool ValidName(const std::string& name) {
     if (name.size() <= 7 || name.size() >= 64 || name.compare(0, 7, "xmodel/") ||
         name.find("..") != std::string::npos || name.find("//") != std::string::npos || name.back() == '/') return false;
     for (unsigned char c : name)
-        if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '-' || c == '/')) return false;
+        if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '-' || c == '/' || c == '(' || c == ')')) return false;
     return true;
 }
 inline bool Add(std::vector<std::string>& names, const std::string& name) {

@@ -2,6 +2,7 @@
 
 Date / Datum: 2026-11-21. Development branch: `feat/0.6.0-coop-suite`.
 Starting point: `801dfd4` (published v0.5.4 assets are unchanged).
+Local source checkpoint: `4a6d36f` (WIP, not pushed or released).
 
 ## Current checkpoint / Aktueller Arbeitsstand
 
@@ -108,7 +109,7 @@ below. Source is still in development; no stable release has been published.
   All eight focused protocol/animation/control C++ sanitizer tests passed.
 - Reverse-direction partition also PASS on `57f7`: the peer's acknowledgement
   was actually dropped, retries recovered automatically and the peer processed
-  exactly one map change (`run/qa-partition/`). Full packet evidence is retained;
+  exactly one map change (`run/qa-partition/history/1795282597982890083/`). Full packet evidence is retained;
   native remote input, stable observation and clean exits passed again.
 - The same `57f7` runtime passed four actual CoD1 players with two consecutive
   native checkpoint reloads (`run/qa-cod1-four/`). Native protocol8 checker
@@ -125,6 +126,71 @@ below. Source is still in development; no stable release has been published.
   33 PASS under pinned Ubuntu22/Python3.10/PySide6
   (`run/uf-roster-ubuntu-tests.log`). Source projection remains explicitly
   capability-gated and does not claim native equipment application.
+- Stronger four-player checkpoint repeat PASS on `57f7`
+  (`run/qa-cod1-four/`): each of three real peers moved after each of two native
+  reloads using distinct forward/back/sideways commands, in addition to advancing
+  clocks and clean exits. The first screenshot had overlapping players because
+  native rejoin respawned them together; the stronger probe separates them and
+  the fresh joiner screenshot was inspected with clear world/player rendering.
+  Exact executed runner SHA `431963e2456d3110c1a8ded6eee0255bf16f44254d002eb406087410818aa4e7`
+  is preserved as `run/reliable-reload-prototype/source/tools/qa_coop-postload-proof.py`.
+  Current runner additionally checks the forward/back input sign.
+- Foy first-use/native-tree borrowing QA PASS on core
+  `93d47274f761da07dd1ea4229b718f5ba8bf81ba7fd613d39212af044650dd0f`:
+  natural truck intro,181.6-unit actual peer movement, stable snapshots and
+  clean exits. Immutable evidence:
+  `run/mainline-credits-qa/proof-deferred-FOY-NATIVE-BORROW-PASS-1795282593854955297/`.
+  Sixteen native borrowed trees and five Core-owned humanoid replacements were
+  active. Borrowing requires all explicit QA flags; it is not a production fix.
+  Subsequent256MB firing/checkpoint test on `a31c4640` correctly FAILed with
+  native renderer access violation `50c0d2` after deferred-tree cleanup.
+- Important RE correction: the97 prepared native cache trees (911,542 bytes)
+  are HUNK-backed, not MT-backed. Native traps0x58/0x59 use different allocators.
+  Core replacements consume the separate512KB MT script pool. Native borrowed
+  HUNK blocks must never reach MT_FreeIndex; the earlier inference that all97
+  native blocks already occupied MT was wrong.
+- Host cancellation now sends session-bound close notices to loading endpoints,
+  stops queued automatic rejoin and clears deferred MT indices before native
+  disconnect. The first oracle looked in the wrong log and was interrupted;
+  the corrected test proved cancellation but then exposed a fresh-session hang
+  at deferred-tree freeing. Native RE confirmed disconnect→full shutdown→MT_Init
+  at45fab0 resets the allocator, invalidating those old indices. Corrected core
+  `68192351789148e3a74eb47a7ecb0003d4ca0321db664632d3694ea9c719ffa8`
+  passed the complete targeted repeat in `run/qa-partition/`: cancellation
+  before remote-slot reallocation, authenticated host-close notice, five seconds
+  with automatic rejoin stopped, explicit fresh session, real remote movement,
+  stable observation and clean exits. Source/runtime are frozen separately in
+  `run/reload-cancel-final/`. Earlier wrong-log oracle ABORTED evidence is in
+  `history/1795282683996027911/`; the corrected-oracle fresh-session hang FAIL
+  remains in `history/1795283172475386184/`. Full campaign/network acceptance is
+  still open.
+- Longer-outage recovery: core `68192351` correctly FAILed a real20s bidirectional
+  outage across a same-map native restart (disconnect after15015ms). First
+  auto-recovery prototype `e1764497` reached the map but FAILed command-clock
+  advancement. Relay evidence showed old client sequence1513…1518 followed by
+  fresh1…166, poisoning the newly allocated native netchan. Core
+  `5a12a783109577d8b13ef83db281607b79b085bc2ca85344775e22e550116b6a`
+  suppresses old-world native sends until attachment. The repeat PASSed:
+  visible logical reconnect wait,20,000.339ms outage,36 actual reload messages
+  dropped, normal automatic world reload,159.5-unit native remote movement,
+  stable observation and clean exits (`run/qa-chaos/`). Immutable source/runtime:
+  `run/reconnect-final/`. Negatives are preserved in its history
+  `1795283713762113551/` and `1795284105770298508/`. Older6cbb bad-WiFi proof
+  formerly at the root is now `run/qa-chaos/history/1795283608037899792/`.
+- Native256MB dense-map first-use/borrow proofs now also include actual firing
+  and checkpoint movement on Noville and Tropez, core `b4594765`:
+  `run/mainline-credits-qa/proof-deferred-NOVILLE-256-FIRE-CHECKPOINT-PASS-1795283674959002564/`
+  and `proof-deferred-TROPEZ-256-FIRE-CHECKPOINT-PASS-1795283901978398451/`.
+  Final host CS counts220/198; they remain within255 without changing native guards.
+- Causal mapping-invariant probe: local native DObjs retained their old model
+  IDs while client-CS changed to host IDs. Delaying only post-checkpoint DObj
+  packets for2s exposed15 model-name mismatches during cls2 rendering. QA-only
+  detach/sync before host CS mapping on `5a12` produced zero mismatches across78
+  observed render states, with265 actual DObj packets withheld,111 local DObjs
+  detached, real firing/movement before and after checkpoint and clean exits.
+  Proof: `run/mainline-credits-qa/proof-deferred-FOY-256-MAPPING-BARRIER-PASS-1795284283778387233/`.
+  Same-DLL feature-off control is in progress. This establishes an invariant
+  repair, not yet the root-cause resolution of the intermittent renderer crash.
 - Native DObj destruction ABI was corrected independently: both engines read
   a stack bool that the old wrapper omitted. A real 32-bit Wine stub tested
   2000 true/false calls and stack preservation. This repair does not close the

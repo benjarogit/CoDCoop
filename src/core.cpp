@@ -26,6 +26,8 @@
 #include "archive_rules.h"
 #include "reload_delivery.h"
 #include "qa_renderer_preload.h"
+#include "qa_dobj_mapping_barrier.h"
+#include "mt_epoch_hook.h"
 
 static const CoreApi* g_api;
 
@@ -117,7 +119,7 @@ struct PendingReload {
     char map[64];
     uint32_t movieCutoff;
 };
-constexpr uint32_t STATE_VERSION = 9;
+constexpr uint32_t STATE_VERSION = 10;
 struct State {
     int role;
     reload_delivery::Token reloadToken;
@@ -136,6 +138,7 @@ struct State {
     bool compatible;
     DWORD joinStarted;
     bool gamestateReady;
+    bool recoveringConnection;
     uint32_t suppressedClientFrames;
     bool waitingForMap;
     int previousLocalWorld;
@@ -1311,7 +1314,7 @@ bool XAnimLoaded(const uint8_t* xanim)
 // UO: al recargar el mapa los arboles propios no se liberan con el DObj (el servidor local corre un frame mas y
 // los usa), pero tampoco los suelta el motor. Se sueltan sus infos ya, y el bloque con el mapa nuevo cargado
 // (JoinerHijack); el tamano se toma ahora, porque despues el XAnim del arbol ya no existe.
-struct OldTree { int index, bytes; };
+struct OldTree { int index, bytes; uint32_t mtEpoch; };
 OldTree g_oldTrees[g::MAX_GENTITIES];
 int g_oldTreeCount;
 void KeepOldTrees()
@@ -1322,13 +1325,24 @@ void KeepOldTrees()
         uint8_t* tree = S->ownTree[e];
         if (!tree || !XAnimLoaded(*(uint8_t**)tree) || g_oldTreeCount >= g::MAX_GENTITIES) continue;
         FreeTreeInfos(tree);
-        g_oldTrees[g_oldTreeCount++] = {(int)(((uintptr_t)tree - g::UO_TREE_BASE) >> 3), g::TreeBytes(*(uint8_t**)tree)};
+        g_oldTrees[g_oldTreeCount++] = {(int)(((uintptr_t)tree - g::UO_TREE_BASE) >> 3), g::TreeBytes(*(uint8_t**)tree), qa_mt_epoch::counter.value};
     }
+}
+void QAMTReset(uint32_t epoch)
+{
+    Log("QA MT native reset: epoch=%u queued_old_trees=%d",epoch,g_oldTreeCount);
 }
 void FreeOldTrees()
 {
     if (g_oldTreeCount) Log("joiner: libero %d arboles del mapa anterior", g_oldTreeCount);
-    for (int i = 0; i < g_oldTreeCount; ++i) g::UO_FreeTreeBlock(g_oldTrees[i].index, g_oldTrees[i].bytes);
+    for (int i = 0; i < g_oldTreeCount; ++i) {
+        const auto& old = g_oldTrees[i];
+        if (qa_mt_epoch::enabled && !mt_epoch::MayFree(old.mtEpoch,qa_mt_epoch::counter.value,(unsigned)old.index,(unsigned)old.bytes)) {
+            Log("QA MT discard old tree index=%d bytes=%d epoch=%u current=%u",old.index,old.bytes,old.mtEpoch,qa_mt_epoch::counter.value);
+            continue;
+        }
+        g::UO_FreeTreeBlock(old.index,old.bytes);
+    }
     g_oldTreeCount = 0;
 }
 
@@ -2870,7 +2884,8 @@ void JoinerSendJoin()
         if (suite::HandshakeExpired(GetTickCount(), S->joinStarted, S->lastJoinTry)) {
             CoopStatus("Host did not pass the suite handshake (offline or older mod). Update both installations.");
             Log("suite: handshake timed out");
-            S->role = NONE;
+            if (S->recoveringConnection) JoinerLeave("Could not reconnect to the host. Retry joining when the host is available.");
+            else S->role = NONE;
             return;
         }
         Writer hello(suite::HELLO);
@@ -2896,6 +2911,11 @@ void JoinerSendJoin()
 
 void QueueJoinerMap(const char* map)
 {
+    // All reload entry paths, including timeout recovery, hand ownership to
+    // normal native world loading in the same way as an explicit host reload.
+    if (g::uo) KeepOldTrees();
+    memset(S->ownTree, 0, sizeof S->ownTree);
+    S->recoveringConnection = false;
     S->gamestateReady = false;
     snprintf(S->pendingMap, sizeof S->pendingMap, "%s", map);
     S->previousLocalWorld = CvarInt("sv_serverid");
@@ -2923,6 +2943,20 @@ void JoinerHijack()
     SetHostRules(S->rules.accepted); // exact accepted rules immediately before native prediction attaches
     FreeOldTrees();
     QACaptureNativeTrees();
+    char barrierOption[8]{};
+    bool barrierEnabled = g_qaDeferredEnabled && g_qaBorrowEnabled &&
+        GetEnvironmentVariableA("CODCOOP_QA_DOBJ_BARRIER", barrierOption, sizeof barrierOption) && !strcmp(barrierOption, "1");
+    auto barrier = qa_dobj_barrier::Run(barrierEnabled,
+        g::uo && g::sv_state != 0 && g::sv_gentities && g::sv_gentitySize == 0x2d0 && g::cgvm,
+        g::MAX_GENTITIES,
+        [](unsigned entity) { return g::serverObjMap[entity] != 0; },
+        [](unsigned entity, bool clear) { g::Com_ServerDObjFree((int)entity, clear); },
+        [] { g::Com_SyncClientDObjs(); });
+    if (barrierEnabled && !barrier.ran) {
+        Log("QA DObj mapping barrier waiting for a valid local native world");
+        return;
+    }
+    if (barrier.ran) Log("QA DObj mapping barrier detached=%u before host model IDs", barrier.detached);
     S->frozen = true;                              // el servidor local queda solo para colision y assets
     *(int*)(g::Client(0) + g::CL_STATE) = 0;      // que no acumule comandos que nadie confirma
     for (int i = 0; i < g::MAX_CONFIGSTRINGS; ++i)
@@ -2981,6 +3015,7 @@ void JoinerControl(uint8_t type, Reader r)
         if (!memchr(r.p, 0, (size_t)(r.end - r.p))) return;
         Log("suite: rejected: %.200s", reason);
         CoopStatus("%.200s", reason);
+        if (S->recoveringConnection) { JoinerLeave(reason); break; }
         S->role = NONE;
         S->compatible = false;
         break;
@@ -3006,6 +3041,12 @@ void JoinerControl(uint8_t type, Reader r)
         }
         S->rules.required = ruleSerial;
         S->reloadToken = world;
+        if (S->recoveringConnection) {
+            snprintf(S->hostMap, sizeof S->hostMap, "%s", map);
+            Log("joiner: host recovered, reload %s before attaching the new world", S->hostMap);
+            QueueJoinerMap(S->hostMap);
+            return;
+        }
         // A player can enter Coop after spending time in their local SP world.
         // Cgame rejects older host snapshots. Reload through the normal engine
         // path instead of altering its private snapshot/prediction structures.
@@ -3024,6 +3065,7 @@ void JoinerControl(uint8_t type, Reader r)
     case M_FULL:
         g::Com_Printf("^1COOP: the host is full (4 players)\n");
         CoopStatus("The host already has 4 players.");
+        if (S->recoveringConnection) { JoinerLeave("The host has no free player slot. Retry joining when a slot is available."); break; }
         S->role = NONE;
         break;
     case M_MAP: {  // el host esta en otro mapa: cargarlo y volver a pedir lugar
@@ -3064,9 +3106,13 @@ void JoinerControl(uint8_t type, Reader r)
     case M_DOBJ:
         if (S->joined) JoinerApplyDObj(r);
         break;
-    case M_BYE:
-        JoinerLeave("The host closed the co-op game.");
+    case M_BYE: {
+        uint8_t reason = r.Get<uint8_t>();
+        auto token = r.Get<reload_delivery::Token>();
+        if (r.Ok() && r.p == r.end && reason == 1 && reload_delivery::AcceptClose(token, S->reloadToken))
+            JoinerLeave("The host closed the co-op game.");
         break;
+    }
     case M_ANIM: {
         if (!S->joined) return;
         while (r.p <= r.end && (size_t)(r.end - r.p) >= sizeof(animwire::Header)) {
@@ -3100,8 +3146,6 @@ void JoinerControl(uint8_t type, Reader r)
         g_animAssembler.Reset();
         bool newMap = *map && _stricmp(map, S->hostMap) != 0;
         if (*map) snprintf(S->hostMap, sizeof S->hostMap, "%s", map);
-        if (g::uo) KeepOldTrees();
-        memset(S->ownTree, 0, sizeof S->ownTree);
         S->joined = S->frozen = false;
         S->role = NONE;  // hasta cooprejoin: no se manda nada mientras carga
         memset(S->downed, 0, sizeof S->downed);
@@ -3153,8 +3197,14 @@ void JoinerKeepAlive()
     }
     if (!g_hostSeen) g_hostSeen = now;  // nucleo recien recargado
     if (now - g_hostSeen < HOST_TIMEOUT) return;
-    Log("joiner: el host no responde hace %lu ms, vuelvo al menu", now - g_hostSeen);
-    JoinerLeave("Lost connection to the host.");
+    Log("joiner: host silent for %lu ms; waiting to reconnect", now - g_hostSeen);
+    S->recoveringConnection = true;
+    S->joined = S->compatible = S->gamestateReady = false;
+    S->rules.required = 0;
+    S->joinStarted = S->lastJoinTry = 0;
+    memset(S->cs, 0, sizeof S->cs);
+    CoopStatus("Connection interrupted. Waiting to reconnect to the host. Choose Leave to cancel.");
+    JoinerSendJoin();
 }
 
 // Vuelta al menu principal. Los DObj propios se olvidan (como en M_RELOAD): el servidor local corre hasta que
@@ -3162,10 +3212,21 @@ void JoinerKeepAlive()
 void JoinerLeave(const char* why)
 {
     S->reloadToken = {};
+    S->recoveringConnection = false;
+    S->waitingForMap = false;
+    S->pendingMap[0] = 0;
+    S->host.sin_port = 0; // a queued cooprejoin must not revive a cancelled session
     RestoreHostRules(); S->rules.received = S->rules.required = 0;
     g_animAssembler.Reset();
     for (int e = 0; e < g::MAX_GENTITIES; ++e)
         if (S->ownTree[e] || g_qaBorrowed[e].tree) JoinerFreeDObj(e);
+    // UO disconnect reaches native MT_Init (45fab0) through full shutdown.
+    // Deferred indices belong to the old allocator and must never be freed
+    // after a new session has rebuilt that pool, even at identical addresses.
+    if (g_oldTreeCount) Log("joiner: forget %d deferred tree indices before native disconnect", g_oldTreeCount);
+    g_oldTreeCount = 0;
+    for (auto& borrowed : g_qaBorrowed) borrowed = {};
+    for (auto& owner : g_qaNativeOwners) owner = {};
     S->joined = S->frozen = false;
     S->role = NONE;
     HookCgame(false);  // como un juego recien abierto: si no, el mapa local no termina de cargar al volver a entrar
@@ -3341,6 +3402,7 @@ void Cmd_CoopHost()
 void Cmd_CoopJoin()
 {
     S->reloadToken = {};
+    S->recoveringConnection = false;
     RestoreHostRules();
     S->rules.received = S->rules.required = 0;
     S->suppressedClientFrames = 0;
@@ -3412,13 +3474,19 @@ void Cmd_CoopLeave()
         for (int k = 0; k < 3; ++k) SendTo(S->host, w.buf, w.len);  // UDP: el host atiende el primero
         JoinerLeave("You left the co-op game.");
     } else if (S->role == HOST) {
-        memset(S->reloadPending, 0, sizeof S->reloadPending);
+        w.Put(S->reloadToken);
         for (int n = 1; n < g::MAX_CLIENTS; ++n) {
-            if (!S->remote[n].active) continue;
-            for (int k = 0; k < 3; ++k) SendTo(S->remote[n].addr, w.buf, w.len);
-            if (PlayerInGame(n)) HostDropRemote(n);
+            const auto& pending = S->reloadPending[n];
+            bool loading = pending.address.sin_port && pending.delivery.token.session == S->reloadToken.session;
+            if (S->remote[n].active)
+                for (int k = 0; k < 3; ++k) SendTo(S->remote[n].addr, w.buf, w.len);
+            if (loading && (!S->remote[n].active || pending.address.sin_addr.s_addr != S->remote[n].addr.sin_addr.s_addr ||
+                            pending.address.sin_port != S->remote[n].addr.sin_port))
+                for (int k = 0; k < 3; ++k) SendTo(pending.address, w.buf, w.len);
+            if (S->remote[n].active && PlayerInGame(n)) HostDropRemote(n);
             S->remote[n].active = false;
         }
+        memset(S->reloadPending, 0, sizeof S->reloadPending);
         S->role = NONE;
         g::Cvar_Set("coop_expected_players", "1");
         g_noPause = false;
@@ -3504,9 +3572,9 @@ void QATick()
     if (!f) return;
     int trees = 0;
     for (auto* tree : S->ownTree) if (tree) ++trees;
-    fprintf(f, "{\"tick\":%lu,\"role\":%d,\"joined\":%s,\"compatible\":%s,\"slot\":%d,\"server_time\":%d,\"snapshot_time\":%d,\"snapshot_num\":%d,\"trees\":%d,\"map\":\"%s\",\"players\":[",
+    fprintf(f, "{\"tick\":%lu,\"role\":%d,\"joined\":%s,\"compatible\":%s,\"slot\":%d,\"server_time\":%d,\"snapshot_time\":%d,\"snapshot_num\":%d,\"trees\":%d,\"recovering_connection\":%s,\"map\":\"%s\",\"players\":[",
             now, S->role, S->joined ? "true" : "false", S->compatible ? "true" : "false", S->slot,
-            g::sv_time, g::cl_snapServerTime, g::cl_snapNum, trees, g::CvarString("mapname"));
+            g::sv_time, g::cl_snapServerTime, g::cl_snapNum, trees, S->recoveringConnection ? "true" : "false", g::CvarString("mapname"));
     for (int n = 0; n < g::MAX_CLIENTS; ++n) {
         bool valid = g::sv_state == 2 && g::svs_clients && g::sv_gameClients;
         uint8_t* ps = valid ? PlayerState(n) : nullptr;
@@ -3537,6 +3605,8 @@ void QATick()
     for (int e = 0; e < g::MAX_GENTITIES; ++e) if (QACurrentBorrow(e)) ++nativeBorrowed;
     fprintf(f, "\"native_tree_borrow\":{\"enabled\":%s,\"active\":%u,\"acquisitions\":%u},",
         g_qaBorrowEnabled ? "true" : "false", nativeBorrowed, g_qaBorrowCount);
+    fprintf(f,"\"mt_epoch\":{\"enabled\":%s,\"value\":%u,\"queued_old_trees\":%d},",
+        qa_mt_epoch::enabled ? "true" : "false",qa_mt_epoch::counter.value,g_oldTreeCount);
     int fixture = CvarInt("coop_qa_render_entity");
     bool fixtureModel = false;
     if (fixture > 0 && fixture < g::MAX_GENTITIES && g::sv_state == 2) {
@@ -3830,6 +3900,9 @@ EXPORT void Coop_Init(const CoreApi* api, void* state, int fresh)
     HookArchiveVariables(true);
     HookQAEndRegistration(true);
     HookQADeferred(true);
+    char mtProbe[8] = {};
+    if (g::uo && suite::IsQA() && GetEnvironmentVariableA("CODCOOP_QA_MT_EPOCH",mtProbe,sizeof mtProbe) && !strcmp(mtProbe,"1"))
+        Log("QA MT epoch hook installed=%d",qa_mt_epoch::Sync(true,QAMTReset));
     Log("nucleo listo (rol %d, %s)", S->role, fresh ? "estado nuevo" : "estado conservado");
     if (!steam::SelfTest()) Log("steam: FALLA la autoprueba de direcciones falsas / nombres");
 }
@@ -3839,6 +3912,12 @@ EXPORT void Coop_Shutdown()
     g_archiveSwap.End();
     RestoreHostRules();
     HookArchiveVariables(false);
+    if (!qa_mt_epoch::Sync(false,nullptr)) {
+        HMODULE retained = nullptr;
+        bool pinned = GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN,
+            reinterpret_cast<LPCSTR>(&qa_mt_epoch::Intercept),&retained);
+        Log("QA MT epoch: retained later wrapper PIN=%d",pinned);
+    }
     HookQADeferred(false);
     HookQAEndRegistration(false);
     if (!campaign_cinematics::Sync(g::gvm, false, nullptr)) {
@@ -3884,6 +3963,12 @@ EXPORT void Coop_Command(const char* name)
 EXPORT void __cdecl Coop_SendPacket(int sock, const void* data, int len, const netadr_t* to)
 {
     if (S->sock == INVALID_SOCKET || len <= 0) return;
+    if (sock == NS_CLIENT && !S->joined &&
+        (S->role == JOINER || S->waitingForMap)) {
+        auto destination = ToSock(*to);
+        if (destination.sin_addr.s_addr == S->host.sin_addr.s_addr && destination.sin_port == S->host.sin_port)
+            return; // old-world sequence numbers must not poison a newly allocated host netchan
+    }
     // CoD SP Netchan_Transmit writes a literal zero qport (CoD1 0x43edfb).
     // The server routes clients by base address + qport, so several joiners
     // behind the same IP would otherwise all control the first remote slot.
@@ -3972,6 +4057,10 @@ EXPORT int __cdecl Coop_GetPacket(int sock, msg_t* msg, netadr_t* from)
                     if (pending.Ok() && reload_delivery::Same(token, S->reloadToken)) {
                         Writer ack(M_RELOAD_ACK); ack.Put(token); SendTo(S->host, ack.buf, ack.len);
                     }
+                }
+                if (fromHost && hasHeader && !mismatch && type == M_BYE) {
+                    Reader close{buf + 5 + sizeof peer, buf + n};
+                    JoinerControl(type, close);
                 }
                 continue;
             }

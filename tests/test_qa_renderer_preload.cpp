@@ -1,6 +1,8 @@
 #include "../src/qa_renderer_preload.h"
 #include <cassert>
 int main() {
+    assert(qa_preload::ValidName("xmodel/o_us_nat_haystack_large(d)"));
+    assert(qa_preload::ValidName("xmodel/o_rs_prp_sandbagscurved(d)"));
     std::vector<std::string> names;
     assert(qa_preload::Parse("xmodel/v_rs_air_il2\r\nxmodel/V_RS_AIR_IL2\nxmodel/viewmodel_30cal_z\n", names));
     assert(names.size()==2);

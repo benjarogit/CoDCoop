@@ -69,6 +69,29 @@ def assess_liveness(before, after, count):
         raise ValueError('host simulation is frozen')
 
 
+def move_remote(host, peer, slot, processes, timeout, action='+forward'):
+    """Require native player movement, including after a checkpoint reconnect."""
+    wait_for(lambda: (p := read_state(host)['players'][slot]) and p.get('pm_type') == 0 and not p.get('linked'),
+             processes, timeout, 'remote player controllable outside a vehicle/cinematic')
+    before = read_state(host)['players'][slot]
+    origin, clock = before['position'], before['command_time']
+    command(peer, action, joiner=True)
+    try:
+        def moved():
+            current = read_state(host)['players'][slot]
+            direction = current.get('forward', 0)
+            acknowledged = (action != '+forward' or direction > 0) and (action != '+back' or direction < 0)
+            return acknowledged and current['command_time'] > clock and math.dist(origin, current['position']) > 5
+        wait_for(moved, processes, 10, 'host applies remote movement input')
+        time.sleep(0.8)
+    finally:
+        command(peer, '-' + action[1:], joiner=True)
+    distance = math.dist(origin, read_state(host)['players'][slot]['position'])
+    if distance < 5:
+        raise RuntimeError('remote %d did not move via real input: %.2f' % (slot, distance))
+    return distance
+
+
 def process_log_errors(folder):
     errors = []
     paths = list(folder.glob('codcoop*.log'))
@@ -262,15 +285,7 @@ def main(argv=None):
         for n, folder in enumerate(folders[1:], 1):
             slot = states[n]['slot']
             if slot < 1 or slot >= args.players: raise RuntimeError('invalid joiner slot')
-            wait_for(lambda: (p := read_state(folders[0])['players'][slot]) and p.get('pm_type') == 0 and not p.get('linked'), processes, args.timeout, 'remote player is controllable outside a vehicle/cinematic')
-            origin = read_state(folders[0])['players'][slot]['position']
-            command(folder, '+forward', joiner=True)
-            wait_for(lambda: read_state(folders[0])['players'][slot].get('forward', 0) > 0, processes, 10, 'host received remote forward input')
-            time.sleep(0.8)
-            command(folder, '-forward', joiner=True)
-            after = read_state(folders[0])['players'][slot]['position']
-            distance = math.dist(origin, after)
-            if distance < 5: raise RuntimeError('remote %d did not move via real input: %.2f' % (slot, distance))
+            distance = move_remote(folders[0], folder, slot, processes, args.timeout)
             results['checks'].append('remote %d moved %.1f units via player input' % (slot, distance))
         for iteration in range(args.checkpoint_reloads):
             # Use the actual native save/load commands, including remote player
@@ -303,6 +318,14 @@ def main(argv=None):
             if not all(s['snapshot_num'] > 0 and s['snapshot_time'] > 0 for s in recovered[1:]):
                 raise RuntimeError('checkpoint joiner has no actual rendered snapshots')
             results['checks'].append('native checkpoint reload %d restored world and all remote command clocks' % (iteration + 1))
+            for peer_number, folder in enumerate(folders[1:]):
+                slot = read_state(folder)['slot']
+                # Separate the actual players after native respawn as well as
+                # checking input: overlapping bodies would obstruct screenshots.
+                action = ('+forward', '+back', '+moveleft')[peer_number]
+                distance = move_remote(folders[0], folder, slot, processes, args.timeout, action)
+                results['checks'].append('checkpoint %d remote %d moved %.1f units via %s' %
+                                        (iteration + 1, slot, distance, action))
         # Unallocated endpoints must not be able to inject engine snapshots.
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
             sock.sendto(b'\x01\x00\x00\x00' + b'fake engine packet', ('127.0.0.1', args.port))

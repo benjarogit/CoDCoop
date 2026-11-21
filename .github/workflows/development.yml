@@ -37,6 +37,12 @@ jobs:
       - run: g++ -std=c++17 -Wall -Wextra -fsanitize=address,undefined tests/test_host_rules.cpp -o build/test_host_rules && ./build/test_host_rules
       - run: g++ -std=c++17 -Wall -Wextra -fsanitize=address,undefined tests/test_archive_rules.cpp -o build/test_archive_rules && ./build/test_archive_rules
       - run: g++ -std=c++17 -Wall -Wextra -fsanitize=address,undefined tests/test_reload_delivery.cpp -o build/test_reload_delivery && ./build/test_reload_delivery
+      - run: g++ -std=c++17 -Wall -Wextra -fsanitize=address,undefined tests/test_qa_renderer_preload.cpp -o build/test_qa_renderer_preload && ./build/test_qa_renderer_preload
+      - run: g++ -std=c++17 -Wall -Wextra -fsanitize=address,undefined tests/test_qa_deferred_models.cpp -o build/test_qa_deferred_models && ./build/test_qa_deferred_models
+      - run: g++ -std=c++17 -Wall -Wextra -fsanitize=address,undefined tests/test_tree_ownership.cpp -o build/test_tree_ownership && ./build/test_tree_ownership
+      - run: g++ -std=c++17 -Wall -Wextra -fsanitize=address,undefined tests/test_mt_epoch.cpp -o build/test_mt_epoch && ./build/test_mt_epoch
+      - run: i686-w64-mingw32-g++ -std=c++17 -O2 -static tests/test_dobj_free_abi.cpp -o build/test-dobj-abi.exe
+      - run: i686-w64-mingw32-g++ -std=c++17 -O2 -static tests/test_mt_epoch_hook.cpp -o build/test-mt-epoch.exe
       - name: Upload development binaries (not a gameplay certification)
         uses: actions/upload-artifact@v4
         with:
@@ -45,6 +51,8 @@ jobs:
             build/ddraw.dll
             build/codcoop_core.dll
             build/suite-check.exe
+            build/test-dobj-abi.exe
+            build/test-mt-epoch.exe
   native-checker-windows:
     needs: engine-build
     runs-on: windows-2022
@@ -61,3 +69,9 @@ jobs:
           path: build
       - name: Native receipt interoperability (no game or Windows 10/11 certification)
         run: python -m unittest discover -s tests -p test_installer_native.py -v
+      - name: Native 32-bit calling and hook fixtures (no game certification)
+        run: |
+          ./build/test-dobj-abi.exe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./build/test-mt-epoch.exe
+          exit $LASTEXITCODE

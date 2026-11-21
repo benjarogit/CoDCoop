@@ -27,6 +27,14 @@ g++ -std=c++17 -fsanitize=address,undefined tests/test_archive_rules.cpp -o buil
 ./build/test_archive_rules
 g++ -std=c++17 -fsanitize=address,undefined tests/test_reload_delivery.cpp -o build/test_reload_delivery
 ./build/test_reload_delivery
+g++ -std=c++17 -fsanitize=address,undefined tests/test_qa_renderer_preload.cpp -o build/test_qa_renderer_preload
+./build/test_qa_renderer_preload
+g++ -std=c++17 -fsanitize=address,undefined tests/test_qa_deferred_models.cpp -o build/test_qa_deferred_models
+./build/test_qa_deferred_models
+g++ -std=c++17 -fsanitize=address,undefined tests/test_tree_ownership.cpp -o build/test_tree_ownership
+./build/test_tree_ownership
+g++ -std=c++17 -fsanitize=address,undefined tests/test_mt_epoch.cpp -o build/test_mt_epoch
+./build/test_mt_epoch
 ```
 
 Native checker interoperability uses an isolated Wine prefix. / Der native
@@ -167,8 +175,14 @@ und echte Bewegung sind Pflicht; ein erneuter Beitritt wird nicht erzwungen.
 
 ```sh
 python3 tools/qa_partition_probe.py --source "/path/to/owned/Call of Duty" \
-  --run run/qa-partition --runtime-dir run/runtime-archive-final \
+  --run run/qa-partition --runtime-dir run/reliable-reload-prototype \
   --chaos-checkout run/reference/coop-anything
+# Reverse direction drops the acknowledgement / Gegenrichtung verliert die Bestätigung:
+python3 tools/qa_partition_probe.py --source "/path/to/owned/Call of Duty" \
+  --run run/qa-partition-ack --runtime-dir run/reliable-reload-prototype \
+  --chaos-checkout run/reference/coop-anything --partition-direction c2s
+python3 tools/qa_reload_cancel_probe.py --source "/path/to/owned/Call of Duty" \
+  --run run/qa-cancel --runtime-dir run/reload-cancel-prototype
 ```
 
 Each run copies game files, freezes one build of the runtime for all slots, owns
