@@ -30,6 +30,17 @@ pre/post-commit cancellation and a Retry after resumption. No native game run or
 new frozen bundle is implied by these tests. The health-preset launcher fix is
 retained. Earlier `6101`/`38ce` bundles remain the previous, immutable proof scope.
 
+Separate native evidence now exists in
+`run/switch-source-native-exits-pass-1795301199610955755/`: two real games
+switch from CoD1 training to UO training, explicitly retry committed recovery,
+and reconnect with the required party of two. All five observed native process
+lifetimes finish nonforced with exit0. This is source-mode transition evidence,
+not a full campaign or a frozen-worker gameplay certificate. Its fresh images
+also expose same-spawn body intersection, tracked separately from recovery.
+New `c6558d2c` Linux and `7ab8e72f` Windows workers contain the stop telemetry;
+their build and installer checks are recorded in
+`run/worker9-api15-provenance.json`.
+
 ## Deutsch
 
 Ein gestarteter Zielprozess bedeutet noch nicht, dass der Trupp wieder verbunden
@@ -56,5 +67,13 @@ geordnet und erhält die Spielstände. Eine bereits beendete Welt wird dadurch
 nicht rückgängig gemacht.
 
 Die Quelltests führen die echte Supervisor-Schleife mit kontrollierten
-Testprozessen aus. Ein nativer Spiellauf und neue Frozen-Bundles stehen für diese
-Änderung noch aus. Frühere Nachweise bleiben unverändert erhalten.
+Testprozessen aus. Separat belegt
+`run/switch-source-native-exits-pass-1795301199610955755/` den echten Wechsel
+zweier Spiele von CoD1-Training zu UO-Training, eine ausdrückliche Wiederholung
+nach Bestätigung und die Wiederverbindung mit zwei Spielern. Alle fünf erfassten
+Spielprozess-Laufzeiten enden regulär mit Code0. Dies bestätigt diesen Wechsel
+mit dem Quellcode-Supervisor, keinen Kampagnendurchlauf oder Laufzeittest der
+Frozen-Worker. Frische Bilder zeigen außerdem eine getrennt erfasste
+Körperüberschneidung am gemeinsamen Spawn. Neue Worker `c6558d2c` (Linux) und
+`7ab8e72f` (Windows) enthalten die Exit-Telemetrie; Build-/Installationsprüfungen
+stehen in `run/worker9-api15-provenance.json`. Frühere Nachweise bleiben erhalten.
