@@ -12,6 +12,33 @@ published v0.5.4 binaries have not been replaced.
 
 ### Current checkpoint / Aktueller Zwischenstand
 
+- **Private network bootstrap UO PASS:** immutable experimental Core
+  `caa9185bacf0b5c36f15058e8a6ec739e2226273a98a56a0b2045697e798546e`
+  transfers87 models and89 ordered weapon entries (4100bytes) over real UDP
+  before the peer's first GAME_INIT. A deliberately lost first fragment is
+  retransmitted; normal native item/alt registration and renderer preload keep
+  game modelCS81 unchanged. Complete Game/CG weapon mappings are checked before
+  native-ready ACK, JOIN and ACCEPT; actual remote input moves185units.
+  Both native exits and final images pass. Evidence:
+  `run/mainline-credits-qa/proof-BOOTSTRAPCAA-UO-UDP-LOSS-PREINIT-PASS/`.
+  This is a QA-gated private dbda-derived branch, not integrated HEAD or a
+  production UF resource/lobby/full campaign pass. CoD1 counterpart is pending.
+- **Legitimate native names:** the first resource probe correctly waited at a
+  mismatched CG mapping for stock `rgd-33russianfrag`; the selection-only name
+  reader wrongly rejected hyphens. HEAD now accepts that bounded native name
+  while still rejecting command separators/whitespace/paths. ASan/UBSan and
+  compilation pass; new actor-aware frozen Core
+  `22e29436579d31dfe1ccf76f8b5f8c0db3ca09be5ec3d7d5a0e19d1f6115a974`
+  is separate from the existing cb7071 runtime candidate and its native proofs.
+- **Cleanup evidence follow-up:** new source records actual `game_stopped`
+  codes/forced termination per owned process, including Retry and normal
+  committed process transitions. Actual child exits7/9 remain observable and
+  cannot become a zero supervisor status in the test oracle. Existing d77e/cb1c
+  bundles and current AppImage candidate predate this telemetry. Earlier
+  supervisor-based final-stop claims have this narrower evidence limit;
+  direct qa_coop native process exit checks are unaffected. See
+  `docs/session-recovery.md`.
+
 - **State18 native save lifecycle:** frozen core
   `dbda01bc97f5fdd3ec36748d6425ce69a7ab9bc89205aff61defbb255ed7b07a`
   passes a real two-player cold A→B→saved-A load without distributing fresh

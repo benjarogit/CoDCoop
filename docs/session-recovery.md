@@ -14,6 +14,12 @@ restarts the same validated campaign, map, difficulty, endpoint and party.
 Fields attached to a Retry control cannot replace the committed specification.
 After `resumed`, that recovery specification is discarded.
 
+Newer source also emits `game_stopped` once per owned process, with its actual
+exit code and a flag for forced termination. The newer transition harness
+requires one nonforced zero exit for every observed game process. Earlier
+`d77e`/`cb1c` workers do not contain this telemetry; their supervisor exit and
+log checks cannot independently certify every final or Retry game exit code.
+
 Before commitment, Cancel requests the native switch cancellation. After
 commitment, the button says **Leave session**: it ends this owned session cleanly
 and retains saves. It does not promise to restore an already ended world.
@@ -36,6 +42,12 @@ offen; die Gruppengröße bleibt erhalten. **Erneut versuchen** beendet ausschli
 den eigenen Prozess geordnet, entfernt dessen alte Befehlsdateien und startet
 dieselbe geprüfte Kampagne mit unveränderter Mission, Schwierigkeit, Adresse und
 Gruppe. Zusätzliche Felder einer Retry-Nachricht ersetzen diesen Auftrag nicht.
+
+Der neuere Quellstand protokolliert mit `game_stopped` außerdem jeden eigenen
+Spielprozess samt tatsächlichem Exitcode und erzwungenem Beenden. Der neue
+Wechseltest verlangt für jeden Prozess einen regulären Exit mit Code0. Die
+älteren Worker `d77e`/`cb1c` enthalten dies noch nicht; deren Supervisor- und
+Logprüfungen belegen nicht unabhängig jeden Spiel-Exit nach Retry oder Stop.
 Nach erfolgreicher Wiederverbindung wird der Auftrag verworfen.
 
 Vor der Bestätigung bricht **Wechsel abbrechen** den nativen Wechsel ab. Nach der
