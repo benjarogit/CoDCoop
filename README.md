@@ -12,6 +12,10 @@ curl -fsSL https://raw.githubusercontent.com/benjarogit/CoDCoop/master/tools/ins
 
 **[⬇ Offline: `Call of Duty - UO Coop Ready.zip` (~1 GB)](https://github.com/benjarogit/CoDCoop/releases/download/v0.5.4/Call-of-Duty-UO-Coop-Ready.zip)** — for installing without internet later: extract, run `Install-CoD-Coop.exe` (Windows) or `install-linux.sh` (Linux). The German language pack (`CoD-UO-German-Language.zip`, ~630 MB) and the optional singleplayer extras (`CoD-SP-Extras.zip`, ~880 MB) are separate downloads; the installers pick them up automatically when they are next to the exe or download them on demand.
 
+**MEGA mirror:** [ready package](https://mega.nz/file/5IoQ3KqZ#nxJ6N36qz-heaygUXZ6KcCzal96XQ2O-dpP4v6sOifE) ·
+[German pack](https://mega.nz/file/5cpi1LzL#F2kXKeDcP8Rz45oYRgPfcUUTvCdONDtEmDrnJLuAkmg) ·
+[SP extras](https://mega.nz/file/FVYT3Coa#x0StdxHWj2a0lP5uHIZcuASlQWo2_J6SBQw8mg7dH5c)
+
 > **This is a fork** of [TheTiranix/CoDCoop](https://github.com/TheTiranix/CoDCoop), maintained here.
 > It adds first-class Linux support — cross-build, native installer, the Proton/`ddraw` fixes and the
 > Steam overlay/friends-list integration — see [Linux (Proton / Wine)](#linux-proton--wine).
@@ -109,8 +113,8 @@ For a fully offline setup put these next to the installer first:
 
 | File | Size | What it is |
 |---|---|---|
-| `CoD-UO-German-Language.zip` | ~630 MB | German text and voices for CoD and UO |
-| `CoD-SP-Extras.zip` | ~880 MB | SP Improved, United Fronts, UO map pack, Kar98k fix |
+| `CoD-UO-German-Language.zip` | ~630 MB | German text and voices for CoD and UO ([MEGA](https://mega.nz/file/5cpi1LzL#F2kXKeDcP8Rz45oYRgPfcUUTvCdONDtEmDrnJLuAkmg)) |
+| `CoD-SP-Extras.zip` | ~880 MB | SP Improved, United Fronts, UO map pack, Kar98k fix ([MEGA](https://mega.nz/file/FVYT3Coa#x0StdxHWj2a0lP5uHIZcuASlQWo2_J6SBQw8mg7dH5c)) |
 
 The installers look for `german/` and `extras/` folders (or the ZIPs themselves)
 next to the exe and use them instead of downloading.
