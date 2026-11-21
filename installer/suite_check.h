@@ -74,7 +74,7 @@ inline std::string Read(const std::wstring& path) {
     if (!ok || got != size) throw std::runtime_error("cannot read metadata");
     return out;
 }
-inline uint32_t CoreProtocol(const std::wstring& path) {
+inline uint32_t CoreData(const std::wstring& path, const char* exportName) {
     const auto data=Read(path);
     auto bounded=[&](uint64_t offset,uint64_t size) {
         if (offset>data.size() || size>data.size()-offset) throw std::runtime_error("truncated Core PE structure");
@@ -128,18 +128,19 @@ inline uint32_t CoreProtocol(const std::wstring& path) {
         auto limit=std::min(name.end,name.offset+128);
         while (end<limit && data[end]) ++end;
         if (end==limit) throw std::runtime_error("unterminated Core PE export name");
-        if (data.compare(name.offset,end-name.offset,"Coop_Protocol")) continue;
+        if (data.compare(name.offset,end-name.offset,exportName)) continue;
         uint32_t ordinal=u16(ot+uint64_t(i)*2);
         if (ordinal>=functions) throw std::runtime_error("invalid Core PE export ordinal");
         uint32_t valueRva=u32(ft+uint64_t(ordinal)*4);
-        if (valueRva>=exportRva && uint64_t(valueRva)<uint64_t(exportRva)+exportSize) throw std::runtime_error("Core protocol cannot be forwarded");
+        if (valueRva>=exportRva && uint64_t(valueRva)<uint64_t(exportRva)+exportSize) throw std::runtime_error("Core DATA export cannot be forwarded");
         auto value=mapped(valueRva,4);
-        if (!(value.flags&0x40000000) || (value.flags&0xa0000000)) throw std::runtime_error("Core protocol must be readonly nonexecutable DATA");
+        if (!(value.flags&0x40000000) || (value.flags&0xa0000000)) throw std::runtime_error("Core export must be readonly nonexecutable DATA");
         result=u32(value.offset); ++found;
     }
-    if (found!=1) throw std::runtime_error("Core requires one readonly Coop_Protocol DATA export");
+    if (found!=1) throw std::runtime_error(std::string("Core requires one readonly ")+exportName+" DATA export");
     return result;
 }
+inline uint32_t CoreProtocol(const std::wstring& path) { return CoreData(path,"Coop_Protocol"); }
 inline std::string Hash(const std::wstring& path, const std::string* data = nullptr) {
     HCRYPTPROV provider = 0; HCRYPTHASH hash = 0;
     if (!CryptAcquireContextW(&provider, nullptr, nullptr, PROV_RSA_AES, CRYPT_VERIFYCONTEXT) ||
@@ -290,6 +291,14 @@ inline bool Validate(const std::wstring& game, bool seal, std::string& error) {
             throw std::runtime_error("unsupported or mismatched suite manifest/runtime lock");
         if (CoreProtocol(Resolve(game,"codcoop_core.dll"))!=PROTOCOL)
             throw std::runtime_error("Core protocol does not match manifest/checker protocol");
+        if (manifest.contains("core_features_required")) {
+            const auto& mask=manifest.at("core_features_required");
+            if ((!mask.is_number_integer() && !mask.is_number_unsigned()) || mask.get<uint64_t>()>0xffffffffULL)
+                throw std::runtime_error("invalid required Core feature mask");
+            uint32_t required=mask.get<uint32_t>();
+            if (required && (CoreData(Resolve(game,"codcoop_core.dll"),"Coop_Features")&required)!=required)
+                throw std::runtime_error("Core feature mask does not provide required compiled APIs");
+        }
         std::vector<std::string> ids;
         for (const auto& v: manifest.at("variants")) ids.push_back(v.at("id"));
         if (ids!=std::vector<std::string>{"cod1","uo","sp_improved","united_fronts"}) throw std::runtime_error("incomplete campaign set");

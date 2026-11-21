@@ -9,12 +9,33 @@ MAX_PE_SIZE = 32 * 1024 * 1024
 
 
 def core_protocol(path):
+    return core_data(path, 'Coop_Protocol')
+
+
+def core_data(path, export_name):
     path = Path(path)
     if not 64 <= path.stat().st_size <= MAX_PE_SIZE:
         raise ValueError('Core PE size is outside the supported bound')
     with path.open('rb') as stream:
         data = stream.read(MAX_PE_SIZE + 1)
-    return pe_data_u32(data, 'Coop_Protocol')
+    return pe_data_u32(data, export_name)
+
+
+def required_feature_mask(manifest):
+    value=manifest.get('core_features_required',0)
+    if type(value) is not int or not 0 <= value <= 0xffffffff:
+        raise ValueError('Invalid required Core feature mask')
+    return value
+
+
+def require_core_features(path, required=0):
+    if type(required) is not int or not 0 <= required <= 0xffffffff:
+        raise ValueError('Invalid required Core feature mask')
+    if not required:return None  # explicit legacy fixture/profile compatibility
+    actual=core_data(path,'Coop_Features')
+    if actual & required != required:
+        raise ValueError('Core feature mask does not provide required compiled APIs')
+    return actual
 
 
 def pe_data_u32(data, export_name):
@@ -79,13 +100,13 @@ def pe_data_u32(data, export_name):
             raise ValueError('Core PE export ordinal is invalid')
         value_rva, = read('<I', functions_offset+4*ordinal)
         if export_rva <= value_rva < export_rva+export_size:
-            raise ValueError('Core protocol cannot be a forwarded export')
+            raise ValueError('Core '+export_name+' cannot be a forwarded export')
         value_offset, flags, _ = mapped(value_rva, 4)
         if not flags & 0x40000000 or flags & (0x80000000 | 0x20000000):
-            raise ValueError('Core protocol must be readable nonwritable nonexecutable DATA')
+            raise ValueError('Core '+export_name+' must be readable nonwritable nonexecutable DATA')
         found.append(read('<I', value_offset)[0])
     if len(found) != 1:
-        raise ValueError('Core requires one readonly Coop_Protocol DATA export; rebuild legacy Core inputs')
+        raise ValueError('Core requires one readonly '+export_name+' DATA export; rebuild legacy Core inputs')
     return found[0]
 
 
@@ -110,7 +131,7 @@ def checker_capabilities(checker, wine_prefix=None):
     return value
 
 
-def require_runtime_protocol(runtime, manifest_protocol, wine_prefix=None):
+def require_runtime_protocol(runtime, manifest_protocol, wine_prefix=None, required_features=0):
     if type(manifest_protocol) is not int or manifest_protocol < 1:
         raise ValueError('Invalid manifest protocol')
     runtime = Path(runtime)
@@ -118,5 +139,9 @@ def require_runtime_protocol(runtime, manifest_protocol, wine_prefix=None):
     checker = checker_capabilities(runtime/'suite-check.exe', wine_prefix)
     if core != manifest_protocol or checker['protocol'] != manifest_protocol:
         raise ValueError('Core, native checker and manifest protocols must match')
+    actual=require_core_features(runtime/'codcoop_core.dll',required_features)
+    if required_features and checker.get('core_features_validation') is not True:
+        raise ValueError('Native checker cannot validate required Core feature mask; rebuild the checker')
     return {'schema': 1, 'manifest_protocol': manifest_protocol, 'core_protocol': core,
-            'checker_protocol': checker['protocol']}
+            'checker_protocol': checker['protocol'], 'required_core_features':required_features,
+            'core_features':actual}

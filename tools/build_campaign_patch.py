@@ -31,6 +31,7 @@ MARKER = '// CoDCoop local campaign menu overlay v1'
 UF_WEAPONS_HASH = '7eb9e7251df248a50ce2c2b5db4196a9634221f0207e969d4549946b8a4d1fb2'
 UF_LOAD_HASH = '74a0b1971d6baf6dede4e382d6b867cb04b713223494011264288737d7814ef7'
 UF_PATHFINDER_HASH = '990f290ff4d69996efb333e0d3898cd722887c80897477718662c8c9ac2114ad'
+CLASSIC_PATHFINDER_HASH = '7d42c29df4d94e5801984a5c0bf31f039bf31c03145d6e120b21a4164a36a984'
 UF_HELMET_ALIAS_HASH = '20abf485b01312bc2dc3d4d262a1c2abeeedc2a52f96c8b96be635b332286b7f'
 UF_HELMET_MODELS = ('xmodel/gear_US_helmet_82nd', 'xmodel/gear_US_helmet_82nd_net',
                     'xmodel/gear_US_helmet_82nd_camo')
@@ -44,6 +45,13 @@ MAINLINE_ASSET_HASHES = {
     'maps/credits_fx.gsc': '7e8910fdfb0b58a3afdd5e3238ba9afc74a76186cc441b8a6237886ff45b5c3d',
 }
 TRIGGER_PATCHES = {
+    'maps/pathfinder.gsc': ('objectives',
+        r'\btrigger\s+waittill\s*\(\s*"trigger"\s*\)\s*;\s*flag_set\s*\(\s*"legbag"\s*\)\s*;',
+        'coop_actor = maps\\_coop_mission_use::wait_for_actor(trigger);\n'
+        '    level notify("coop_pathfinder_legbag_actor", coop_actor);\n'
+        '    flag_set("legbag");', {
+        '7d42c29df4d94e5801984a5c0bf31f039bf31c03145d6e120b21a4164a36a984',
+        UF_PATHFINDER_HASH}),
     'animscripts/melee.gsc': ('MeleeCombat',
         r'\bif\s*\(\s*self\.enemy\s*==\s*player\s*\)\s*\{\s*enemypose\s*=\s*player\s+getstance\s*\(\s*\)\s*;',
         'if (maps\\_coop_players::is_player(self.enemy))\n'
@@ -369,12 +377,28 @@ def transform_uf_pathfinder_assets(data):
 
 def transform_trigger(path, data):
     function, pattern, replacement, allowed = TRIGGER_PATCHES[path]
-    if hashlib.sha256(data).hexdigest() not in allowed:
+    source_digest = hashlib.sha256(data).hexdigest()
+    if source_digest not in allowed:
         raise ValueError('Unknown mission script revision: ' + path)
+    if path == 'maps/pathfinder.gsc' and hashlib.sha256(data).hexdigest() == UF_PATHFINDER_HASH:
+        # This higher-precedence mission overlay must retain the already
+        # reviewed authored UF helmet-name repair from the variant overlay.
+        data = transform_uf_pathfinder_assets(data)
     text = data.decode('latin-1')
     start, end = function_span(text, function)
     body = replace_active(text[start:end], pattern, replacement.replace('\\\\', '\\'), expected=1)
     text = text[:start] + body + text[end:]
+    if path == 'maps/pathfinder.gsc':
+        start, end = function_span(text, 'beacon_think')
+        body = replace_active(text[start:end], r'\btrigger\s+waittill\s*\(\s*"trigger"\s*\)\s*;',
+            'coop_actor = maps\\_coop_mission_use::wait_for_actor(trigger);\n'
+            '    level notify("coop_pathfinder_beacon_actor", coop_actor);', expected=1)
+        text = text[:start] + body + text[end:]
+        if source_digest == CLASSIC_PATHFINDER_HASH:
+            start,end=function_span(text,'parachute_player')
+            body=replace_active(text[start:end],r'\blevel\.player\s+unlink\s*\(\s*\)\s*;',
+                'level.player unlink();\n    thread maps\\_coop_pathfinder_equipment::watch();',expected=1)
+            text=text[:start]+body+text[end:]
     if path == 'maps/brecourt.gsc':
         start, end = function_span(text, 'Moody_GetInjuredMan')
         body = replace_active(text[start:end],
@@ -403,11 +427,13 @@ def transform_trigger(path, data):
     return text.encode('latin-1')
 
 
-def build_trigger_patch(game, output, profile, qa=False):
+def build_trigger_patch(game, output, profile, qa=False, qa_pathfinder=False):
     """Patch only reviewed trigger activator predicates in installed sources."""
     from campaign_inventory import layer_files
     if profile not in ('cod1', 'uo', *PROFILES):
         raise ValueError('Unknown campaign profile')
+    if qa and qa_pathfinder:
+        raise ValueError('Choose one explicit QA mission')
     groups = ['Main'] + ([] if profile == 'cod1' else ['uo'])
     if profile in PROFILES:
         groups.append(PROFILES[profile][0])
@@ -426,7 +452,7 @@ def build_trigger_patch(game, output, profile, qa=False):
     output = Path(output)
     if any(p.resolve() == output.resolve() for p, _ in sources.values()):
         raise ValueError('Cannot overwrite source mission package')
-    metadata = {'schema': 1, 'profile': profile, 'changes': ['reviewed-player-trigger-activators', 'brecourt-native-eligible-normal-handoff', 'ai-melee-remote-player-stance'],
+    metadata = {'schema': 1, 'profile': profile, 'changes': ['reviewed-player-trigger-activators', 'pathfinder-native-eligible-use-actors', 'brecourt-native-eligible-normal-handoff', 'ai-melee-remote-player-stance'],
                 'runtime_verified': False,
                 'sources': {name: hashlib.sha256(data).hexdigest() for name, (_, data) in sorted(sources.items())}}
     entries = [(name, transform_trigger(name, data)) for name, (_, data) in sorted(sources.items())]
@@ -446,8 +472,29 @@ def build_trigger_patch(game, output, profile, qa=False):
                 'objective_state(4, "done");\n    level notify("coop_brecourt_qa_objective4_done");',expected=1)
             entries[index]=(name,(text[:start]+body+text[end:]).encode('latin-1'))
         entries.append(('maps/_coop_brecourt_handoff_qa.gsc',(ROOT/'campaign_patches/brecourt_handoff_qa.gsc').read_bytes()))
+    if qa_pathfinder:
+        metadata['qa_only'] = True
+        metadata['qa_scope'] = 'natural Pathfinder intro and real Use observation; no mission completion claim'
+        for index,(name,data) in enumerate(entries):
+            if name != 'maps/pathfinder.gsc': continue
+            text=data.decode('latin-1');start,end=function_span(text,'main')
+            body=replace_active(text[start:end],r'\bmaps\\_load::main\s*\(\s*\)\s*;',
+                'maps\\_load::main();\n    thread maps\\_coop_pathfinder_qa::main();',expected=1)
+            text=text[:start]+body+text[end:]
+            start,end=function_span(text,'objectives');body=text[start:end]
+            for objective in (1,2):
+                body=replace_active(body,r'\bobjective_state\s*\(\s*'+str(objective)+r'\s*,\s*"done"\s*\)\s*;',
+                    'objective_state('+str(objective)+', "done");\n    level notify("coop_pathfinder_objective_done", '+str(objective)+');',expected=1)
+            entries[index]=(name,(text[:start]+body+text[end:]).encode('latin-1'))
+            text=entries[index][1].decode('latin-1');start,end=function_span(text,'parachute_player')
+            body=replace_active(text[start:end],r'\blevel\.player\s+unlink\s*\(\s*\)\s*;',
+                'level.player unlink();\n    level notify("coop_pathfinder_qa_landed");',expected=1)
+            entries[index]=(name,(text[:start]+body+text[end:]).encode('latin-1'))
+        entries.append(('maps/_coop_pathfinder_qa.gsc',(ROOT/'campaign_patches/pathfinder_qa.gsc').read_bytes()))
     entries.append(('maps/_coop_players.gsc', (ROOT / 'campaign_patches/coop_players.gsc').read_bytes()))
     entries.append(('maps/_coop_brecourt_handoff.gsc', (ROOT / 'campaign_patches/brecourt_handoff.gsc').read_bytes()))
+    entries.append(('maps/_coop_mission_use.gsc', (ROOT / 'campaign_patches/mission_use.gsc').read_bytes()))
+    entries.append(('maps/_coop_pathfinder_equipment.gsc', (ROOT / 'campaign_patches/pathfinder_equipment.gsc').read_bytes()))
     entries.append(('codcoop/trigger-overlay.json', (json.dumps(metadata, sort_keys=True) + '\n').encode()))
     output.parent.mkdir(parents=True, exist_ok=True)
     tmp = output.with_suffix(output.suffix + '.part')

@@ -31,6 +31,16 @@ int main() {
     assert(Name("rgd-33russianfrag"));
     assert(DefinitionMatches("rgd-33russianfrag","rgd-33russianfrag","rgd-33russianfrag"));
     assert(!DefinitionMatches("rgd-33russianfrag","rgd-33russianfrag","rgd_33russianfrag"));
+    for(unsigned variant=1;variant<=4;++variant)
+        assert(PathfinderInitialSource(variant,true,true,true,"pathfinder_initial","0","m1carbine")== (variant<=3));
+    assert(!PathfinderInitialSource(1,false,true,true,"pathfinder_initial","0","m1carbine"));
+    assert(!PathfinderInitialSource(1,true,false,true,"pathfinder_initial","0","m1carbine"));
+    assert(!PathfinderInitialSource(1,true,true,false,"pathfinder_initial","0","m1carbine"));
+    for(auto name:{"thompson","m1carbine;quit",""})assert(!PathfinderInitialSource(1,true,true,true,"pathfinder_initial","0",name));
+    assert(!PathfinderInitialSource(1,true,true,true,"uf_plan","0","m1carbine"));
+    assert(!PathfinderInitialSource(1,true,true,true,"pathfinder_initial","00","m1carbine"));
+    assert(!PathfinderInitialSource(0,true,true,true,"pathfinder_initial","0","m1carbine"));
+    assert(!PathfinderInitialSource(1,true,true,true,nullptr,"0","m1carbine"));
     for(auto bad:{"springfield;quit","../bar","BAR","bar\nquit","bar quit","bar\\quit","bar/quit","bar\"quit",""})assert(!Name(bad));
     char unterminated[64];memset(unterminated,'a',sizeof unterminated);assert(!Name(unterminated));
     r.weapon=0;r.flags=0;assert(!Valid(r,1,3));r.flags=SEED;strcpy(r.name,"none");assert(Valid(r,1,3));

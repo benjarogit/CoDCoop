@@ -43,7 +43,7 @@ echo "== ddraw.dll"
 echo "== codcoop_core.dll"
 "$CXX" $OPT -o build/codcoop_core.dll src/core.cpp -lws2_32 -ladvapi32
 echo "== suite-check.exe"
-"$CXX" -std=c++17 -O2 -s -static -municode -o build/suite-check.exe installer/suite_check.cpp -ladvapi32
+"$CXX" -std=c++17 -O2 -s -static -municode -Wl,--no-insert-timestamp -o build/suite-check.exe installer/suite_check.cpp -ladvapi32
 echo "== cod2coop.dll"
 "$CXX" $OPT -o build/cod2coop.dll src/cod2.cpp -lws2_32
 echo "BUILD OK: $(ls -l build/*.dll | awk '{print $9, $5}' | tr '\n' ' ')"
@@ -87,7 +87,7 @@ if [ "$INSTALLER" = 1 ]; then
     else
         echo "== Install-CoD-Coop.exe"
         "$WINDRES" -i installer/installer.rc -o build/installer_res.o
-        "$CXX" -std=c++17 -O2 -s -static -mwindows -municode -o "build/Install-CoD-Coop.exe" \
+        "$CXX" -std=c++17 -O2 -s -static -mwindows -municode -Wl,--no-insert-timestamp -o "build/Install-CoD-Coop.exe" \
             installer/installer.cpp build/installer_res.o \
             -lole32 -lshell32 -lurlmon -lcomctl32 -loleaut32 -luuid -ladvapi32
         echo "BUILD OK: build/Install-CoD-Coop.exe"

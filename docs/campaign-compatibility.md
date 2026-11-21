@@ -1111,6 +1111,123 @@ Durable local evidence (ignored game assets remain outside source control):
 - `run/qa-cod1-four/history/brecourt-cb7071-cod1-standing-one-hp-PASS-1795300110559756232`
 - `run/qa-cod1-four/history/brecourt-cb7071-cod1-HOST-CONTROL-PASS-1795300434037251644`
 - `run/campaign-investigation/brecourt-joiner-postgoal-contact.png`
+- `run/campaign-investigation/brecourt-downed-gate-contact.png`
+
+The same post-goal actual-Joiner action also passes in original UO and SP
+Improved (256 MiB, actual pinned YAP loaded for SP Improved). Their archives
+are `brecourt-cb7071-UO-POSTGOAL-JOINER-PASS-1795300695362383390` and
+`brecourt-cb7071-SPI-POSTGOAL-JOINER-PASS-1795300814520113735` under the same
+history directory. The UO fixture initially missed the original pre-goal
+`cant_shoot` initialization: the original `can_shoot` tail correctly errored
+when restoring an undefined sight-distance field. The fixture now runs that
+original prerequisite, without changing production NPC behavior. This failed
+run is retained as `brecourt-cb7071-UO-postgoal-cantshoot-prerequisite-FAIL-1795300636383239501`.
+An earlier UO startup also rejected leftover UF-only renderer QA input names;
+that failure is preserved, and unrelated QA renderer/deferred-model input
+files are now quarantined before this normal-profile scene. Strict asset
+validation remains enabled.
+
+United Fronts also passes the same actual-Joiner post-goal action, with its
+authored script revision and YAP, in
+`brecourt-cb7071-UF-POSTGOAL-JOINER-PASS-1795300878060897947` under the same
+history directory. This targeted raw-copy probe used 512 MiB, so it does not
+establish the installer's 256 MiB production preset. All four profile proofs
+use the same immutable native actor Core but individually generated and
+archived source-derived overlays; the fixtures evolved as the missing UO
+pre-goal prerequisite was identified. No complete Brecourt playthrough is
+claimed for any profile.
+
+Reproduction from the checkout uses `/usr/bin/python3 tools/qa_brecourt_handoff.py`
+with `--source run/campaign-host --run run/qa-cod1-four --runtime-dir
+run/actor-eligibility-prototype/cb7071e5c92f794a91634b63cc2afba87865ba35e267507bbe5c628512528a41`
+and `--variant cod1|uo|sp_improved|united_fronts --scenario joiner-positive`.
+The alternatives `standing-one-hp`, `downed-negative` and `host-control` were
+tested on CoD1. `dead-boundary` remains a documented failing live-gate setup.
+The runner modifies only owned QA copies and builds an explicit opt-in scene;
+it is never a normal campaign launcher.
+
+### Pathfinder shared Use and initial-equipment follow-up
+
+The original `objectives` legbag and `beacon_think` routines contain no personal
+weapon/ammo reward. They advance shared flags/objectives and delete/change the
+original world objects. New pinned transformations capture the actual native
+Use activator for these two waits and require the same current native actor
+eligibility as the Brecourt gate. The separate first tutorial trigger, original
+intro/camera and original shared effects remain unchanged. The higher-precedence
+UF mission overlay retains the already-reviewed authored helmet-model repair.
+
+The first actual CoD1 follow-up completed the original parachute without an
+intro skip or actor/object arrangement. Read-only native observation matched
+each player's active Game weapon with their own CGame desired/predicted/current
+snapshot selection. It exposed a separate concrete equipment gap: after the
+Host's four original grants, the remote retained only the earlier fallback
+Thompson. Neither shared Use object is supposed to award these missing items.
+
+The source fix now starts a scoped watcher after the original classic Host
+detach. On CoD1/UO/SP Improved's exact classic revision it gives the original
+`m1carbine`, `thompson`, `colt`, `fraggrenade` recipe only to a current FRESH
+remote owner once, clearing only that owner's provisional fallback first to
+restore the original empty-before-grant condition and weapon-slot order. It
+waits without clearing/giving when the explicit native mission
+selection capability is missing. A matching PRESERVED owner only updates its
+external receipt, with no give/refill or active-weapon replacement. UF has a
+different authored/individual recipe and never calls this classic adapter.
+The fixed native request source is `pathfinder_initial`, epoch 0 and canonical
+`m1carbine`, committed after the complete current session/slot/ticket/world
+identity. Actual CoD1 integration now verifies the original primary M1 Carbine,
+secondary Thompson, Colt and frag grenade slots, exact original unspent Host
+stock/clip arrays, both active Game/own-CGame M1 selections and exact current
+native acknowledgement. Clearing the remote did not change Host equipment.
+The previous fallback-retained slot order is preserved as a partial earlier
+proof, not accepted as the original recipe. A pre-grant checkpoint resumed through the
+later earned grant needs separate event provenance; it is not covered by the
+conservative PRESERVED skip policy.
+
+There is **no Pathfinder Use PASS yet**. The natural-route probe stopped before
+approaching because native keyboard-turn inputs produced no actual yaw. A
+repeat verified focus on the owned peer's own Xvfb window and observed normal
+unlinked Host PS, raw command angles0 and native input-frame milliseconds0.
+Native `CL_AdjustAngles` at CoD1 `0x40a5b0` scales keyboard turn by that field
+before writing engine view angles; the evidence is in
+`run/campaign-investigation/native-cod1-keyboard-look.disasm.txt`. This is a
+bounded observed keyboard-input failure, not a claim that mouse aiming fails.
+The next probe uses XTest mouse motion confined to that owned Xvfb/window and
+still requires actual own-CGame plus HostPS yaw and native objective evidence.
+
+Both failed runs and exact sources/overlays are retained under
+`run/qa-cod1-four/history/pathfinder22e-NATURAL-INTRO-ownCG-PASS-yaw-input-FAIL-1795301698666286073`
+and `pathfinder22e-owned-focus-keyboard-look-frametime0-FAIL-1795301952502182565`
+in the same history directory. The `PASS` word in the first archive labels
+only the observed natural intro/own-CGame prerequisite; its overall result is
+FAIL. No interaction, mission or campaign completion is claimed.
+
+The native client-input clock correction has a real counterfactual: with
+`dbf6b9c2e11a0135d393f1a8a9e9280cdc2dd75f900b4f6853c6839ce1d065c8`,
+the same remote keyboard turn changes Host PS yaw29.998→120.718, raw owner
+command angles and own predicted CGame yaw; its native input clock reads13ms.
+The remote then genuinely walks about1,600units along the original route.
+This is not a mouse-hardware claim. Direct XTest motion did not produce yaw
+in that run. The route subsequently stopped because the existing250ms command
+poll quantized the QA controller's180deg/s turn pulses into45degree steps;
+the queued-key controller now scales the ordinary local turn speed instead.
+That overall run remains FAIL, archived as
+`pathfinder-dbf6-input-clock-counterfactual-PASS-steering-poll-quantization-FAIL-1795303760336724622`.
+
+The separate actual post-grant checkpoint test restored the remote's normally
+user-selected Colt and consumed ammunition exactly, with PRESERVED/no recipe
+repeat. It nevertheless remains **FAIL**: Host owned pistol reserve changed
+28→51. Read-only native slot mapping confirms Colt stock/clip index4, so this
+cannot be dismissed as an unused raw-array word. Static native analysis shows
+classic `ClientDisconnect` can drop a held weapon when a saved ghost still has
+connected state2, and managed ghost cleanup invokes that original callback.
+Actual pickup causation and the narrowly scoped cleanup correction are being
+verified; no Host-ammo exception was added. The negative evidence is
+`pathfinder-bac5739-remote-Colt-CP-exact-PASS-Host-stock4-FAIL-1795303251601764946`.
+The complete original-recipe prerequisite is in
+`pathfinder-bac5739-exactslots-ammo-ownCG-PASS-remote-keyboard-clock0-FAIL-1795302951051601090`.
+All archives are under the same owned QA history directory. UO/SP Improved's
+new initial-grant behavior, actual shared Use, complete mission flow, native
+Windows and physical mouse input still need acceptance.
 
 The zero-health test remains a **failed live-gate test setup**, not a passing
 death-lifecycle proof. An entity-only GSC health 0 write was observed as 600 on

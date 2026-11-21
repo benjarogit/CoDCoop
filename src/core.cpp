@@ -13,6 +13,10 @@
 #include <vector>
 #include "api.h"
 #include "actor_eligibility.h"
+#include "core_features.h"
+#include "input_frame_clock.h"
+#include "saved_ghost_cleanup.h"
+#include "near_body_draw.h"
 #include "game.h"
 #include "hook.h"
 #include "steam.h"
@@ -1164,18 +1168,28 @@ void CheckPathLists(const char* when)
 
 // Un checkpoint guardado con remotos los carga como jugadores del juego sin cliente del motor (HookLoad). Con la
 // partida ya cargada se desconectan (ClientDisconnect, vmMain 4): el remoto vuelve a entrar como al empezar el nivel.
-void HostDropGhosts()
+bool HostDropGhosts()
 {
     uint8_t* reloading = g::Cvar_FindVar("g_reloading");
-    if (g::sv_state != 2 || !g::svs_clients || !g::sv_gameClients || (reloading && *(int*)(reloading + 0x20))) return;
+    if (g::sv_state != 2 || !g::svs_clients || !g::sv_gameClients || (reloading && *(int*)(reloading + 0x20))) return false;
     S->inventoryLoading=false;
     for (int n = 1; n < g::MAX_CLIENTS; ++n) {
         if (S->remote[n].active || *(int*)(g::Client(n) + g::CL_STATE) || !*(int*)(g::PlayerState(n) + g::GC_CONNECTED))
             continue;
         Log("host: el jugador %d vino en el checkpoint sin nadie en ese lugar, se desconecta", n);
+        auto base=(uintptr_t)GetModuleHandleA(g::GameDll());
+        if(!base||!saved_ghost_cleanup::ValidBranch((const uint8_t*)(base+g::A(0x14cbf,0x1689f)),base,g::uo)) {
+            CoopStatus("Saved-player cleanup code is incompatible. Joining is waiting for the supported game module.");
+            return false;
+        }
         CapturePeerInventory(n,"native restored checkpoint before ghost disconnect",true);
+        int& connected=*(int*)(g::PlayerState(n)+g::GC_CONNECTED);
+        int normalized=saved_ghost_cleanup::Connection(n,S->remote[n].active,*(int*)(g::Client(n)+g::CL_STATE),connected);
+        if(normalized!=connected)Log("inventory: saved ghost slot=%d native connection %d -> %d before cleanup",n,connected,normalized);
+        connected=normalized;
         g::GameCall(4, n);
     }
+    return true;
 }
 
 void HostJoin(const sockaddr_in& from, Reader r)
@@ -1197,7 +1211,7 @@ void HostJoin(const sockaddr_in& from, Reader r)
     }
     uint8_t* reloading = g::Cvar_FindVar("g_reloading");
     if (reloading && *(int*)(reloading + 0x20)) return;  // mision fallida: esperar a que cargue el checkpoint
-    HostDropGhosts();
+    if(!HostDropGhosts())return;
     const char* hostMap = g::CvarString("mapname");
     const char* theirMap = r.p < r.end && memchr(r.p, 0, r.end - r.p) ? (const char*)r.p : nullptr;
     if (theirMap && _stricmp(theirMap, hostMap) != 0) {  // que cargue el mapa del host y vuelva (sin ocupar slot)
@@ -1899,6 +1913,39 @@ void HostFreeBody(int n)
 }
 
 bool g_bodyDraw = true;  // prueba: coopbodydraw 0 -> sin cuerpos, los jugadores como en el SP
+bool g_nearBodyDraw = true;
+unsigned g_nearBodyHidden = 0;
+void Cmd_CoopBodyOverlap() {if(suite::IsQA())g_nearBodyDraw=atoi(g::Argv(1))!=0;}
+bool NearBodyHidden(int e,int self,const uint8_t* state)
+{
+    if(!g_nearBodyDraw||!g_api||!S||(S->role!=HOST&&S->role!=JOINER)||self<0||self>=g::MAX_CLIENTS||
+       g::sv_state!=2||g::cls_state!=2||(S->role==JOINER&&!S->joined))return false;
+    uint8_t* cg=(uint8_t*)GetModuleHandleA(g::CgameDll());
+    if(!cg)return false;
+    auto dos=(IMAGE_DOS_HEADER*)cg;
+    if(dos->e_magic!=IMAGE_DOS_SIGNATURE||dos->e_lfanew<=0||
+       (unsigned)dos->e_lfanew>0x1000-sizeof(IMAGE_NT_HEADERS))return false;
+    auto pe=(IMAGE_NT_HEADERS*)(cg+dos->e_lfanew);
+    if(pe->Signature!=IMAGE_NT_SIGNATURE||pe->FileHeader.Machine!=IMAGE_FILE_MACHINE_I386||
+       pe->OptionalHeader.Magic!=IMAGE_NT_OPTIONAL_HDR32_MAGIC)return false;
+    size_t image=pe->OptionalHeader.SizeOfImage,needed=g::A(0x374,0x5c0);
+    if(image<g::A(0x125748,0x275ed4)||image>UINTPTR_MAX-(uintptr_t)cg)return false;
+    uint8_t* snap=*(uint8_t**)(cg+g::A(0x10b8a8,0x259548));
+    if((uintptr_t)snap<(uintptr_t)cg||(uintptr_t)snap-(uintptr_t)cg>image-needed-8)return false;
+    const uint8_t* ps=snap+8;const uint8_t* predicted=cg+g::A(0x11e0b4,0x26d9e4);
+    near_body_draw::View v{};
+    v.ready=*(int*)ps>0;v.currentClient=*(int*)(ps+g::PS_CLIENTNUM);v.expectedClient=self;
+    v.thirdPerson=*(int*)(cg+g::A(0x11e0b0,0x26d9e0))!=0;v.movie=S->movieWorldSuspended;
+    v.ownDowned=S->downed[self];v.foreignDowned=S->downed[e];v.pmType=*(int*)(ps+4);
+    v.pmFlags=*(int*)(ps+12)|*(int*)(predicted+12);v.foreignFlags=*(int*)(state+0x10);
+    v.health=*(int*)(ps+g::PS_HEALTH);v.viewLocked=*(int*)(ps+g::A(0x35c,0x5a0))|*(int*)(predicted+g::A(0x35c,0x5a0));
+    memcpy(v.camera,cg+g::A(0x12573c,0x275ec8),12);memcpy(v.predictedFeet,predicted+0x14,12);
+    memcpy(v.snapshotFeet,ps+0x14,12);memcpy(v.foreignFeet,state+0x20,12);memcpy(v.foreignVelocity,state+0x2c,12);
+    memcpy(&v.viewHeight,predicted+g::A(0xc0,0xe8),4);v.standingHeight=(float)*(int*)(predicted+g::A(0x32c,0x564));
+    if(!near_body_draw::Suppress(v))return false;
+    if(!g_nearBodyHidden++)Log("body: native player draw retained for coincident upright teammate %d, self=%d",e,self);
+    return true;
+}
 void Cmd_CoopBodyDraw()
 {
     g_bodyDraw = atoi(g::Argv(1)) != 0;
@@ -1932,6 +1979,7 @@ extern "C" uint8_t* CgEntityState(const int* args)
     uint8_t* st = g::Entity(e);
     int self = S->role == JOINER ? S->slot : 0;
     if (!g_bodyDraw || S->role == NONE || e < 0 || e >= g::MAX_CLIENTS || e == self || st[0] != 1 || !g::serverObjMap[e]) return st;
+    if(NearBodyHidden(e,self,st))return st;
     uint8_t* c = copy[e];
     memcpy(c, st, g::ENTSTATE_SIZE);
     c[0] = 0;
@@ -4206,7 +4254,7 @@ const CmdDef kCmds[] = {
     {"coopswitch", Cmd_CoopSwitch}, {"coopswitchcancel", Cmd_CoopSwitchCancel}, {"coopswitchretry", Cmd_CoopSwitchRetry}, {"coopqastart", Cmd_CoopQAStart}, {"coophost", Cmd_CoopHost}, {"coopjoin", Cmd_CoopJoin}, {"coopinfo", Cmd_CoopInfo}, {"coopbring", Cmd_CoopBring},
     {"coopdobj", Cmd_CoopDObj}, {"coopgod", Cmd_CoopGod},   {"cooplook", Cmd_CoopLook}, {"coopstate", Cmd_CoopState},
     {"coopbodydraw", Cmd_CoopBodyDraw}, {"coopanims", Cmd_CoopAnims}, {"coopcmd", Cmd_CoopCmd}, {"coopent", Cmd_CoopEnt},
-    {"coophealth", Cmd_CoopHealth}, {"coopkill", Cmd_CoopKill}, {"cooplists", Cmd_CoopLists},
+    {"coophealth", Cmd_CoopHealth}, {"coopkill", Cmd_CoopKill}, {"cooplists", Cmd_CoopLists}, {"coopbodyoverlap",Cmd_CoopBodyOverlap},
     {"cooprejoin", Cmd_CoopRejoin}, {"coopendlevel", Cmd_CoopEndLevel}, {"coopweapons", Cmd_CoopWeapons}, {"coopuiclick", Cmd_CoopUiClick}, {"coopnet", Cmd_CoopNet},
     {"coopjoinfriend", Cmd_CoopJoinFriend}, {"coopgive", Cmd_CoopGive}, {"coopleave", Cmd_CoopLeave},
 };
@@ -4215,6 +4263,7 @@ const CmdDef kCmds[] = {
 
 #define EXPORT extern "C" __declspec(dllexport)
 EXPORT const uint32_t Coop_Protocol = suite::PROTOCOL;
+EXPORT const uint32_t Coop_Features = core_features::COMPILED;
 
 EXPORT uint32_t Coop_StateVersion() { return (uint32_t)sizeof(State) ^ (STATE_VERSION << 28); }
 EXPORT int Coop_StateSize() { return (int)sizeof(State); }
@@ -4236,6 +4285,7 @@ EXPORT void Coop_Init(const CoreApi* api, void* state, int fresh)
     bool prepared=g::uo&&(!suite::IsQA()||suite::PreparedQA())&&
         suite::LoadIdentity(g::uo,g::CvarString("fs_game"),preparedIdentity,preparedError);
     ConfigureBodyMemory(prepared);
+    SetCoopCvarChanged("coop_select_pathfinder_api","0");
     PublishActorEligibility();
     Log("nucleo listo (rol %d, %s)", S->role, fresh ? "estado nuevo" : "estado conservado");
     if (!steam::SelfTest()) Log("steam: FALLA la autoprueba de direcciones falsas / nombres");
@@ -4243,6 +4293,8 @@ EXPORT void Coop_Init(const CoreApi* api, void* state, int fresh)
 
 EXPORT void Coop_Shutdown()
 {
+    SetCoopCvarChanged("coop_select_api","0");
+    SetCoopCvarChanged("coop_select_pathfinder_api","0");
     SetCoopCvarChanged("coop_actor_api","0");
     for(int n=0;n<g::MAX_CLIENTS;++n) {
         char key[64];snprintf(key,sizeof key,"coop_actor_%d_state",n);
@@ -4602,6 +4654,17 @@ EXPORT void __cdecl Coop_HostFrame()
 
 // En el que se une el servidor local no corre, pero el cliente del SP toma su reloj de sv.time
 // (CL_Frame 0x40df80): lo avanzamos siguiendo al ultimo snapshot del host, un snapshot atras para interpolar.
+bool PublishFrozenClientInput(int msec)
+{
+    auto input=g::A(0x1439380,0x4842220),residue=g::A(0x1439384,0x4842224);
+    const auto* setter=(const uint8_t*)g::A(0x40df70,0x40f110);
+    if(!input_frame_clock::ValidSetter(setter,(uint32_t)input,(uint32_t)residue)) {
+        JoinerLeave("Client input-clock code is incompatible. Restore the supported game executable before joining.");
+        return false;
+    }
+    input_frame_clock::Publish(*(int*)input,*(int*)residue,msec);
+    return true;
+}
 EXPORT int __cdecl Coop_FrozenFrame(int msec)
 {
     if (S->role == JOINER && !S->joined && S->gamestateReady) {
@@ -4611,14 +4674,17 @@ EXPORT int __cdecl Coop_FrozenFrame(int msec)
     }
     // While looking for the host, do not let the independent singleplayer
     // simulation run ahead of it. Keep rendering and servicing the handshake.
-    if (S->role == JOINER && !S->joined && g::sv_state == 2) return 1;
+    if (S->role == JOINER && !S->joined && g::sv_state == 2) {
+        PublishFrozenClientInput(msec);
+        return 1;
+    }
     if (!S->frozen) return 0;
     HookCgame(true);
     HookUsercmd(true);
     JoinerSkipPregame();
     JoinerKeepAlive();
     if (!S->frozen) return 0;  // se perdio el host
-    if (S->movieWorldSuspended) return 1; // native movie owns rendering/world until host M_RELOAD
+    if (S->movieWorldSuspended) {PublishFrozenClientInput(msec);return 1;} // native movie owns rendering/world until host M_RELOAD
     DrawTeamOnCompass(g_team, g_teamPos, S->slot);
     int& t = S->frozenTime;
     int latest = g::cl_snapServerTime;
@@ -4635,5 +4701,6 @@ EXPORT int __cdecl Coop_FrozenFrame(int msec)
     if (dt < 0.0f || dt > 0.2f) dt = 0.0f;
     JoinerAdvanceAnims(dt);
     g::Com_SyncClientDObjs();           // lo hace un trap del juego, que aca no corre
+    PublishFrozenClientInput(msec);
     return 1;
 }

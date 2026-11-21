@@ -1,6 +1,6 @@
 # CoDCoop 0.6 handoff / Übergabe
 
-Date / Datum: 2026-11-21. Development branch: `feat/0.6.0-coop-suite`.
+Date / Datum: 2026-11-22. Development branch: `feat/0.6.0-coop-suite`.
 Starting point: `801dfd4` (published v0.5.4 assets are unchanged).
 Local source checkpoints: `4a6d36f`, `3288c23`, `7b1428f` (WIP, not pushed or released).
 
@@ -11,6 +11,65 @@ ersetzt die älteren Standangaben weiter unten. Development is unfinished;
 published v0.5.4 binaries have not been replaced.
 
 ### Current checkpoint / Aktueller Zwischenstand
+
+#### November22 addendum / Ergänzung 22. November
+
+This addendum supersedes pending statements below. Nothing has been published.
+/ Diese Ergänzung ersetzt ältere Offen-Angaben unten. Nichts wurde veröffentlicht.
+
+- **Brecourt:** seven targeted native checks now pass across CoD1, UO,
+  SP Improved and United Fronts. An eligible real joiner triggers the original
+  post-goal Moody handoff while the host remains outside its distance gate.
+  Actual downed1HP is rejected; standing1HP and the original host are accepted.
+  Original objective4, explosives flag and four bomb triggers are retained.
+  `run/campaign-investigation/brecourt-acceptance-summary.json` records scope:
+  isolated post-goal mechanics, not NPC approach, battle or full mission.
+- **Pathfinder input and inventory:** Core
+  `7f19ec02b05655cd3fbdc993ae664c11576a9d1ac66958a98bd741e665b56449`
+  preserves the native local client-input clock while its independent server
+  simulation is frozen. Actual peer keyboard turning and owned Win32 mouse
+  injection change native and own-CG yaw; this is not physical hardware testing.
+  A strict near-host checkpoint restores the guest's chosen Colt28/6, all
+  slots and ammunition exactly, without repeating the fresh initial kit.
+  Host Colt28/7 is unchanged and no dropped Colt is introduced. Saved-ghost
+  cleanup uses the signature-checked native partial-connection path before
+  normal entity cleanup. Ordinary explicit disconnect/timeout drops are a
+  separate open scenario. Evidence:
+  `run/qa-cod1-four/history/pathfinder7f19-nearHost-Colt-nativeCP-exact-MOUSE-KEYBOARD-PASS-1795304573891484772/`.
+  Natural bag/beacon use and complete Pathfinder playthrough remain pending.
+  Fresh-only starting equipment excludes UF's authored individual kit path;
+  checkpoint-before-earned-kit provenance remains open.
+- **Rendering:** private UO proof retains native ET_PLAYER drawing for a
+  precisely coincident upright teammate, removing a head intersection without
+  moving either player. Downed bodies, third-person views and movement apart
+  retain normal bodies. This is a conservative half-unit coordinate-equivalence
+  rule, not a general proximity radius; CoD1's observed15-unit spawn case is
+  explicitly unresolved. Evidence: `run/body-overlap-private/STATUS.md`.
+  HEAD combines this policy with input/ghost fixes and stronger PE image bounds;
+  compiled Core `602cb6af5d25fc7cf8a010e96f56e2a05095dcd30a991499b80ae08d07fa9228`
+  is undergoing fresh native regression in `run/combined-core-prototype/`.
+- **Private resource bootstrap:** CoD1 and UO now both pass lost-fragment
+  retransmission before the peer's first GAME_INIT. UF also passes default and
+  peer-first world-refresh cases with complete current weapon mappings.
+  These are private QA prototypes, including raw512MiB UF; persistent lifecycle,
+  complete future asset closure, host world rules and individual pre-mission
+  party transport are not production-integrated. See
+  `run/network-bootstrap-prototype/STATUS.md`.
+- **Installation contract:** all variants now require the same two pinned visual
+  patches even for slim suites. Mandatory Core feature bits15 are checked from a
+  read-only PE export, separately from runtime hook readiness. Recursive save
+  summaries preserve nested native saves and avoid symlinks. Current checker
+  `0cd064f6d495114db2def1fecbd5cded9898c92a7c77d30083781594724637a8`
+  and Linux/Windows frozen workers are recorded in
+  `run/fixed-suite-api15-handoff.json`. New immutable stages still contain the
+  older bac5739 Core and must be rebuilt after combined-Core validation.
+  The previous cb7071 AppImage is an old private test artifact, not a current
+  distribution. Actual native Windows/Steam acceptance remains unavailable.
+- **Current source checks:**250 Python cases,227 passed and23 opt-in native
+  skips (`run/unit-current.log`);27 C++ fixtures passed ASan/UBSan. Native
+  campaign acceptance is recorded separately from these source checks.
+
+Older checkpoints follow for traceability. / Ältere Zwischenstände zur Nachverfolgung:
 
 - **Private network bootstrap UO PASS:** immutable experimental Core
   `caa9185bacf0b5c36f15058e8a6ec739e2226273a98a56a0b2045697e798546e`

@@ -239,6 +239,9 @@ def main(argv=None, *, scenario=None):
                                       for p in ('ddraw.dll', 'codcoop_core.dll')}
     if args.expect_protocol_rejection:
         provenance['coverage'] = 'negative protocol compatibility test only; no joined gameplay claim'
+    if scenario is not None:
+        provenance['scope'] = 'targeted-native-scenario'
+        provenance['coverage'] = 'targeted Python scenario pending; no ordinary smoke or campaign completion claim'
     if chaos_script:
         provenance['network'] = {'tool': 'coop-anything/chaos', 'revision': COOP_ANYTHING_REVISION,
                                  'profile': args.chaos_profile, 'seed': args.chaos_seed}

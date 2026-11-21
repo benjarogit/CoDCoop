@@ -50,6 +50,14 @@ class AppImageSuiteTests(unittest.TestCase):
             package.embed_suite(self.f.game,self.destination)
         self.assertFalse(self.destination.exists())
 
+    def test_reviewed_visual_patch_is_required_in_online_payload_too(self):
+        name='Main/zzz_patch.pk3';(self.f.game/name).unlink()
+        lock=json.loads((self.f.game/'coop/runtime-lock.json').read_text());lock['files'].pop(name)
+        self.f.write('coop/runtime-lock.json',fixtures.suite.canonical(lock))
+        with self.assertRaisesRegex(ValueError,'missing required suite content'):
+            package.embed_suite(self.f.game,self.destination)
+        self.assertFalse(self.destination.exists())
+
     def test_unowned_symlink_cannot_copy_external_files_into_artifact(self):
         outside=Path(self.temp.name)/'private.txt';outside.write_text('outside source')
         (self.f.game/'unowned.txt').symlink_to(outside)

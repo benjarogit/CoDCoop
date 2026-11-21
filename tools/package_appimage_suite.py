@@ -5,7 +5,7 @@ from pathlib import Path
 import shutil
 from coop_suite import (PROTOCOL, approved_localizations, content_files, load_manifest,
                         localization_inventory, read_lock, resolve, sha256)
-from runtime_protocol import core_protocol
+from runtime_protocol import core_protocol, require_core_features, required_feature_mask
 
 ROOT=Path(__file__).resolve().parents[1]
 
@@ -18,11 +18,12 @@ def embed_suite(source,destination,base_catalog=None):
     manifest,mhash=load_manifest(source);lock=read_lock(source,manifest,mhash)
     if core_protocol(resolve(source,'codcoop_core.dll'))!=PROTOCOL:
         raise ValueError('staged Core protocol mismatch')
+    require_core_features(resolve(source,'codcoop_core.dll'),required_feature_mask(manifest))
     files={p.relative_to(source).as_posix():sha256(p) for p in source.rglob('*') if p.is_file()}
     for name,digest in lock['files'].items():
         if sha256(resolve(source,name))!=digest:raise ValueError('staged hash mismatch: '+name)
     catalog=json.loads(Path(base_catalog or ROOT/'content/base-packages.json').read_text())
-    optional={item['path'].lower() for key in ('packages','additional_visual_patches') for item in catalog[key]}
+    optional={item['path'].lower() for item in catalog['packages']}
     missing=[]
     for item in manifest['required']:
         name=item['path'];path=resolve(source,name)

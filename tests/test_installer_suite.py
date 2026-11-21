@@ -228,6 +228,34 @@ class LocalizationTests(unittest.TestCase):
 
 
 class BaseCompletenessTests(unittest.TestCase):
+    def test_embedded_campaigns_cannot_skip_missing_required_suite_patches(self):
+        for location in ('game','payload'):
+            with self.subTest(location=location), tempfile.TemporaryDirectory() as folder:
+                root=Path(folder);game=root/'game';overlay=root/'payload'
+                game.mkdir();(overlay/'coop/launcher').mkdir(parents=True)
+                (game/'CoDSP.exe').write_bytes(b'owned game');(game/'ddraw.dll').write_bytes(b'old intact module')
+                (overlay/'coop/launcher/CoD-Coop-Launcher').write_bytes(b'not executed')
+                for name in ('sp_improved/sp_improved_1.5.pk3','UnitedFronts/ZUnitedFronts_1.1_beta.pk3'):
+                    path=(game if location=='game' else overlay)/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(b'campaign already present')
+                (overlay/'coop/variants.json').write_text(json.dumps({'required':[{'path':'Main/zzz_patch.pk3','sha256':hashlib.sha256(b'reviewed').hexdigest(),'size':8,'install_source':'suite'}]}))
+                with mock.patch.object(installer,'download') as download, \
+                     mock.patch.object(installer,'InstallTransaction') as transaction, \
+                     mock.patch.object(installer,'run_suite_validator') as validator:
+                    result=installer.suite_main(['--game',str(game),'--suite-source',str(overlay),'--yes'])
+                self.assertEqual(result,2);download.assert_not_called();transaction.assert_not_called();validator.assert_not_called()
+                self.assertEqual((game/'ddraw.dll').read_bytes(),b'old intact module')
+                self.assertFalse((game/'coop/backups').exists())
+
+    def test_suite_patch_preflight_checks_actual_pin_even_when_file_exists(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);(root/'coop').mkdir();(root/'Main').mkdir()
+            patch=root/'Main/zzz_patch.pk3';patch.write_bytes(b'reviewed')
+            (root/'coop/variants.json').write_text(json.dumps({'required':[{'path':'Main/zzz_patch.pk3','sha256':hashlib.sha256(b'reviewed').hexdigest(),'size':8,'install_source':'suite'}]}))
+            installer.require_suite_owned_patches(root)
+            patch.write_bytes(b'changed!')
+            with self.assertRaisesRegex(ValueError,'missing or changed'):
+                installer.require_suite_owned_patches(root)
+
     def test_missing_original_mission_data_aborts_before_any_mutation(self):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder);game=root/'game';overlay=root/'payload'

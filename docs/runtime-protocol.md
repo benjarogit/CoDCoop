@@ -78,3 +78,24 @@ Diese Tests prüfen Identität und Integrität. Sie beweisen weder vollständige
 Kampagnen noch sichere Modell-Lebenszyklen, individuelle Ausrüstungsübernahme
 oder Spielbetrieb unter nativem Windows. Protokoll 9 aktiviert allein keine
 Ausrüstungsfähigkeit.
+
+## Compiled API mask / Kompilierte API-Maske
+
+Canonical suite manifests require `core_features_required: 15`. `Coop_Features`
+is a readonly, nonexecutable PE DATA export: owner inventory=1, actor selection=2,
+actor eligibility=4, Pathfinder initial recipe=8. All required bits must be set;
+missing/forwarded/writable/executable/out-of-bounds exports are rejected without
+loading the DLL. This describes compiled support. Native readiness CVars still
+control whether an initialized engine can actually use the API.
+
+The native checker advertises `core_features_validation: true` in its
+`capabilities` JSON. Staging requires that capability for a nonzero manifest
+mask, so an older protocol9 checker cannot silently ignore the new requirement.
+An absent or explicit zero requirement is retained only for legacy fixtures and
+historical profiles; it does not establish current API readiness.
+
+Kanonische Paketmanifeste verlangen alle vier Bits (`15`). Python, nativer
+Validator und Stager lesen dafür ausschließlich das begrenzte PE-Datenexport;
+die DLL wird nicht ausgeführt. Vorhandener Code ist noch kein Laufzeitnachweis:
+Die nativen Bereitschafts-CVars bleiben maßgeblich. Ein alter Protokoll9-Validator
+ohne ausdrücklich gemeldete Maskenprüfung wird beim Staging abgewiesen.

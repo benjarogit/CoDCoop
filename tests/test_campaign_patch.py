@@ -631,6 +631,57 @@ class CampaignPatchTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Unknown mission script'):
             patch.transform_trigger('maps/brecourt.gsc', b'cannot match original')
 
+    def test_pathfinder_preserves_intro_inventory_and_single_shared_use_actions(self):
+        source=b'''objectives() {
+          trigger waittill("trigger"); objective_state(0,"done");
+          trigger = getent("legbag_trigger","targetname");
+          trigger waittill("trigger"); flag_set("legbag");
+          legbag delete(); trigger delete(); objective_state(1,"done");
+        }
+        beacon_think(beacon) {
+          flag_wait("legbag"); trigger waittill("trigger"); trigger delete();
+          flag_set("flares set"); beacon setmodel("xmodel/eureka_beacon");
+        }
+        parachute_player() { level.player giveWeapon("m1carbine"); level.player switchToWeapon("m1carbine"); level.player unlink(); }
+        '''
+        path='maps/pathfinder.gsc';old=patch.TRIGGER_PATCHES[path];classic=patch.CLASSIC_PATHFINDER_HASH
+        try:
+            patch.TRIGGER_PATCHES[path]=(*old[:3],{hashlib.sha256(source).hexdigest()})
+            patch.CLASSIC_PATHFINDER_HASH=hashlib.sha256(source).hexdigest()
+            result=patch.transform_trigger(path,source).decode()
+            with self.assertRaisesRegex(ValueError,'Unknown mission script revision'):
+                patch.transform_trigger(path,source.replace(b'flag_set("legbag")',b'flag_set("unknown")'))
+        finally:patch.TRIGGER_PATCHES[path]=old;patch.CLASSIC_PATHFINDER_HASH=classic
+        self.assertEqual(result.count(r'maps\_coop_mission_use::wait_for_actor(trigger)'),2)
+        self.assertEqual(result.count('trigger waittill("trigger")'),1)
+        self.assertEqual(result.count('flag_set("legbag")'),1)
+        self.assertIn('level.player giveWeapon("m1carbine")',result)
+        self.assertIn('level.player switchToWeapon("m1carbine")',result)
+        self.assertIn(r'thread maps\_coop_pathfinder_equipment::watch()',result)
+        self.assertEqual(result.count('beacon setmodel("xmodel/eureka_beacon")'),1)
+        helper=(patch.ROOT/'campaign_patches/mission_use.gsc').read_text()
+        self.assertIn('waittill("trigger", actor)',helper)
+        self.assertIn(r'maps\_coop_brecourt_handoff::eligible(actor)',helper)
+        self.assertIn('actor != level.player',helper)
+        self.assertNotIn('giveWeapon',helper)
+
+    def test_pathfinder_classic_recipe_waits_for_fresh_native_owner_and_never_refills_preserved(self):
+        text=(patch.ROOT/'campaign_patches/pathfinder_equipment.gsc').read_text()
+        a,b=patch.function_span(text,'consider');body=uncomment(text[a:b])
+        preserved=body[body.index('if (state == "PRESERVED")'):body.index('if (state != "FRESH"')]
+        self.assertNotIn('giveWeapon',preserved)
+        self.assertNotIn('takeallweapons',preserved)
+        self.assertIn('PRESERVED_NO_GIVE',preserved)
+        self.assertLess(body.index('getcvar(native + "identity") != context'),body.index('giveWeapon'))
+        self.assertLess(body.index('coop_select_pathfinder_api'),body.index('giveWeapon'))
+        self.assertEqual(re.findall(r'giveWeapon\("([^"]+)"\)',body),['m1carbine','thompson','colt','fraggrenade'])
+        self.assertLess(body.index('coop_select_pathfinder_api'),body.index('takeallweapons'))
+        self.assertLess(body.index('takeallweapons'),body.index('giveWeapon'))
+        a,b=patch.function_span(text,'request_selection');request=uncomment(text[a:b])
+        self.assertIn('"source","pathfinder_initial"',request)
+        self.assertIn('"epoch",0',request)
+        self.assertTrue(request.rstrip().endswith('setcvar(key + "seq",sequence + 1);'))
+
     def test_ai_melee_uses_actual_enemy_stance_for_every_player(self):
         path = 'animscripts/melee.gsc'
         source = b'''MeleeCombat(reason) {

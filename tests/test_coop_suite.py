@@ -8,7 +8,7 @@ import sys
 import unittest
 import zipfile
 from unittest import mock
-from pe_fixtures import core_pe, malformed_core
+from pe_fixtures import core_pe, malformed_core, malformed_feature
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
@@ -76,6 +76,23 @@ class SuiteTest(unittest.TestCase):
         self.assertEqual((self.game / 'Main/save/autosave.svg').read_bytes(), b'important save')
         self.assertEqual((self.game / 'Main/config.cfg').read_bytes(), b'player settings')
 
+    def test_missing_partial_or_unsafe_compiled_features_cannot_be_sealed_or_prepared(self):
+        examples=[core_pe(suite.PROTOCOL,bits) for bits in (None,0,1,3,7)]
+        examples += [malformed_feature(kind,suite.PROTOCOL) for kind in ('forwarded','writable','executable','out_of_bounds','ordinal')]
+        for data in examples:
+            with self.subTest(core=data[-8:]):
+                self.repin_core(data)
+                with self.assertRaises(ValueError):suite.seal_installation(self.game)
+                with self.assertRaises(ValueError):suite.prepare(self.game,'uo')
+                self.assertFalse(suite.check_installation(self.game)['ok'])
+                self.assertFalse((self.game/'coop/install.json').exists())
+
+    def test_legacy_zero_features_requirement_does_not_claim_compiled_readiness(self):
+        self.manifest['core_features_required']=0
+        self.repin_core(core_pe(suite.PROTOCOL,None))
+        self.assertTrue(suite.seal_installation(self.game))
+        self.assertTrue(suite.check_installation(self.game)['ok'])
+
     def test_install_seals_once_but_later_launch_rechecks_content(self):
         with mock.patch.object(suite, 'collect', wraps=suite.collect) as collect:
             suite.seal_and_prepare(self.game, 'sp_improved')
@@ -137,6 +154,32 @@ class SuiteTest(unittest.TestCase):
         self.write('coop/variants.json', suite.canonical(self.manifest))
         with self.assertRaisesRegex(ValueError, 'save area'):
             suite.load_manifest(self.game)
+
+    def test_native_autosave_subfolders_count_with_safe_relative_latest_name(self):
+        receipt=suite.seal_installation(self.game)
+        self.write('sp_improved/save/autosave/pathfinder.svg',b'actual-file native autosave layout')
+        self.write('sp_improved/save/manual/Slot A.SVG',b'independent manual save')
+        self.write('UnitedFronts/save/autosave/pathfinder.svg',b'other variant progress')
+        os.utime(self.game/'sp_improved/save/autosave/pathfinder.svg',(300,300))
+        os.utime(self.game/'sp_improved/save/manual/Slot A.SVG',(200,200))
+        checked=suite.check_installation(self.game)
+        self.assertEqual(checked['variants'],receipt['variants'])
+        self.assertEqual(checked['local_saves']['sp_improved'],{'count':2,'latest':{'name':'autosave/pathfinder.svg','modified':'1970-01-01T00:05:00+00:00'}})
+        self.assertEqual(checked['local_saves']['united_fronts']['latest']['name'],'autosave/pathfinder.svg')
+        self.assertEqual(checked['local_saves']['uo'],{'count':0,'latest':None})
+
+    def test_save_summary_never_follows_symlink_files_or_directories(self):
+        with tempfile.TemporaryDirectory() as external:
+            outside=Path(external);(outside/'private.svg').write_bytes(b'not variant progress')
+            save=self.game/'Main/save'
+            try:
+                (save/'foreign.svg').symlink_to(outside/'private.svg')
+                (save/'external').symlink_to(outside,target_is_directory=True)
+                (save/'loop').symlink_to(save,target_is_directory=True)
+            except OSError as error:self.skipTest('symlink privilege unavailable: '+str(error))
+            summary=suite.local_save_summary(self.game,self.manifest)
+            self.assertEqual(summary['cod1']['count'],1)
+            self.assertEqual(summary['cod1']['latest']['name'],'autosave.svg')
 
     def test_languages_keep_gameplay_fingerprint_but_are_locally_verified(self):
         before = suite.seal_installation(self.game)['variants']

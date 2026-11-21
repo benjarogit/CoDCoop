@@ -55,6 +55,19 @@
 - Show the verified package version and latest local save per campaign in the
   English/German launcher. Compare extra loaded PK3s even under multiplayer filenames.
 - Add English/German documentation and mark CoD 2 experimental.
+- Preserve each player's weapon slots, ammunition and active weapon across
+  checkpoint loading; issue a fresh mission kit only for a fresh player state.
+  Avoid a duplicate weapon drop when cleaning up a player restored from a save.
+- Keep the joiner's native input timer running while freezing its independent
+  world simulation, restoring keyboard and mouse look between host snapshots.
+- Adapt Brecourt's post-goal handoff to a healthy participating player, retaining
+  the original one-time objectives and explosives actions. Targeted native tests
+  cover all four variants; full mission completion remains open.
+- Require the same pinned visual patches in every installation and check native
+  Core feature exports before declaring a payload compatible. Preserve nested
+  save directories during installation and repair.
+- Record actual game exit codes during launcher retries and process transitions;
+  a successful supervisor exit alone does not prove successful game shutdown.
 
 Mission-level coverage, Steam across accounts, native Windows and all special
 mechanics remain acceptance gates. See [handoff](docs/HANDOFF-0.6.md).
@@ -118,6 +131,20 @@ mechanics remain acceptance gates. See [handoff](docs/HANDOFF-0.6.md).
   und englischen Launcher anzeigen. Zusätzliche geladene PK3s auch unter
   Multiplayer-Dateinamen beim Inhaltsvergleich berücksichtigen.
 - Englische/deutsche Dokumentation; CoD 2 ausdrücklich experimentell.
+- Waffenplätze, Munition und aktive Waffe jedes Spielers beim Checkpoint-Laden
+  erhalten; eine neue Missionsausrüstung nur an einen frischen Spielerzustand
+  vergeben. Beim Bereinigen geladener Spielerreste keinen Waffenduplikat abwerfen.
+- Lokalen Eingabetakt des Mitspielers trotz eingefrorener eigener Weltsimulation
+  fortführen, damit Tastatur- und Mausblick zwischen Host-Snapshots funktionieren.
+- Brecourts Übergabe nach dem Missionsziel auf einen gesunden beteiligten Spieler
+  erweitern; ursprüngliche einmalige Ziele und Sprengstoffaktionen erhalten.
+  Gezielte echte Spieltests decken alle vier Varianten ab; der vollständige
+  Missionsdurchlauf bleibt offen.
+- Dieselben festgelegten Grafikpatches in jeder Installation verlangen und native
+  Core-Funktionsexporte vor der Kompatibilitätsbestätigung prüfen. Verschachtelte
+  Spielstandverzeichnisse bei Installation und Reparatur erhalten.
+- Tatsächliche Spielprozess-Exitcodes bei Launcher-Wiederholungen und Neustarts
+  erfassen; ein erfolgreicher Begleitprozess allein belegt kein sauberes Spielende.
 
 Missionsabdeckung, Steam zwischen Accounts, native Windows-Läufe und sämtliche
 Spezialmechaniken bleiben Abnahmekriterien. Siehe [Übergabe](docs/HANDOFF-0.6.md).

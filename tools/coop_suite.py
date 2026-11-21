@@ -5,7 +5,7 @@ No game state is trusted from the network. A receipt describes one complete
 installation; gameplay fingerprints omit approved localization and personal settings.
 """
 import argparse
-from runtime_protocol import core_protocol
+from runtime_protocol import core_protocol, required_feature_mask, require_core_features
 import configparser
 from datetime import datetime, timezone
 import hashlib
@@ -14,6 +14,7 @@ import os
 from pathlib import Path, PurePosixPath
 import re
 import shlex
+import stat
 import subprocess
 import sys
 import tempfile
@@ -103,6 +104,7 @@ def load_manifest(game, manifest=None):
         if variant.get("save_root", native_save_root(variant)) != native_save_root(variant):
             raise ValueError("campaign save area does not match its native profile")
     approved_localizations(data)
+    required_feature_mask(data)
     return data, sha256(path)
 
 
@@ -118,10 +120,30 @@ def local_save_summary(game, manifest):
         try:
             folder = resolve(game, native_save_root(variant))
             saves = []
+            if folder.is_symlink():
+                raise ValueError("save area is a symlink")
             if folder.is_dir():
-                for path in folder.iterdir():
-                    if path.suffix.lower() == ".svg" and path.is_file() and not path.is_symlink():
-                        saves.append((path.stat().st_mtime, path.name))
+                reparse = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+                if getattr(folder.stat(follow_symlinks=False), "st_file_attributes", 0) & reparse:
+                    raise ValueError("save area is a reparse point")
+                base = folder.resolve()
+                def real_node(path):
+                    metadata = path.stat(follow_symlinks=False)
+                    return (not path.is_symlink() and
+                            not getattr(metadata, "st_file_attributes", 0) & reparse and
+                            path.resolve().is_relative_to(base))
+                def inaccessible(_error):
+                    entry["unavailable"] = True
+                for current, directories, filenames in os.walk(folder, followlinks=False, onerror=inaccessible):
+                    parent = Path(current)
+                    directories[:] = [name for name in directories if real_node(parent / name)]
+                    for name in filenames:
+                        path = parent / name
+                        try:
+                            if path.suffix.lower() == ".svg" and real_node(path) and path.is_file():
+                                saves.append((path.stat().st_mtime, path.relative_to(folder).as_posix()))
+                        except OSError:
+                            entry["unavailable"] = True
             entry["count"] = len(saves)
             if saves:
                 modified, name = max(saves)
@@ -216,6 +238,7 @@ def fingerprints(game, manifest, files):
 def collect(game, manifest, manifest_hash):
     if core_protocol(resolve(game, "codcoop_core.dll")) != PROTOCOL:
         raise ValueError("Core protocol does not match manifest/checker protocol")
+    require_core_features(resolve(game, "codcoop_core.dll"), required_feature_mask(manifest))
     game = Path(game).resolve()
     lock = read_lock(game, manifest, manifest_hash)
     inventory_path = "coop/languages/en/manifest.json"

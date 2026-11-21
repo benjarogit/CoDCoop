@@ -18,13 +18,30 @@ import zipfile
 from build_campaign_patch import (build as build_campaign_patch, PROFILES,
                                   build_trigger_patch, build_mainline_patch)
 from coop_suite import canonical, sha256, resolve
-from runtime_protocol import require_runtime_protocol
+from runtime_protocol import require_runtime_protocol, required_feature_mask
 
 ROOT = Path(__file__).resolve().parents[1]
 YAP_ZIP_SHA = 'cdc9131a189796143ace80f9ecb9f19c347bdb8553558b5fd26e6f7d08bb2ae9'
 YAP_EXTRAS_SHA = '3e1fba1bbb7a71bdc5dd2532b7a366eb961dfe7372bd670ba3fcf241a45a74b2'
 UOSP_ORIGINAL = 'c17e57c060f08ef65d7cddea738cced61ab7ccb6d98df95fe185b1ab8aa7e325'
 UOSP_LAA = '0a0c52e5aa3e15f4b7039bb22593b8b58f594db5061b4fd4e25a2b4ca3a10018'
+
+
+def copy_reviewed_visual_patches(game, output, inventory, manifest):
+    """These shared pinned assets belong to every suite, not optional base data."""
+    reviewed=[]
+    for item in inventory['additional_visual_patches']:
+        requirement=next((row for row in manifest['required'] if row['path']==item['path']),None)
+        if (not requirement or requirement.get('install_source')!='suite' or
+                requirement.get('sha256')!=item['sha256'] or requirement.get('size')!=item['size']):
+            raise ValueError('visual patch manifest pin differs from reviewed inventory: '+item['path'])
+        source=resolve(game,item['path'])
+        if not source.is_file() or source.stat().st_size!=item['size'] or sha256(source)!=item['sha256']:
+            raise ValueError('required reviewed visual patch missing or changed: '+item['path'])
+        reviewed.append((source,Path(output)/item['path']))
+    for source,destination in reviewed:
+        destination.parent.mkdir(parents=True,exist_ok=True)
+        shutil.copy2(source,destination)
 
 
 def laa_bytes(original):
@@ -60,7 +77,7 @@ def stage(game, output, yap_archive, yap_extras, include_base=False, launcher_so
         if prefix == game or prefix == output or game.is_relative_to(prefix) or output.is_relative_to(prefix):
             raise ValueError('native checker must use a separate isolated Wine prefix')
     # Reject stale binaries before copying or publishing any payload output.
-    require_runtime_protocol(runtime_source, manifest['protocol'], checker_prefix)
+    require_runtime_protocol(runtime_source, manifest['protocol'], checker_prefix, required_feature_mask(manifest))
     temporary = Path(tempfile.mkdtemp(prefix='codcoop-stage-', dir=output.parent))
     try:
         def copy(src, rel):
@@ -109,9 +126,10 @@ def stage(game, output, yap_archive, yap_extras, include_base=False, launcher_so
             source = resolve(game, rel)
             if source.is_file():
                 copy(source, rel)
+        base_inventory=json.loads((ROOT/'content/base-packages.json').read_text())
+        copy_reviewed_visual_patches(game, temporary, base_inventory, manifest)
         if include_base:
-            base_inventory=json.loads((ROOT/'content/base-packages.json').read_text())
-            for item in base_inventory['packages'] + base_inventory['additional_visual_patches']:
+            for item in base_inventory['packages']:
                 rel=item['path'];source=resolve(game,rel)
                 if source.stat().st_size!=item['size'] or sha256(source)!=item['sha256']:
                     raise ValueError('base content differs from the reviewed owned inventory: '+rel)

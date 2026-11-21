@@ -2,7 +2,7 @@
 #include <cstdio>
 int wmain(int argc,wchar_t** argv) {
     if (argc==2 && !wcscmp(argv[1],L"capabilities")) {
-        printf("{\"kind\":\"codcoop_suite_checker\",\"schema\":1,\"protocol\":%u}\n",suite::PROTOCOL);
+        printf("{\"kind\":\"codcoop_suite_checker\",\"schema\":1,\"protocol\":%u,\"core_features_validation\":true}\n",suite::PROTOCOL);
         return 0;
     }
     std::string error; bool ok=false;

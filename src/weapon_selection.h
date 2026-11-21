@@ -24,6 +24,14 @@ inline bool Name(const char* s) {
     for(;i<64&&s[i];++i) if(!((s[i]>='a'&&s[i]<='z')||(s[i]>='0'&&s[i]<='9')||s[i]=='_'||s[i]=='-'))return false;
     return i>0&&i<64;
 }
+inline bool PathfinderInitialSource(unsigned variant,bool pathfinder,bool fresh,bool unused,
+                                    const char* source,const char* epoch,const char* name) {
+    // UF has its own authored/individual equipment contract; never replace it
+    // with the original parachute recipe. A restored or already served owner
+    // cannot use this initial grant to overwrite their later weapon choice.
+    return variant>=1&&variant<=3&&pathfinder&&fresh&&unused&&source&&epoch&&name&&
+        !std::strcmp(source,"pathfinder_initial")&&!std::strcmp(epoch,"0")&&!std::strcmp(name,"m1carbine");
+}
 inline bool Valid(const Request& r,unsigned slot,uint32_t ticket) {
     return r.serial&&slot>0&&slot<4&&r.slot==slot&&r.ticket&&r.ticket==ticket&&r.flags<=SEED&&r.weapon<128&&
         std::memchr(r.name,0,sizeof r.name)&&Name(r.name)&&(r.weapon||r.flags==SEED);

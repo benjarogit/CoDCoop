@@ -198,6 +198,7 @@ Coop_SelectWeapon(weapon, context)
     if (getcvar(key + "world") != context.world || getcvar(key + "ticket") != context.ticket || getcvar(key + "session_a") != context.a || getcvar(key + "session_b") != context.b || getcvar(key + "session_c") != context.c)
         sequence = 0;
     if (sequence < 0 || sequence >= 2147483647) { setcvar("coop_qa_kit_select_error_" + slot, "SEQUENCE_EXHAUSTED"); return; }
+    setcvar(key + "source", "uf_plan");
     setcvar(key + "name", weapon);
     setcvar(key + "ticket", context.ticket);
     setcvar(key + "session_a", context.a); setcvar(key + "session_b", context.b); setcvar(key + "session_c", context.c);

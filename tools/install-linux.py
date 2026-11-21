@@ -1789,6 +1789,31 @@ def remove_active_localizations(game, transaction):
                 transaction.remember(folder + '/' + path.name).unlink()
 
 
+def require_suite_owned_patches(overlay):
+    """Required suite patches cannot be skipped because SPI/UF already exist."""
+    from pathlib import Path, PurePosixPath
+    base=Path(overlay).resolve()
+    manifest=json.loads((base/'coop/variants.json').read_text())
+    for item in manifest.get('required', []):
+        if not isinstance(item,dict):raise ValueError('invalid required suite content entry')
+        if item.get('install_source')!='suite':continue
+        name=item.get('path')
+        if not isinstance(name,str) or not name or '\\' in name or ':' in name:
+            raise ValueError('invalid required suite patch path')
+        relative=PurePosixPath(name)
+        if relative.is_absolute() or '..' in relative.parts:
+            raise ValueError('invalid required suite patch path')
+        source=base.joinpath(*relative.parts)
+        expected=item.get('sha256')
+        if not re.fullmatch('[0-9a-f]{64}',expected or ''):
+            raise ValueError('invalid required suite patch pin: '+name)
+        if (source.is_symlink() or not source.resolve().is_relative_to(base) or not source.is_file() or
+                ('size' in item and (type(item['size']) is not int or item['size']<=0 or source.stat().st_size!=item['size'])) or
+                sha256(source)!=expected):
+            raise ValueError('Required suite patch missing or changed in payload: '+name+
+                             '. Rebuild or download the complete matching suite payload.')
+
+
 def require_original_campaign_source(game, overlay, offline_source=None):
     """The UO Ready ZIP cannot supply missing original CoD mission packages."""
     from pathlib import Path
@@ -1885,6 +1910,7 @@ def suite_main(argv=None):
     say('Target: %s\nOverlay: %s\nGame language: %s' % (game, overlay, args.language))
     say('Base/extras downloads, when required: 1,036,938,510 / 922,302,300 bytes. German: 657,419,767 bytes.')
     try:
+        require_suite_owned_patches(overlay)
         require_original_campaign_source(game, overlay, args.source)
     except (OSError, ValueError, TypeError, KeyError) as error:
         say('INSTALLATION FAILED: '+str(error))

@@ -210,6 +210,20 @@
       "size": 92890903,
       "kind": "base_content",
       "engine": "uo"
+    },
+    {
+      "path": "Main/zzz_patch.pk3",
+      "sha256": "4a4f76f0a58176e8e84739740f9487556a29170f6262b4f459294414b0548c04",
+      "size": 544551,
+      "kind": "visual_patch",
+      "install_source": "suite"
+    },
+    {
+      "path": "Main/zzzzzzz_kar98k_firing_anim_fix.pk3",
+      "sha256": "a0ff833f949b2cf8d7cc76570a5e85e73d1a02fea787a6f106bedc83dac8eff8",
+      "size": 28177,
+      "kind": "visual_patch",
+      "install_source": "suite"
     }
   ],
   "packages": {
@@ -351,5 +365,6 @@
     "uo/localized_english_pakuo09.pk3": [
       "6f21a4e4bdb9f22d3c4b852f1da14eae9df62f334677999a377afb018ad96c30"
     ]
-  }
+  },
+  "core_features_required": 15
 }

@@ -10,7 +10,7 @@ from pathlib import Path
 import subprocess
 import unittest
 from unittest import mock
-from pe_fixtures import core_pe, malformed_core
+from pe_fixtures import core_pe, malformed_core, malformed_feature
 
 import test_coop_suite as fixture_module
 suite = fixture_module.suite
@@ -45,7 +45,29 @@ class NativeInterop(unittest.TestCase):
     def test_checker_reports_machine_readable_protocol_without_game_argument(self):
         result=self.native('capabilities')
         self.assertEqual(result.returncode,0,result.stderr)
-        self.assertEqual(json.loads(result.stdout),{'kind':'codcoop_suite_checker','schema':1,'protocol':suite.PROTOCOL})
+        self.assertEqual(json.loads(result.stdout),{'kind':'codcoop_suite_checker','schema':1,'protocol':suite.PROTOCOL,'core_features_validation':True})
+
+    def test_readonly_compiled_features_are_required_and_match_python(self):
+        examples=[core_pe(suite.PROTOCOL,bits) for bits in (None,0,1,3,7)]
+        examples += [malformed_feature(kind,suite.PROTOCOL) for kind in ('missing','forwarded','writable','executable','out_of_bounds','ordinal')]
+        for data in examples:
+            self.fixture.repin_core(data)
+            with self.assertRaises(ValueError):suite.seal_installation(self.game)
+            self.assertNotEqual(self.native('seal').returncode,0)
+            self.assertFalse((self.game/'coop/install.json').exists())
+        self.fixture.repin_core(core_pe(suite.PROTOCOL,15))
+        python=suite.seal_installation(self.game)
+        self.assertEqual(self.native('check').returncode,0)
+        self.assertEqual(self.native('seal').returncode,0)
+        self.assertEqual(json.loads((self.game/'coop/install.json').read_text()),python)
+
+    def test_explicit_legacy_zero_mask_allows_protocol_only_fixture_without_readiness_claim(self):
+        self.fixture.manifest['core_features_required']=0
+        self.fixture.repin_core(core_pe(suite.PROTOCOL,None))
+        python=suite.seal_installation(self.game)
+        self.assertEqual(self.native('check').returncode,0)
+        self.assertEqual(self.native('seal').returncode,0)
+        self.assertEqual(json.loads((self.game/'coop/install.json').read_text()),python)
 
     @unittest.skipUnless(os.environ.get('COOP_LEGACY_CHECKER'),'requires preserved pre-enforcement protocol9 checker')
     def test_old_sealer_receipt_cannot_hide_a_stale_core_from_check_or_prepare(self):
@@ -164,6 +186,19 @@ class NativeInterop(unittest.TestCase):
         result=self.native('seal')
         self.assertNotEqual(result.returncode,0)
         self.assertFalse((self.game/'coop/install.json').exists())
+
+    def test_both_reviewed_visual_patches_are_mandatory_in_python_and_native(self):
+        for name in ('Main/zzz_patch.pk3','Main/zzzzzzz_kar98k_firing_anim_fix.pk3'):
+            path=self.game/name;original=path.read_bytes();path.unlink()
+            with self.subTest(path=name):
+                with self.assertRaises(ValueError):suite.seal_installation(self.game)
+                self.assertNotEqual(self.native('seal').returncode,0)
+                self.assertFalse((self.game/'coop/install.json').exists())
+            path.write_bytes(original)
+        receipt=suite.seal_installation(self.game)
+        self.assertEqual(self.native('check').returncode,0)
+        self.assertEqual(self.native('seal').returncode,0)
+        self.assertEqual(json.loads((self.game/'coop/install.json').read_text()),receipt)
 
     def test_root_weapon_json_is_receipted_and_affects_only_yap_profiles(self):
         original=suite.seal_installation(self.game)

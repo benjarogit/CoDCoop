@@ -80,6 +80,7 @@ void WeaponSelectionTick()
     if(S->role==HOST) {
         bool ready=g_getUsercmdTramp&&patch_owner::JumpTargets((uint8_t*)SV_GET_USERCMD,(uintptr_t)Hook_GetUsercmd);
         SetCoopCvarChanged("coop_select_api",ready?"1":"0");PublishSpawnTickets();
+        SetCoopCvarChanged("coop_select_pathfinder_api",ready&&g_identity.variant>=1&&g_identity.variant<=3?"1":"0");
         for(int n=1;n<g::MAX_CLIENTS;++n) {
             if(!S->remote[n].active)continue;
             auto& source=S->selection.producer[n];
@@ -90,11 +91,18 @@ void WeaponSelectionTick()
                 // console-variable names, command text or a player pointer.
                 uint32_t ticket=0,world=0,a=0,b=0,c=0;
                 auto session=spawn_ticket::Split(S->reloadToken.session);
-                std::string name=SelectionField(n,"name"),epoch=SelectionField(n,"epoch");
-                bool valid=UFPlannedSlot(n)&&SelectionNumber(SelectionField(n,"ticket"),ticket)&&ticket==S->spawnTicket[n]&&
+                std::string name=SelectionField(n,"name"),epoch=SelectionField(n,"epoch"),requestSource=SelectionField(n,"source");
+                bool uf=(requestSource.empty()||requestSource=="uf_plan")&&UFPlannedSlot(n)&&epoch==g::CvarString("coop_qa_kit_verified_epoch");
+                bool initial=weapon_selection::PathfinderInitialSource(g_identity.variant,
+                    !_stricmp(g::CvarString("mapname"),"pathfinder"),
+                    g::sv_state==2&&g::sv_gameClients&&PlayerInGame(n)&&
+                        inventory_preservation::Same(S->preservation.slots[n].identity,PreservationIdentity(n))&&
+                        S->preservation.slots[n].phase==inventory_preservation::FRESH,source.sequence==0,
+                    requestSource.c_str(),epoch.c_str(),name.c_str());
+                bool valid=(uf||initial)&&SelectionNumber(SelectionField(n,"ticket"),ticket)&&ticket==S->spawnTicket[n]&&
                     SelectionNumber(SelectionField(n,"world"),world,0xffffffff)&&world==S->reloadToken.generation&&
                     SelectionNumber(SelectionField(n,"session_a"),a)&&a==session.a&&SelectionNumber(SelectionField(n,"session_b"),b)&&b==session.b&&
-                    SelectionNumber(SelectionField(n,"session_c"),c)&&c==session.c&&epoch==g::CvarString("coop_qa_kit_verified_epoch")&&
+                    SelectionNumber(SelectionField(n,"session_c"),c)&&c==session.c&&
                     weapon_selection::Name(name.c_str())&&SelectionField(n,"seq")==std::to_string(seq);
                 if(valid)source.sequence=seq;
                 int weapon=0;
