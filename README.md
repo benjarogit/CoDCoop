@@ -2,7 +2,9 @@
 
 Play the **Call of Duty 1 (2003)** campaign, the **United Offensive** expansion and the **Call of Duty 2** campaign in co-op with friends: up to 4 players, through Steam, over the internet by IP, or on a local network.
 
-**[⬇ Download the installer](https://github.com/benjarogit/CoDCoop/releases/latest)**
+**[⬇ Ready package: Call of Duty + United Offensive 1.51 + mod (~1 GB, MEGA)](https://mega.nz/file/pd41FRbA#SMUk9x3r_koj_6z_ODkH7MJxIf5SgfnV5yreYHkDSUY)** — extract, run the installer, done. No disc image, no patch wizard.
+
+**[⬇ Only the mod installer](https://github.com/benjarogit/CoDCoop/releases/latest)** (small) — for an existing Call of Duty 1.5 / United Offensive / Call of Duty 2 install.
 
 > **This is a fork** of [TheTiranix/CoDCoop](https://github.com/TheTiranix/CoDCoop), maintained here.
 > It adds first-class Linux support — cross-build, native installer, the Proton/`ddraw` fixes and the
@@ -27,17 +29,40 @@ Play the **Call of Duty 1 (2003)** campaign, the **United Offensive** expansion 
 ## Requirements
 
 - **Call of Duty 1 version 1.5** for Windows, on every PC that will play.
-- For the expansion: **United Offensive version 1.41**, installed in the same folder.
+- For the expansion: **United Offensive 1.51** in the same folder — included in the ready package.
 - For Call of Duty 2: **version 1.3** (`CoD2SP_s.exe`).
 - The mod installed on all of those PCs.
 
 ## Install
 
-1. Download `Install-CoD-Coop.exe` from the [latest release](https://github.com/benjarogit/CoDCoop/releases/latest).
-2. Run it and accept the game folder (the one with `CoDSP.exe`, or `CoD2SP_s.exe` for Call of Duty 2). If it can't find it, it lets you choose it.
-3. If Windows shows "Windows protected your PC", click **More info** → **Run anyway** (the installer is not signed).
+### Ready package (recommended)
 
-The installer copies `ddraw.dll`, `codcoop_core.dll`, `steam_api.dll`, `main\pakz_coop.pk3` and a `CoD Coop README.txt` into the game folder, plus `uo\pakz_coop.pk3` if United Offensive is there. If there was already a `ddraw.dll` or `steam_api.dll` from another program, it keeps it with `.bak` added to the name.
+One download, already containing **United Offensive 1.51** and the mod. No disc
+image to mount, no UO installer, no patch wizard:
+
+1. Download **[Call of Duty - UO Coop Ready.zip](https://mega.nz/file/pd41FRbA#SMUk9x3r_koj_6z_ODkH7MJxIf5SgfnV5yreYHkDSUY)** (~1 GB) and extract it.
+2. Make sure Call of Duty **1.5** is installed (`CoDSP.exe`, 1,716,224 bytes).
+3. **Windows:** run `Install-CoD-Coop.exe` from the extracted folder.
+   **Linux:** run `python3 install-linux.py` (see [Linux](#linux-proton--wine)).
+4. Accept the game folder. The installer finds it itself (Steam, AnkerGames,
+   registry or portable) and asks when there are several.
+
+It checks CoD 1.5 first and writes nothing if the exe is another version. Then it
+copies the contents of `game/` into the game folder: the UO paks, the 1.51 DLLs,
+`CoDUOSP.exe`, the mod DLLs and the menus. Existing files are kept as `.bak`;
+`CoDSP.exe` is never touched.
+
+If Windows shows "Windows protected your PC", click **More info** → **Run anyway**
+(the installer is not signed).
+
+### Only the mod (small installer)
+
+Download `Install-CoD-Coop.exe` from the [latest release](https://github.com/benjarogit/CoDCoop/releases/latest)
+and run it. It copies `ddraw.dll`, `codcoop_core.dll`, `steam_api.dll`,
+`main\pakz_coop.pk3` and a `CoD Coop README.txt` into the game folder, plus
+`uo\pakz_coop.pk3` if United Offensive is there. If there was already a
+`ddraw.dll` or `steam_api.dll` from another program, it keeps it with `.bak`
+added to the name. It does not install United Offensive itself.
 
 ## Linux (Proton / Wine)
 
@@ -45,8 +70,10 @@ The mod is a Windows mod and runs on Linux through Proton. Everything below was
 set up and tested on Linux with the **AnkerGames launcher** and Proton 11.0, on an
 NVIDIA card and with Mesa/llvmpipe:
 
-1. Install the game and the launcher as usual, get Call of Duty to **1.5**, then
-   run the mod installer.
+1. Install the game and the launcher as usual and get Call of Duty to **1.5**.
+   Then extract the ready package and run `python3 install-linux.py` from it
+   ([docs/linux.md](docs/linux.md), section 0). It copies United Offensive 1.51
+   and the mod into the game folder.
 2. When the launcher warns that the files changed, click **Keep my files**:
 
    ![Launcher warning: click "Keep my files"](docs/screenshots/launcher-keep-files.png)
@@ -111,9 +138,16 @@ installed without Wine:
 ```sh
 sudo apt install g++-mingw-w64-i686
 ./build.sh                                                  # the three DLLs
-python3 tools/install-linux.py --game "/path/to/Call of Duty"   # from the latest release
-python3 tools/install-linux.py --game ".../Call of Duty" --build build   # from ./build.sh
-python3 tools/install-linux.py --game ".../Call of Duty" --check         # verify
+python3 tools/install-linux.py --game "/path/to/Call of Duty"                # latest GitHub release (mod only)
+python3 tools/install-linux.py --game ".../Call of Duty" --build build       # from ./build.sh
+python3 tools/install-linux.py --game ".../Call of Duty" --check             # verify
+```
+
+The ready package ships the same script next to `game/`, so the normal Linux
+install is just:
+
+```sh
+python3 install-linux.py            # auto-detects the game folder
 ```
 
 The script insists on Call of Duty **1.5** before touching anything, keeps a
@@ -190,6 +224,8 @@ The Call of Duty 2 campaign works the same way: the host runs the mission and up
 ## Uninstall
 
 Delete `ddraw.dll`, `codcoop_core.dll`, `steam_api.dll`, `main\pakz_coop.pk3`, `uo\pakz_coop.pk3` and the `codcoop_tmp` folder from the game folder. If there are `.bak` files (`ddraw.dll.bak`, `steam_api.dll.bak`), remove the `.bak` from their names.
+
+United Offensive (if you installed it from the ready package): delete `CoDUOSP.exe`, `CoDUOMP.exe`, `uo_gamex86.dll`, `uo_cgamex86.dll`, `uo_uix86.dll` and the `uo` folder. `CoDUOSP.exe.bak` (if present) is the previous exe.
 
 ## How it works
 

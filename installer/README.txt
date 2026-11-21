@@ -9,12 +9,17 @@ How it works
 
 What you need
 - Call of Duty 1 version 1.5 on every PC, with co-op installed on all of them.
-- United Offensive (version 1.41, same folder) works too: start CoDUOSP.exe and use
+- United Offensive 1.51 is included in the ready package: start CoDUOSP.exe and use
   its Co-op menu. The compass does not show teammates there yet.
 
-Install
-- Run "Install CoD Coop.exe" and accept the game folder (the one with CoDSP.exe, or
-  CoD2SP_s.exe for Call of Duty 2). It detects the game and installs the matching files.
+Install (Windows)
+- Extract the ready package ("Call of Duty - UO Coop Ready.zip") and run
+  "Install CoD Coop.exe" from that folder. It finds the game (Steam, AnkerGames,
+  registry or portable), checks that CoDSP.exe is 1.5, and copies everything:
+  United Offensive 1.51, the paks and the mod. Existing files are kept as .bak.
+- No disc image has to be mounted and no UO/patch wizard is involved.
+- The installer is also in the game folder afterwards; the ready files live in
+  game\ next to it, so you can install again at any time.
 - First start: if Call of Duty asks whether the computer changed (WIN_COMPUTER_CHANGE
   or "your configuration has changed"), click "Ja" once. The game stores the hardware
   it detected and does not ask again.
@@ -78,9 +83,17 @@ Over the internet by IP
 - If you cannot open the port: use a virtual network program (for example Radmin VPN
   or ZeroTier) and the IP that program gives the host.
 
+Linux (Proton/Wine)
+- Extract the same package and run, from that folder:
+    python3 install-linux.py --game "/path/to/Call of Duty"
+  It copies game\ into the game folder the same way (the game folder is the one with
+  CoDSP.exe). Add --check to verify an installation. See docs/linux.md.
+
 Uninstall
 - Delete from the game folder: ddraw.dll, codcoop_core.dll, steam_api.dll,
   main\pakz_coop.pk3, uo\pakz_coop.pk3 and the codcoop_tmp folder. If there are .bak files
   (ddraw.dll.bak or steam_api.dll.bak), remove the .bak from their names.
+- United Offensive: delete CoDUOSP.exe, CoDUOMP.exe, the uo_*.dll files and the uo\
+  folder. A .bak of CoDUOSP.exe (if any) is the previous exe.
 - Call of Duty 2: delete ddraw.dll, cod2coop.dll, steam_api.dll and main\zz_coop2.iwd from
   the game folder (and remove the .bak from ddraw.dll.bak or steam_api.dll.bak if any).

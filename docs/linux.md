@@ -8,11 +8,36 @@ Proton. This guide is the setup that was tested end to end:
 | Launcher | AnkerGames (also applies to similar launchers that start the game through `umu-run`/Proton) |
 | Proton | 11.0 |
 | GPU / driver | NVIDIA (proprietary) and Mesa (llvmpipe) |
-| Game | Call of Duty 1.5, mod 0.5.1 (this fork) |
+| Game | Call of Duty 1.5 + United Offensive 1.51, mod 0.5.2 (this fork) |
 
 Three things matter on Linux: the launcher has to keep the modified files, the
 driver must not report more OpenGL extensions than the 2003 engine can hold, and
 Steam — if you want the friend list — has to be reachable inside the prefix.
+
+## 0. Installing the ready package
+
+The download is one ZIP, already containing **United Offensive 1.51** and the mod.
+Nothing has to be mounted, no UO installer and no patch wizard:
+
+1. Download **Call of Duty - UO Coop Ready.zip** (about 1 GB, link in the
+   [README](../README.md#install)) and extract it.
+2. Make sure **Call of Duty 1.5** is installed (`CoDSP.exe`, 1,716,224 bytes).
+3. In the extracted folder run:
+
+   ```sh
+   python3 install-linux.py
+   ```
+
+   It finds the game itself (Steam libraries, AnkerGames, current folder) and asks
+   if there is more than one. With `--game "/path/to/Call of Duty"` you choose it
+   yourself, with `--check` you only verify an existing installation.
+
+4. The script copies `game/` into the game folder: the UO paks, the 1.51 DLLs, the
+   no-CD `CoDUOSP.exe`, the mod DLLs and the menus. Existing files are kept as
+   `<name>.bak`; `CoDSP.exe` itself is never touched.
+
+You can also copy the contents of `game/` into the game folder by hand — the
+installer is only a convenience. The game folder is the one with `CoDSP.exe`.
 
 ## 1. "Buffer overrun detected!" right after the intro
 
@@ -255,26 +280,41 @@ The only file that is not in the repository is Valve's 32-bit `steam_api.dll`
 (Steam invites); copy it into `build/` from a Windows build or a Steamworks
 redistributable. Without it the mod still works over IP.
 
-## 7. Installing without Wine (`tools/install-linux.py`)
+## 7. Installing without Wine (`install-linux.py`)
 
-The Windows installer only extracts its files, so on Linux you can do the same
-with a Python script that needs nothing but `python3`:
+The ready package ships `install-linux.py`; the Windows installer only extracts
+its files, so on Linux you can do the same with a Python script that needs
+nothing but `python3`:
 
 ```sh
-# from the latest GitHub release (downloads Install-CoD-Coop.exe and extracts it)
-python3 tools/install-linux.py --game "/path/to/Call of Duty"
+# from the extracted ready package (uses game/ next to the script)
+python3 install-linux.py
 
-# from a local build/ produced by ./build.sh (menu pak taken from game/Main/)
-python3 tools/install-linux.py --game ".../Call of Duty" --build build
+# or point it at the folder / the ZIP
+python3 install-linux.py --game "/path/to/Call of Duty"
+python3 install-linux.py --archive "Call of Duty - UO Coop Ready.zip"
 
 # only verify an existing installation
-python3 tools/install-linux.py --game ".../Call of Duty" --check
+python3 install-linux.py --check
 ```
 
-It checks **Call of Duty 1.5 first** (`CoDSP.exe` must be 1,716,224 bytes) and
-stops with the download options if it is not — nothing is written in that case.
-Existing files are kept as `<name>.bak`. `--dry-run` shows what would be copied,
-`--allow-incomplete` installs anyway (multiplayer-only copies).
+Without `--game` it looks for the game in all Steam libraries, in AnkerGames and
+in the current folder, and asks when there are several. It checks **Call of Duty
+1.5 first** (`CoDSP.exe` must be 1,716,224 bytes) and stops without writing
+anything if it is not. Existing files are kept as `<name>.bak`. `--dry-run`
+shows what would be copied, `--allow-incomplete` installs anyway
+(multiplayer-only copies).
+
+The repository version (`tools/install-linux.py`) can also install only the mod:
+
+```sh
+python3 tools/install-linux.py --game ".../Call of Duty"                # latest GitHub release
+python3 tools/install-linux.py --game ".../Call of Duty" --build build  # from ./build.sh
+```
+
+The UO version label in the game stays **1.41** — it is hard-coded in the exe and
+the 1.51 patch does not change it. What matters is `uo/version.inf`
+(`ExtVersion=1.51`), which `--check` prints.
 
 ## 8. Both sides need the same versions
 
