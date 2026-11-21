@@ -21,6 +21,7 @@ from coop_suite import PROTOCOL, atomic_write, canonical, check_installation, la
 from frozen_runtime import spawn_owned
 
 VARIANTS = ('cod1', 'uo', 'sp_improved', 'united_fronts')
+RECOVERY_WAIT_SECONDS = 180  # informational only; never kills a slow native load
 
 
 def event(phase, **details):
@@ -109,6 +110,7 @@ class SwitchState:
             self.prepared = key
             return 'prepare'
         if request['action'] == 'cancel':
+            if key in self.committed: return 'ignored'
             if self.prepared == key: self.prepared = None
             return 'cancel'
         if self.prepared != key or key in self.committed:
@@ -118,11 +120,66 @@ class SwitchState:
         return 'commit'
 
 
+class InstallationVerifier:
+    """Keep file hashing off the session/heartbeat loop, with one bounded worker.
+
+    Cancelled or replaced results never acknowledge a later transaction. The
+    daemon only reads installation files; stopping the session need not wait
+    for a slow disk read. A replacement queues behind the existing worker.
+    """
+    def __init__(self, game):
+        self.game = game
+        self.results = queue.Queue()
+        self.generation = 0
+        self.active = None
+        self.pending = None
+
+    def submit(self, request):
+        self.generation += 1
+        self.pending = (self.generation, dict(request))
+        self._start()
+
+    def cancel(self):
+        self.generation += 1
+        self.pending = None
+
+    def _start(self):
+        if self.active is not None or self.pending is None:
+            return
+        generation, request = self.pending
+        self.pending = None
+        self.active = generation
+
+        def verify():
+            try:
+                check = check_installation(self.game)
+                ok = bool(check['ok'] and request['variant'] in check.get('variants', {})
+                          and target_map_exists(self.game, request['variant'], request.get('map')))
+                error = '' if ok else '; '.join(check['errors']) or 'Target mission is not installed'
+            except Exception as failure:
+                # A background verifier must fail closed even on an unexpected
+                # backend exception; otherwise no ACK would ever reach the UI.
+                ok, error = False, str(failure)
+            self.results.put((generation, request, ok, error))
+
+        threading.Thread(target=verify, daemon=True).start()
+
+    def poll(self):
+        try:
+            generation, request, ok, error = self.results.get_nowait()
+        except queue.Empty:
+            return None
+        self.active = None
+        self._start()
+        return (request, ok, error) if generation == self.generation else None
+
+
 def recovery_spec(request):
     request = validate_request(request)
     return {'variant': request['variant'], 'host': request.get('host') or None,
             'hosting': request['role'] == 'host', 'port': request.get('port', 28960),
-            'map': request.get('map'), 'difficulty': request.get('difficulty', 1)}
+            'map': request.get('map'), 'difficulty': request.get('difficulty', 1),
+            'players': request.get('players', 1)}
 
 
 def recovery_ready(state, variant, map_name, hosting, players):
@@ -133,6 +190,18 @@ def recovery_ready(state, variant, map_name, hosting, players):
     if hosting:
         return state.get('role') == 'host' and state.get('live_players', 0) >= players
     return state.get('role') == 'joiner' and state.get('joined') is True
+
+
+def waiting_switch(state):
+    change = state.get('switch') if isinstance(state, dict) else None
+    if not isinstance(change, dict) or change.get('waiting') is not True:
+        return None
+    transaction, phase, retry = (change.get(key) for key in ('transaction', 'phase', 'retry_round'))
+    if (type(transaction) is not int or not 0 < transaction <= 0xffffffff or
+            type(phase) is not int or phase not in (1, 2, 3) or
+            type(retry) is not int or not 0 <= retry <= 0xffffffff):
+        return None
+    return transaction, retry
 
 
 def clear_command_files(game):
@@ -188,6 +257,7 @@ def supervise(args):
     current = None
     difficulty = args.difficulty
     machine = SwitchState()
+    verifier = InstallationVerifier(game)
     last_event = None
     heartbeat = 0
     commit_seen = 0
@@ -195,8 +265,10 @@ def supervise(args):
     restart = None
     recovery = None
     recovery_wait = False
+    recovery_started = None
     command_queue = []
     pending_reply = None
+    last_wait_state = None
     awaiting_launch = True
     next_map = args.map_name
     try:
@@ -212,8 +284,11 @@ def supervise(args):
                 (game / 'coop/runtime-state.json').unlink(missing_ok=True)
                 current = spawn_owned(command, cwd=game, env=env)
                 recovery_wait = False
+                recovery_started = time.monotonic() if recovery is not None else None
                 awaiting_launch = False
-                event('running', variant=variant, pid=current.pid)
+                event('running', variant=variant, pid=current.pid, recovering=recovery is not None)
+                if recovery is not None:
+                    event('reconnecting', variant=variant, pid=current.pid, committed=True)
             while not controls.empty():
                 control = controls.get()
                 if not isinstance(control, dict):
@@ -221,7 +296,9 @@ def supervise(args):
                 action = control.get('action')
                 if action == 'stop': stopping.set()
                 elif action == 'switch':
-                    if not hosting or control.get('variant') not in VARIANTS:
+                    if recovery is not None:
+                        event('error', recovering=True, error='finish reconnecting before selecting another campaign')
+                    elif not hosting or control.get('variant') not in VARIANTS:
                         event('error', error='only the host can select a registered campaign')
                     else:
                         mission = control.get('map') or 'default'
@@ -230,10 +307,22 @@ def supervise(args):
                             event('error', error='invalid target mission or difficulty')
                         else:
                             command_queue.append(('coopswitch %s %s %d' % (control['variant'], mission, skill), time.monotonic() + 5, True))
-                elif action == 'cancel': command_queue.append(('coopswitchcancel', time.monotonic()+5, False))
+                elif action == 'cancel':
+                    if recovery is not None:
+                        # Commitment already saved progress and ended the old
+                        # world. Cancel can leave this owned session, not undo it.
+                        verifier.cancel()
+                        command_queue.clear(); pending_reply = None
+                        stopping.set()
+                        event('recovery_cancelled', variant=variant, committed=True)
+                    else:
+                        command_queue.append(('coopswitchcancel', time.monotonic()+5, False))
                 elif action == 'retry':
-                    if recovery is not None and current.poll() is not None:
+                    if recovery is not None:
                         spec = recovery_spec(recovery)
+                        event('reconnecting', variant=spec['variant'], committed=True, retrying=True)
+                        stop_owned(game, current, bool(host))
+                        clear_command_files(game)
                         variant, host, hosting, port = spec['variant'], spec['host'], spec['hosting'], spec['port']
                         next_map, difficulty = spec['map'], spec['difficulty']
                         restart = None; commit_seen = 0; quit_sent = False; last_event = None
@@ -267,15 +356,17 @@ def supervise(args):
                         action = machine.accept(request)
                         last_event = raw
                         if action == 'prepare':
-                            # Verify without changing profile.ini while the old game runs.
-                            check = check_installation(game)
-                            ok = check['ok'] and request['variant'] in check.get('variants', {}) and target_map_exists(game, request['variant'], request.get('map'))
-                            atomic_write(ack, ('%d %d\n' % (request['transaction'], 1 if ok else 0)).encode('ascii'))
-                            if not ok:
-                                machine.prepared = None
-                                event('error', error='; '.join(check['errors']) or 'Target mission is not installed')
-                            else: event('prepared', variant=request['variant'], transaction=request['transaction'])
-                        elif action == 'cancel': event('cancelled', variant=variant)
+                            # No commit is valid until this exact asynchronous
+                            # read-only verification has completed successfully.
+                            machine.prepared = None
+                            verifier.submit(request)
+                            event('verifying', variant=request['variant'], transaction=request['transaction'])
+                        elif action == 'cancel':
+                            verifier.cancel()
+                            if recovery is None:
+                                event('cancelled', variant=variant)
+                            else:
+                                event('reconnecting', variant=variant, committed=True)
                         elif action == 'commit':
                             restart = request
                             recovery = dict(request)
@@ -287,16 +378,39 @@ def supervise(args):
                     except (ValueError, KeyError, OSError, zipfile.BadZipFile) as error:
                         last_event = raw
                         event('error', error=str(error))
+            verification = verifier.poll()
+            if verification is not None:
+                request, ok, error = verification
+                atomic_write(ack, ('%d %d\n' % (request['transaction'], 1 if ok else 0)).encode('ascii'))
+                if ok:
+                    machine.prepared = (request['transaction'], request['variant'])
+                    event('prepared', variant=request['variant'], transaction=request['transaction'])
+                    last_wait_state = None
+                else:
+                    machine.prepared = None
+                    event('error', error=error)
             runtime_state = game / 'coop/runtime-state.json'
-            if recovery is not None and restart is None and current.poll() is None and runtime_state.exists():
+            if current.poll() is None and runtime_state.exists():
                 try:
                     state = json.loads(runtime_state.read_bytes())
-                    ready = recovery_ready(state, variant, next_map, hosting, recovery.get('players', 1))
-                    if ready:
+                    waiting = waiting_switch(state) if restart is None and recovery is None else None
+                    if waiting is not None and waiting != last_wait_state:
+                        event('waiting', transaction=waiting[0], retry_round=waiting[1],
+                              error='Campaign change is waiting for verification, a player or a save. Retry or cancel; nobody was skipped.')
+                    last_wait_state = waiting
+                    if recovery is not None and restart is None and recovery_ready(state, variant, next_map, hosting, recovery.get('players', 1)):
                         recovery = None
+                        recovery_started = None
+                        recovery_wait = False
                         event('resumed', variant=variant)
                 except (OSError, ValueError): pass
-            if current is not None and current.poll() is not None:
+            if (recovery is not None and restart is None and current.poll() is None and
+                    recovery_started is not None and not recovery_wait and
+                    time.monotonic() - recovery_started >= RECOVERY_WAIT_SECONDS):
+                recovery_wait = True
+                event('recovery_waiting', variant=variant, committed=True,
+                      error='Reconnection is taking longer than expected. The game remains open. Retry this session or leave; saved progress is kept.')
+            if current is not None and current.poll() is not None and not awaiting_launch:
                 if restart is None and recovery is None:
                     event('exited', code=current.returncode)
                     return current.returncode
@@ -311,9 +425,10 @@ def supervise(args):
                     clear_command_files(game)
                 elif not recovery_wait:
                     recovery_wait = True
-                    event('error', error='game failed during switch; retry is available')
+                    event('error', recovering=True, error='game failed during switch; retry or leave this session; saved progress is kept')
             time.sleep(.2)
     finally:
+        verifier.cancel()
         stop_owned(game, current, bool(host))
         clear_command_files(game)
         (game / 'coop/supervisor.json').unlink(missing_ok=True)

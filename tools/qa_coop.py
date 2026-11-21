@@ -21,6 +21,10 @@ ROOT = Path(__file__).resolve().parents[1]
 COOP_ANYTHING_REVISION = 'e83fc578ad2c3d3bb30b06f98ba11d965d11e105'
 
 
+class ExpectedProtocolRejection(Exception):
+    pass
+
+
 def zpath(path):
     return 'Z:' + str(Path(path).resolve()).replace('/', '\\')
 
@@ -115,8 +119,9 @@ def archive_previous(output):
     for path in list(output.iterdir()):
         if path.is_file() and path.suffix.lower() in ('.json', '.jsonl', '.log', '.png'):
             path.rename(archive / path.name)
-    if (output / 'runtime').exists():
-        (output / 'runtime').rename(archive / 'runtime')
+    for snapshot in ('runtime', 'peer-runtime'):
+        if (output / snapshot).exists():
+            (output / snapshot).rename(archive / snapshot)
     for game in (output / 'host', *(output / ('join%d' % n) for n in range(1, 4))):
         if not game.is_dir(): continue
         paths = list(game.glob('codcoop*.log')) + list(game.glob('*/console.log'))
@@ -131,6 +136,8 @@ def main(argv=None):
     parser.add_argument('--source', required=True, type=Path)
     parser.add_argument('--run', required=True, type=Path, help='new or reusable isolated output directory')
     parser.add_argument('--runtime-dir', type=Path, help='immutable DLL snapshot; defaults to the current build directory')
+    parser.add_argument('--peer-runtime-dir', type=Path, help='separate immutable joiner DLL snapshot for compatibility tests')
+    parser.add_argument('--expect-protocol-rejection', action='store_true', help='require readable protocol rejection, no allocated slot and clean exits')
     parser.add_argument('--variant', choices=('cod1', 'uo', 'sp_improved', 'united_fronts'), default='cod1')
     parser.add_argument('--map', default='training')
     parser.add_argument('--players', type=int, choices=(2, 4), default=2)
@@ -159,8 +166,13 @@ def main(argv=None):
         chaos_script = checkout / 'tools/chaos/chaos.py'
     source, output = args.source.resolve(), args.run.resolve()
     runtime_source = (args.runtime_dir or ROOT / 'build').resolve()
+    peer_source = args.peer_runtime_dir.resolve() if args.peer_runtime_dir else None
+    if args.expect_protocol_rejection and (peer_source is None or args.players != 2):
+        parser.error('protocol rejection test requires two players and --peer-runtime-dir')
     if runtime_source == output / 'runtime' or runtime_source.is_relative_to(output / 'runtime'):
         parser.error('runtime input must be separate from the output snapshot that is archived on retry')
+    if peer_source is not None and (peer_source == output / 'peer-runtime' or peer_source.is_relative_to(output / 'peer-runtime')):
+        parser.error('peer runtime input must be separate from its archived output snapshot')
     if output == source or output.is_relative_to(source) or source.is_relative_to(output):
         parser.error('test output must be separate from the source installation')
     output.mkdir(parents=True, exist_ok=True)
@@ -175,6 +187,11 @@ def main(argv=None):
     runtime.mkdir(exist_ok=True)
     for module in ('ddraw.dll', 'codcoop_core.dll'):
         shutil.copy2(runtime_source / module, runtime / module)
+    peer_runtime = output / 'peer-runtime' if peer_source is not None else runtime
+    if peer_source is not None:
+        peer_runtime.mkdir(exist_ok=True)
+        for module in ('ddraw.dll', 'codcoop_core.dll'):
+            shutil.copy2(peer_source / module, peer_runtime / module)
     folders = []
     for n in range(args.players):
         folder = output / ('host' if n == 0 else 'join%d' % n)
@@ -182,7 +199,7 @@ def main(argv=None):
             folder.mkdir()
             subprocess.run(['cp', '-a', '--reflink=auto', str(source) + '/.', str(folder)], check=True)
         for module in ('ddraw.dll', 'codcoop_core.dll'):
-            shutil.copy2(runtime / module, folder / module)
+            shutil.copy2((peer_runtime if n else runtime) / module, folder / module)
         for root in ('Main', 'main', 'uo', 'sp_improved', 'UnitedFronts'):
             for config in ('config.cfg', 'config_mp.cfg', 'uoconfig.cfg', 'console.log'):
                 (folder / root / config).unlink(missing_ok=True)
@@ -197,6 +214,12 @@ def main(argv=None):
                   'initial_expected_players': args.initial_expected_players or args.players,
                   'runtime': {p: hashlib.sha256((runtime / p).read_bytes()).hexdigest() for p in ('ddraw.dll', 'codcoop_core.dll')},
                   'coverage': 'connection/liveness/movement smoke only; no campaign completion claim'}
+    if peer_source is not None:
+        provenance['peer_runtime_source'] = str(peer_source)
+        provenance['peer_runtime'] = {p: hashlib.sha256((peer_runtime / p).read_bytes()).hexdigest()
+                                      for p in ('ddraw.dll', 'codcoop_core.dll')}
+    if args.expect_protocol_rejection:
+        provenance['coverage'] = 'negative protocol compatibility test only; no joined gameplay claim'
     if chaos_script:
         provenance['network'] = {'tool': 'coop-anything/chaos', 'revision': COOP_ANYTHING_REVISION,
                                  'profile': args.chaos_profile, 'seed': args.chaos_seed}
@@ -275,6 +298,28 @@ def main(argv=None):
                        s['snapshot_num'] > 0 and s['snapshot_time'] > 0 and
                        s['map'] == host['map'] for s in states[1:]): return None
             return states
+        if args.expect_protocol_rejection:
+            def rejected_protocol():
+                h, p = read_state(folders[0]), read_state(folders[1])
+                log = folders[1] / 'codcoop_join.log'
+                text = log.read_text(errors='replace') if log.exists() else ''
+                if h and p and 'suite: rejected: Different CoDCoop protocol' in text and p['role'] == 0 and not p['joined']:
+                    if any(remote['active'] for remote in h['players'][1:]):
+                        raise RuntimeError('incompatible peer was allocated a native player slot')
+                    return h, p
+            rejected = wait_for(rejected_protocol, processes, args.timeout, 'readable protocol incompatibility before slot allocation')
+            (output / 'rejected.json').write_text(json.dumps(rejected, indent=2))
+            for folder in folders:
+                if process_log_errors(folder):
+                    raise RuntimeError('native error during protocol rejection')
+            for n, folder in enumerate(folders):
+                command(folder, 'quit', joiner=n != 0)
+            for process in processes:
+                if process.wait(timeout=20) != 0:
+                    raise RuntimeError('nonzero shutdown after protocol rejection')
+            results['checks'] += ['different protocol rejected readably before native slot allocation',
+                                  'both game processes shut down cleanly']
+            raise ExpectedProtocolRejection()
         states = wait_for(connected, processes, args.timeout, 'real host and all joiners connected')
         results['checks'].append('real connected host and joiners')
         before = states[0]
@@ -353,6 +398,8 @@ def main(argv=None):
         for process in processes:
             if process.wait(timeout=20) != 0: raise RuntimeError('nonzero game shutdown')
         results['checks'].append('all game processes shut down cleanly')
+        results['status'] = 'PASS'
+    except ExpectedProtocolRejection:
         results['status'] = 'PASS'
     except KeyboardInterrupt:
         results['status'] = 'ABORTED'

@@ -42,6 +42,9 @@ TEXT = {
         "details": "Details", "retry": "Retry", "language": "Language", "close_title": "Leave the session?",
         "cancel_check": "Cancel check", "cancelled": "Installation check cancelled.",
         "switch": "Switch campaign", "cancel_switch": "Cancel switch", "switching": "Preparing the campaign change with your squad…",
+        "switch_waiting": "Campaign change is waiting. Retry or cancel; your squad stays together.",
+        "reconnecting": "Reconnecting to the saved campaign. Wait for your squad, retry this session or leave it.",
+        "recovery_waiting": "Reconnection is taking longer than expected. The game stays open. Retry this session or leave; saved progress is kept.",
         "switch_title": "Switch the whole squad?", "switch_message": "Switch everyone to {campaign}?\n\nStarting mission: {mission}\nDifficulty: {difficulty}\n\nProgress is saved at a safe point before the group follows.",
         "close_message": "The game session is still running. Leave it and close this window?",
         "worker_error": "The session helper could not start. Repair the CoD Coop launcher installation.",
@@ -80,6 +83,9 @@ TEXT = {
         "details": "Details", "retry": "Erneut versuchen", "language": "Sprache", "close_title": "Sitzung verlassen?",
         "cancel_check": "Prüfung abbrechen", "cancelled": "Installationsprüfung abgebrochen.",
         "switch": "Kampagne wechseln", "cancel_switch": "Wechsel abbrechen", "switching": "Kampagnenwechsel wird mit deinem Trupp vorbereitet…",
+        "switch_waiting": "Der Kampagnenwechsel wartet. Erneut versuchen oder abbrechen; dein Trupp bleibt zusammen.",
+        "reconnecting": "Verbindung zur gespeicherten Kampagne wird hergestellt. Auf den Trupp warten, diese Sitzung erneut versuchen oder verlassen.",
+        "recovery_waiting": "Die Wiederverbindung dauert länger als erwartet. Das Spiel bleibt offen. Diese Sitzung erneut versuchen oder verlassen; der Spielstand bleibt erhalten.",
         "switch_title": "Mit dem ganzen Trupp wechseln?", "switch_message": "Alle zu {campaign} wechseln?\n\nStartmission: {mission}\nSchwierigkeit: {difficulty}\n\nDer Fortschritt wird an einem sicheren Punkt gespeichert, bevor die Gruppe folgt.",
         "close_message": "Die Spielsitzung läuft noch. Verlassen und dieses Fenster schließen?",
         "worker_error": "Die Sitzungshilfe konnte nicht starten. Die CoD-Coop-Launcher-Installation reparieren.",
@@ -236,6 +242,7 @@ def main(argv=None):
             self.event_buffer = ""
             self.active_variant = None
             self.switching = False
+            self.recovering = False
             self.status_key = "ready"
             self.verified_summary = None
             self.equipment_path = args.settings_file.with_name('equipment.json') if args.settings_file else equipment.preferences_path()
@@ -516,7 +523,7 @@ def main(argv=None):
                 getattr(self, name).setText(self.text(key))
             self.switch.setText(self.text("switch"))
             self.retry_session.setText(self.text("retry"))
-            self.cancel_switch.setText(self.text("cancel_switch"))
+            self.cancel_switch.setText(self.text("stop" if self.recovering else "cancel_switch"))
             self.campaigns.setAccessibleName(self.text("variant"))
             self.mode.setItemText(0, self.text("hosting"))
             self.mode.setItemText(1, self.text("joining"))
@@ -771,7 +778,7 @@ def main(argv=None):
         def set_status(self, key):
             self.status_key = key
             self.status.setText(self.text(key))
-            if key in {"invalid", "failed", "worker_error", "need_folder", "need_host"}:
+            if key in {"invalid", "failed", "worker_error", "need_folder", "need_host", "reconnecting", "recovery_waiting"}:
                 self.content_scroll.ensureWidgetVisible(self.status)
 
         def set_busy(self, value):
@@ -785,10 +792,11 @@ def main(argv=None):
                                    and self.campaigns.currentItem().data(Qt.ItemDataRole.UserRole) != self.active_variant)
             if not value:
                 self.switching = False
+                self.recovering = False
                 self.retry_session.hide()
                 self.cancel_switch.hide()
             self.runner.setEnabled(not value and os.name != "nt")
-            self.stop.setVisible(value)
+            self.stop.setVisible(value and not self.recovering)
             self.stop.setEnabled(value and not self.stopping)
             self.stop.setText(self.text("stop" if self.session else "cancel_check"))
             self.progress.setVisible(value)
@@ -837,31 +845,57 @@ def main(argv=None):
                     except ValueError:
                         continue
                     phase = event.get("phase") if isinstance(event, dict) else None
-                    if phase == "running":
+                    if phase in {"reconnecting", "recovery_waiting"} or (phase == "running" and event.get("recovering") is True):
                         self.active_variant = event.get("variant", self.active_variant)
+                        self.recovering = True
+                        self.switching = True
+                        self.clear_authoritative_roster()
+                        self.retry_session.show()
+                        self.cancel_switch.setText(self.text("stop"))
+                        self.cancel_switch.show()
+                        self.set_status("recovery_waiting" if phase == "recovery_waiting" else "reconnecting")
+                        self.set_busy(True)
+                    elif phase in {"running", "resumed"}:
+                        self.active_variant = event.get("variant", self.active_variant)
+                        self.recovering = False
                         self.switching = False
                         self.retry_session.hide()
                         self.cancel_switch.hide()
                         self.set_status("active")
                         self.set_busy(True)
-                    elif phase in {"prepared", "restarting"}:
+                    elif phase in {"verifying", "prepared", "restarting"}:
                         self.clear_authoritative_roster()
+                        self.recovering = phase == "restarting"
                         self.switching = True
-                        self.cancel_switch.setVisible(self.mode.currentData() == "hosting")
+                        self.cancel_switch.setText(self.text("stop" if self.recovering else "cancel_switch"))
+                        self.cancel_switch.setVisible(self.recovering or self.mode.currentData() == "hosting")
                         self.set_status("switching")
                         self.set_busy(True)
                     elif phase == "cancelled":
+                        self.recovering = False
                         self.switching = False
                         self.cancel_switch.hide()
                         self.retry_session.hide()
                         self.set_status("active")
                         self.set_busy(True)
+                    elif phase == "waiting":
+                        self.set_status("switch_waiting")
+                        self.retry_session.setVisible(self.mode.currentData() == "hosting")
+                        self.cancel_switch.setVisible(self.mode.currentData() == "hosting")
                     elif phase == "error":
                         self.clear_authoritative_roster(unavailable=True)
-                        self.set_status("failed")
+                        self.recovering = self.recovering or event.get("recovering") is True
+                        self.set_status("recovery_waiting" if self.recovering else "failed")
                         self.details_toggle.setChecked(True)
                         self.retry_session.show()
-                        self.cancel_switch.setVisible(self.mode.currentData() == "hosting")
+                        self.cancel_switch.setText(self.text("stop" if self.recovering else "cancel_switch"))
+                        self.cancel_switch.setVisible(self.recovering or self.mode.currentData() == "hosting")
+                    elif phase == "recovery_cancelled":
+                        self.stopping = True
+                        self.set_status("stopping")
+                        self.retry_session.hide()
+                        self.cancel_switch.hide()
+                        self.set_busy(True)
 
         def send_control(self, action, **fields):
             if self.session and self.busy and not self.stopping:

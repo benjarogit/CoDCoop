@@ -494,10 +494,192 @@ python3 tools/uf_equipment_catalog.py --game /path/to/owned/game \
   --output /path/to/uf-equipment-catalog.json
 ```
 
-The focused campaign tooling suite currently has 34 passing unit tests,
+The focused campaign tooling suite currently has 37 passing unit tests,
 including comment-aware menu parsing, separate kit/alternate resources,
 unavailable choices, original aircraft decisions, negative DObj flag semantics
 and the fixed model boundary.
+
+The opt-in `build(..., qa_kits=True)` / `--qa-kits` experiment adds
+`maps/_coop_uf_kits.gsc` only to clearly marked QA overlays. Default builds do
+not contain this adapter. It clones the pinned original five active-family
+weapon processors and `refill_ammo` into actor-local methods, preserving native
+`giveweapon`, alternate registration, weapon switching and `giveStartAmmo`.
+It does not swap global equipment CVars or copy another player's inventory.
+The fixed QA host-plan fields require enable, authority marker, exact catalog
+SHA, target map, nonempty fresh-world epoch, commit and all four canonical menu
+values per manual slot. All requested choices are checked before precaching or
+applying any kit. Automatic mode leaves the authored path intact; reviewed
+exclusive-script maps are visibly blocked for this bounded prototype. These
+QA CVars do not authenticate a production host: a future native API must accept
+only the validated host roster, approved asset union and fresh-mission tickets.
+
+`tools/qa_uf_kits.py` runs actual host/joiner processes on existing isolated
+copies, supplies the labelled host plan through one `+exec` configuration and
+reads native inventories/ammunition independently. Many `+set` arguments were
+shown to exceed the original bounded command-line list; that launcher-fixture
+failure is retained. The first real attachment attempt found host startup 240
+approved models versus peer 234 and failed native validation on
+`w_us_spw_binocular_world`. This is the still-open production asset-bootstrap
+gap. For the isolated actor-kit proof only, the exact trusted roster's 21 media
+models were supplied to both owned copies before `GAME_INIT`, using existing
+QA cache hooks and unchanged strict native guards. No lobby or network resource
+exchange is inferred from those local QA files.
+
+With frozen protocol-9 Core `22a3d142…` and a 512 MiB hunk, Brecourt then
+connected a real pair. Host inventory was Garand/Thompson/Colt/frag; remote
+inventory was Carbine/Greaser/binoculars/mine. Actual attack input consumed
+Garand clip 8→7 (stock 192) and remote Carbine clip 15→14 (stock 240). The
+native checkpoint test exposed a genuine existing reset: after save/load and
+real rejoin, host slot 1 instead held the host's Garand/Thompson/Colt/frag with
+192 stock and clip 7. Slot 0 retained its own 192/7. The adapter's external
+epoch receipts deliberately prevented reapplying kits or refilling restored
+ammunition, so the runner reported **FAIL**. Native code must preserve each
+restored remote's own weapon/ammo/slot data before saved-ghost disconnect and
+restore it after `ClientConnect`/`ClientBegin`, suppressing host mirroring for
+that restored slot. The earlier attempt also retained an original
+`Ally_Names` script-watchdog error; it did not recur on the clobber-proof run,
+and its bounded source loop was not disabled to obtain a pass.
+
+Complete raw native before/after observations, saved checkpoint, exact executed
+GSC/PK3s, runtime snapshots and logs are retained in
+`run/uf-script-qa/history/kits-fire-pass-OWN-PS-checkpoint-clobber-1795287346623500980`.
+The asset-bootstrap negative is in
+`run/uf-script-qa/history/kit-bootstrap-missing-fail-1795286939001277722`.
+Individual-kit checkpoint acceptance therefore remains open, alongside native
+authenticated roster delivery and pre-registration asset bootstrap.
+
+The subsequent immutable numeric-state candidate `2c9d17c7…` passed the same
+real two-player **inventory/ammunition** regression. Before disconnecting the restored ghost, native
+code captured slot 1's own weapon 13/viewmodel 102; after native connect/begin
+it restored that numeric inventory. Host Garand 192 stock/clip 7 and remote
+Carbine 240 stock/clip 14, all four inventory slots and all five native ammo
+maps matched exactly after actual checkpoint load and rejoin. Movement checks
+passed 202.3 units before and 181.3 units after loading, with stable observation
+and clean shutdown. Full proof is retained in
+`run/uf-script-qa/history/kits-ownPS-2c9d-PASS-1795288340884448186`.
+This closes that targeted inventory/ammo clobber regression for the candidate;
+production authenticated delivery/bootstrap and four-player retention remain
+separate gates. The executable was original UO `c17e57c0…`, not the prepared
+installer's LAA executable, with a requested QA hunk of 512 MiB.
+
+The generated five-family processors and original refill function are now
+audited for global gameplay effects during the build. Their only retained
+world writes are `level.precache_mine = 1` and `level.precache_plane = 1`,
+shared resource-union hints with no active readers in this pinned UF script
+revision. Health, speed, faction, settings and `game[]` mutations are rejected
+by the actor-clone audit. Debug printing reads a setting but changes no gameplay
+state. No original weapon/ammo behavior is removed by this audit.
+
+The durable kit runner also accepts `--players 4` with four different original
+American roles and the exact 23-world/39-media resource union. Each actual
+controller's native slot is read rather than inferred from its folder name.
+It checks every native inventory/ammo map before and after checkpoint loading.
+The MG and bazooka roles fire their original Thompson/BAR secondaries in this
+inventory-retention probe; standing MG or launcher firing is not claimed.
+The separate terrain-valid MG deployment test remains the deployment evidence.
+The four existing owned test folders were reused; only the pinned YAP tree was
+copied. Executable hashes and actual COFF LAA flags are recorded separately,
+without claiming this raw 512 MiB gate represents the prepared 256 MiB preset.
+
+The stricter follow-up found that the old inventory/ammo-only oracle omitted
+the active selected weapon. In the two-player archive, remote inventory stayed
+Carbine with stock 240/clip 14, but native active weapon changed 13→0 after
+checkpoint load. In the four-role test, all inventories/ammo survived and
+native reconnection arrived out of order 1→3→2, but Springfield 98→0 and BAR
+5→0 lost their active selection. Fresh screenshots showed missing/cropped
+first-person weapons and ammunition HUD for those peers. The historical raw
+PASS reports remain preserved with supplemental **FAIL active selection**
+audits; they must not be reported as complete checkpoint/kit acceptance.
+Four-role evidence is retained in
+`run/qa-cod1-four/history/four-role-ammo-PASS-activeweapon-FAIL-1795289399920232132`.
+A later State15 run with native resources-only item registration on each peer
+still lost Springfield selection, so XModel caching alone is not the cause.
+The native observer is now recompiled from captured source each run and the
+oracle requires active weapon, weapon name and viewmodel retention too; this
+also fixes a retained stale-observer-binary/KeyError failure in the earlier QA
+runner. Original script-watchdog failures remain visible and are not filtered
+out to obtain a pass.
+
+Native analysis identifies an actual Singleplayer assumption beyond source
+`level.player` replacements: UO `self switchToWeapon` validates the actor's
+owned bits in Game RVA `0x16fd0`, then calls `0xc600` **without an actor
+argument**. That routine writes global local-engine `cg_weaponSelect` and
+selection time through Game trap 8, with original alternate/run behavior.
+Thus using it on a remote still changes the host's UI selection. Registration
+table `0xaaec0` identifies the Game VM CVar `0x154780`; CGame registers the same
+name at VM CVar `0x24aec0`. Native CGame `weapon <name-or-id>` at RVA
+`0x342b0` resolves the definition and calls the normal selection routine
+`0xb9f0`. Exact hashes, registration-table findings and assembly are retained
+in `run/campaign-investigation/native-switch-selection-proof.json`.
+
+An actor-targeted reliable selection bridge is therefore required for remote
+kit processors. The receiver must use the normal local selection path only
+after its own authoritative snapshot and owned weapon are available, with
+session/world/owner/sequence validation. Checkpoint restoration also needs a
+one-time selection seed before stale/default early user commands can erase the
+restored active weapon. The isolated native State16 prototype now implements this bridge; authenticated
+production asset/lobby delivery remains a separate requirement. No per-frame
+forced selection, ammunition reset or silent removal of original switching
+behavior was substituted. The source audit now explicitly lists
+this native global method rather than implying source scans prove native
+actor isolation. Reviewed UF mine/mount/binocular actor functions contain no
+active `switchToWeapon` calls in this revision; they are not blanket-rewritten.
+
+The opt-in GSC adapter now passes an immutable per-invocation owner context
+(session parts, actual slot, spawn ticket, world and validated plan epoch)
+through the five original loadout processors. Slot 0 retains the original
+native switch; slots 1–3 commit canonical weapon names through the reviewed
+fixed-field API, with sequence written last. Native acknowledgement must match
+the entire request context. Missing API or stale ownership never falls back to
+the global host switch. This remains `qa_kits=True`; default production overlays
+do not apply this prototype or claim a lobby transport.
+
+The stricter two-player gate passed with immutable Core `e9820fae…`:
+`run/uf-script-qa/history/selection-e982-two-STRICT-PASS-1795292190790199867`.
+Immediately before actual Save, host Garand 192/7 and remote Carbine 240/14
+matched native host PS and each controller's own current CGame snapshot,
+prediction and desired selection. Native load/rejoin retained them exactly;
+real firing afterwards consumed another round on both controllers.
+
+The four-role gate passed with immutable Core `ddc1a6d3…`:
+`run/qa-cod1-four/history/four-selection-ddc-STRICT-PASS-1795292654322543580`.
+Immediately before Save the active weapons were Thompson 270/25, Springfield
+55/4, BAR 200/17 and Garand 192/7. All four kits, ammunition and active selections
+survived actual native checkpoint loading. Each actual controller then fired
+again; final separated screenshots show all four correct guns and ammo HUDs
+(22/270, 3/55, 15/200 and 6/192). The initial overlapping-body checkpoint
+screenshots remain preserved alongside the clean final views. Both runs used
+raw original `c17e57c0…` executables, requested 512 MiB hunk, pinned YAP and an
+explicit offline host-derived resource/item union. They establish the bounded
+prototype regression, not prepared 256 MiB installation acceptance, arbitrary
+kit combinations, automatic-kit behavior or campaign completion. The separate normal user-choice/stale-selection gate also passed with the same
+`ddc1a6d3…` Core:
+`run/uf-script-qa/history/selection-ddc-USERCHOICE-NEGATIVES-CP-PASS-1795292850597022590`.
+After actual Carbine firing (240/14), the remote used the normal local
+`weaponslot primaryb` command to hold its own Greaser. Host Garand stayed
+unchanged. Replaying the authentic earlier Carbine selection as duplicate,
+wrong-ticket, wrong-world and wrong-session packets could not undo this user
+choice; wrong-world/session each increased native type-115 stale counts
+(0→1→2). Independent fixed host requests with invalid ticket and session were
+visibly REJECTED with fresh matching acknowledgements. The runner was corrected
+for changed-only CVar publication: an unchanged REJECTED status need not be
+logged again, but a fresh exact acknowledgement is required. The failed oracle
+run remains archived; native errors were not suppressed.
+
+Immediately before native Save, remote Greaser was 270/30 and the previously
+fired Carbine remained 240/14. Actual load/rejoin retained both and the user's
+held Greaser, with matching host PS and own CGame desired/predicted/current
+snapshot names. Real firing afterwards yielded clean final Garand 6/192 and
+Greaser 28/270 screenshots. This proves no prototype starting-kit refill or
+forced return to the starting Carbine in this bounded scenario.
+
+An additional pinned UF resource repair restores early `gear_US_load1`
+registration only for Foy/Noville with optional models enabled. Original
+`US_Airborne` still randomly attaches that model, while its original precache
+branch explicitly skipped those maps. The source mod SHA is `4be5bb5c…` and
+the original Main/pak0 XModel SHA is `a7fdc7e7…`. Random appearance selection
+and late-registration validation remain intact; the next dense-map resource
+gate must include this corrected overlay.
 
 An independent read-only reference measurement is retained in
 `run/uf-model-live-references`. The same fixed legal MG/Thompson/binocular/smoke
@@ -572,3 +754,311 @@ python3 tools/qa_mainline_probe.py --source /path/to/owned/test/source \
 The probe does not yet demonstrate every MG family or simultaneous mounts,
 specific artillery/airstrike victim damage, natural mission completion, or native
 Windows behavior. These remain explicit gameplay acceptance work.
+
+## Read-only startup-rule bootstrap audit (proposal, not wired)
+
+The pinned UF package SHA-256 is
+`b4f6bb7d03477d7e77e5150af4ca88eeb3dee30e0f715edfa1e2338d3e9d1cbe`;
+SP Improved is
+`25c1978fb48ec9324babed270be78d2f647e0d8a3e24c2415cd88aabb012e678`.
+A comment-aware read-only scan of every `.gsc`, `.menu` and `.cfg` member in
+these two packages records 160 UF literal CVar names/30 dynamic read sites and
+52 SP Improved names/no dynamic read sites. Menu item blocks are parsed within
+their own braces, including yes/no controls, rather than borrowing a following
+item's choices. Raw original source is retained only in ignored investigation
+output. Exact member hashes, original line numbers, readers/writers, active
+menu domains and the proposed contract are in
+`run/campaign-investigation/host-rule-bootstrap/{all,reviewed-proposal}.json`;
+`collect.py` and `review.py` reproduce them without running the game. This is
+an inventory of syntactically active package readers, not proof that every
+function is reached on every map, nor a complete audit of inherited native
+engine/base-package options.
+
+The concrete shared startup inputs missing from a model/item-only bootstrap
+are UF `sp_order` (0 chronological, 1 original), the two faction overrides
+(menu `sp_fr`/`sp_en` values 0–13, mapped to the fixed `sp_ally`/`sp_axis`
+strings), `sp_ammo` (0/1), and the legacy authored weapon mode
+`sp_forceweapons` (0/1/2). Its current-family selector `sp_campaign` has active
+menu choices 0 British, 1 Russian, 2 American, 3 German and 4 Italian.
+The Polish case 5 exists in script but does not establish supported menu/assets.
+Original menu evidence is `ui/options_mod.menu` items starting at lines 191,
+491, 517, 559, 685 and 763. Individual manual/automatic kits remain the
+separate owner-confirmed catalog/roster contract; these legacy global selectors
+must never silently replace a remote's own role.
+
+`sp_ammo` has a particularly important world effect: besides original
+`maps/_UF_weapons.gsc:611/709` ammunition behavior, it changes original spawner
+counts/wave handling in `maps/_UF_mod.gsc:1628` and later branches at
+1733, 1803, 1885 and 2067. It therefore cannot become a private per-player
+"extra ammo" toggle. `sp_history` has live readers at
+`maps/_UF_loadout.gsc:1508` and `maps/_UF_mod.gsc:27`, setting
+`level.mod_events` when equal to 1, although its menu item at
+`ui/options_mod.menu:222` is commented out. Capture an explicit host semantic
+value for compatibility; do not advertise that dormant control as an active UI.
+
+Year, climate and resolved faction/nation are not independent menu options.
+`maps/_UF_loadout.gsc:1099–1203` derives `sp_year` from the mission (1940–1945).
+`maps/_UF_mod.gsc:1017–1077` derives `sp_climate` as none/winter/desert from
+spawners and map identity. That script writes resolved faction/nation at
+874–878 and retains them through `Save_Faction_Cvars` at 885–918.
+`sp_loadgame` changes restoration/precache/loadout branches and is reset by
+native save lifecycle scripts. Dynamic `sp_name_*`, `sp_nation_*`,
+`sp_faction_*`, `*_head`, `*_head_type` and `*_body` readers also exist.
+These are derived/saved state, not permission to transmit arbitrary CVar
+names or asset strings. A host resource graph needs to bind and validate the
+resolved results and checkpoint lifecycle; copying only six raw `sp_*`
+selectors is insufficient to reproduce them safely.
+
+Both packages read ordinary `g_gameskill` values 0–3 in mission branches;
+UF additionally exposes native `difficultygimp` in its menu. This audit does
+not establish that command's numeric mapping and does not guess one. The
+shared difficulty contract must explicitly resolve that mapping before claiming
+support. No active `ai_*` literal CVar readers or adjustable AI menu controls
+were found in these two packages. The already recorded SP Improved bravery
+changes and UF scripted actor parameters are pinned content, not newly
+invented AI-setting fields. Existing YAP shared sprint/jump-shot rules remain
+`player_sprintSpeedScale`, `player_sprintmult` and `bg_allowJumpShot`, with
+their existing native ranges and acknowledgement semantics. FOV, input,
+resolution, HUD/crosshair, weapon sprint presentation and local language
+remain individual. The inspected YAP `g_enemyFireDist` reader controls
+crosshair coloring, not enemy detection or firing distance. Some presentation
+CVars are read by host mission scripts; that alone does not authorize forcing
+them on every client's renderer.
+
+Proposed native format: a capability/versioned, exact-length block of numbered
+fixed fields with compile-time names and enum mappings, bound to variant,
+pinned package/catalog, exact map, session, world generation, rules revision
+and roster/resource digest. Validate every field and the ordered native
+item/approved-media tables before `GAME_INIT`, stage them together, then commit
+atomically and acknowledge that exact identity before readiness. Reject unknown,
+duplicate, missing required or wrong-variant fields. Never concatenate received
+console text, accept arbitrary CVar names, or partially apply a malformed block.
+Keep derived world results and save ownership separate from user options.
+`start`, `skip*`, `quick_*`, developer/cheat/testing flags and dynamic character
+strings are excluded from this proposed transfer. SP Improved's script-only
+`no_intro == "true"` at `maps/bastogne1.gsc:503` is another explicit scene-policy
+input to review, not a silent authorized skip; stale peer development overrides
+need detection. Native receive/apply/resource exchange and real phase-order
+acceptance remain unimplemented by this audit. No Core, GSC or GUI code was
+changed and no additional game instances were started for it.
+
+## Cold-save preservation producer (source prototype; native gate pending)
+
+The opt-in UF kit producer now requires a native inventory decision in addition
+to its owner ticket. Native publishes `coop_inventory_<slot>_state` as WAIT,
+FRESH or PRESERVED, with `coop_inventory_<slot>_identity` equal to the complete
+current `session_a|session_b|session_c|slot|ticket|world` tuple. Publication is
+WAIT first, identity next and final state last. Missing, malformed, mismatched
+or changing publication is WAIT. The producer checks it again directly before
+`takeallweapons`. Older runtimes lacking this explicit bridge conservatively
+wait; their earlier immutable positive overlays remain archived unchanged.
+
+PRESERVED is handled before current external plan/mode checks: it updates only
+the external full-identity receipt and skips all kit application, giving,
+refilling and actor-field changes. FRESH alone may apply the already validated
+individual starting kit. No saved ticket counter is restored and no save
+metadata revision is invented by this source change. The native selected-weapon
+restore seed is independently derived from successful numeric inventory restore,
+not from a stale external next-map kit plan. Native implementation and successful
+host-slot-0 legacy-save handling belong to the separately reviewed Core change.
+
+`tools/qa_uf_kits.py` now prepares a bounded two-player cross-map regression:
+Brecourt A consumes actual ammunition and saves; fresh Pathfinder B applies
+different legal primary/secondary choices and both real controllers fire; loading
+the actual Save A must restore A's exact inventory/ammunition/active weapon and
+own CGame selection, with PRESERVED proof and no additional
+`COOP_UF_KIT_APPLIED` event. External B identity receipts are retained. An
+always-FRESH/null preservation implementation therefore fails through refill or
+an extra application; an always-PRESERVED implementation cannot pass fresh A/B
+kit checks. The runner requires the actual recovered A map and a new native
+world, because B's smaller clock must not be mistaken for a checkpoint rollback.
+It accepts an explicit immutable Pathfinder native model ledger for offline media
+preload before either process starts; this is not production asset exchange.
+
+The new source has 41 focused tests passing, including stale world/owner
+publication, preservation-before-plan ordering and the prohibition on Give/Apply
+in the PRESERVED branch. Native GSC compilation and the actual A→B→Save-A
+runtime gate have **not yet run** for this producer revision. Original special
+script guards remain intact; no training/parachute/vehicle role is globally
+unblocked to obtain a pass. The next game window must be coordinated with the
+frozen installer/switch gates before using an immutable Core that implements the
+bridge.
+
+### Later native difficulty evidence corrects the skill-only proposal
+
+After the source audit above, native menu handlers were verified and executed
+through buffered real CLI commands in both original engines. Gimp is
+`g_gameskill=0` plus `g_player_maxhealth=12000`; Easy is 0/1200,
+Medium 1/600, Hard 2/300 and Fu 3/200. There is no skill 4. Setting the skill
+alone left a deliberately distinct health value of 777 unchanged, so the
+original audit's proposed 0–3 skill field cannot represent a complete native
+difficulty preset or distinguish Gimp from Easy.
+
+This is subsequent evidence, not a retroactive claim that the earlier package
+scan was complete. Preserve its historical report and use a fixed five-preset
+enum with an exact compile-time skill/health pair in the revised bootstrap
+proposal. Commit both before `GAME_INIT`; reject contradictory/unknown pairs
+rather than guessing from skill 0 or quietly mapping Gimp to Easy. Custom
+skill/health combinations need separately versioned semantics. Evidence:
+`run/native-difficulty-menu-probe-buffered/result.json` (PASS, both engines,
+no Coop DLL and no mission started), the native difficulty registration/handler
+disassemblies in `run/campaign-investigation/`, and the independently hashed
+`host-rule-bootstrap/native-difficulty-addendum.json`. The bootstrap receiver
+and gameplay acceptance are still separate work.
+
+The first native State17 `8e0482f5…` cross-map attempts now compile and execute
+the new producer on two real UF instances. Native A FRESH publication,
+individual kits and consumed ammo/save passed. Actual fresh Pathfinder B
+allocated new host/remote tickets (A 2/3 → B 4/5), applied the different legal
+Thompson/Greaser primaries and both fired them (270/30 → 270/24 and 270/28).
+The normal map-before-`coophost` argument order was retained. Native logs show
+hosting already active at actual initial `GAME_INIT`; this does not prove the
+separate true standalone-to-host warm-import branch.
+
+The cold return to A **failed before preservation acceptance** with the real
+engine error `G_LoadGame: client mis-match in savegame`. Native save ownership
+was verified (`leases=1/0/0`), saved-intent 1/map Brecourt was observed and both
+current identities correctly entered WAIT in world 4; no successful PRESERVED
+state or no-refill outcome is claimed. Full immutable runtime, native saves,
+sidecars, executed scripts/observer, logs and source are retained in
+`run/uf-script-qa/history/preservation8e-COLD-A-native-client-mismatch-FAIL-1795295790571384576`.
+
+Read-only disassembly narrows the failure: pinned UO Game DLL `9fd3665b…`,
+string VA `0x20097788`, reference `0x20030b76`. The saved-client loop computes
+`[0x20307f00] + savedIndex * 0x8330` and requires its field `+0x8228` to be
+nonzero at `0x20030b69–74`, before deserializing that client. An index greater
+than four has a different error branch; this is not evidence of a generic
+client-count comparison. The failing index was not captured and no native
+field was overwritten to bypass the guard. Evidence is in
+`run/campaign-investigation/native-save-client-mismatch{.json,.disasm.txt}`.
+Native connection-state reconstruction across cold loading remains an open
+Core issue.
+
+Two earlier failed QA-oracle runs are retained separately: GSC `println`
+application messages were not emitted into this normal console log, so the
+runner now counts actual `coop_qa_kit_applied_<slot>` receipt commits; another
+run attempted B firing while original native `weapon_state=1` was still
+raising the host weapon. The runner now waits for the original ready state 0
+with a bounded timeout before sending actual attack input. These corrections
+change observation timing only and do not disable script, model, ownership or
+native save guards.
+
+### State18 closes the reproduced cold-load/no-refill case
+
+The exact case was repeated with immutable Core `dbda01bc…`, retaining the
+same executed QA wrapper, generated host/peer PK3s and observer source as the
+`8e0482f5…` native failure. Their hashes match byte-for-byte; the separately
+rebuilt observer EXEs differ only in the COFF build timestamp and PE checksum,
+with original binaries retained and normalized comparison recorded. The Core
+repairs the lifetime of the existing reviewed saved-remote branch patch before
+native saved-world deserialization; no additional serializer check was disabled.
+
+The real two-player A→B→Save-A run **passed**. Actual Save A held Garand
+192/7 and Carbine 240/14. Fresh Pathfinder B used different approved
+Thompson/Greaser primaries, advanced current tickets 2/3→4/5, and both actual
+controllers fired (remaining clips 27/28). Loading Save A retained current
+tickets 4/5 in new world 4 and emitted exact native PRESERVED tuples for host
+and guest. Original A inventory/ammunition and active weapons matched both host
+PS and each controller's own CGame desired/predicted/current snapshot. Native
+application receipts stayed exactly two per slot (A and B); the cold load
+updated only external identity receipts, so no fresh kit or starting ammo was
+reapplied. Actual post-load attacks produced visually verified final Garand
+6/192 and Carbine 13/240 HUDs. Both games exited cleanly without engine errors.
+
+The native log orders the existing patch rearm at 22:21:44.116, immediately
+inside saved-intent-1 `GAME_INIT` before original deserialization; save ownership
+verification follows at 22:21:44.125, host PRESERVED at 22:21:47.212, and guest
+numeric restore/targeted selected-weapon seed/PRESERVED at 22:21:47.266.
+Full immutable proof and the source/PK3 comparison are retained in
+`run/uf-script-qa/history/preservation-dbda-COLD-A-NO-REFILL-STRICT-PASS-1795296164772889368`.
+The earlier native failure remains its negative control. This closes that
+specific cold cross-map inventory/refill regression for the prototype; it does
+not certify every save lifetime, true standalone warm hosting, wrong-owner
+restoration, arbitrary roles or campaign completion. The test still used
+Wine/Xvfb, original non-LAA UO, requested 512 MiB hunk and explicit offline QA
+item/media bootstrap, rather than the prepared 256 MiB installation path.
+
+## Mission-interaction audit and next native action cases
+
+A read-only effective-source audit reuses the campaign inventory and checks each
+profile's installed original script layers against the current trigger overlay.
+Raw pinned member hashes, predicate contexts, BSP entities and the exact
+four-profile overlay footprint are retained under ignored
+`run/campaign-investigation/mission-interactions/`. The scan includes host
+Use/Touch/distance/activator predicates; it is a candidate inventory, not a
+claim that every match blocks mandatory progress. In-memory transforms of all
+four profiles accept the pinned revisions and preserve bytes outside each
+reviewed function. Existing tests now explicitly preserve the normal Moody
+handoff gate when testing the old fallback-only transform, making that missing
+coverage visible rather than accidentally calling the fallback a full fix.
+
+The concrete ordinary-action gap is Brecourt's **normal surviving-Moody**
+explosive handoff. After objective 4 becomes active, `Moody_GetInjuredMan`
+waits for host distance ≤100 at original CoD `maps/brecourt.gsc:836`,
+SP Improved :845 and UF :866. Only then does the original NPC animation lead
+to `got_explosives`, `Has_Explosives`, objective 4 done and bomb-trigger
+activation. The existing overlay changes only `explosives_objective_wait`,
+the separate failed-rescue/fallback branch. A remote near the surviving Moody
+therefore still cannot advance this normal gate while the host remains away.
+The surrounding goal, dialogue and hand animation operate on Moody/lastnode;
+there is no player camera/link or exclusive player inventory role to preserve
+at this gate. A narrow eligible-recipient replacement is now being prepared;
+it must reject dead/downed participants using actual native eligibility,
+not equate `is_player` or `isalive` with being able to act. Coop downed players
+remain alive at health 1; excluding every health-1 player would incorrectly
+reject a legitimately standing survivor and is not an accepted substitute.
+
+Other concrete remaining host assumptions include Brecourt's door failsafe
+(:1785 original/:1815 UF), which shoves only the host if blocking the door,
+and Chateau's ordinary `doorBlocker` wait (:553), which waits only for the
+host rather than any blocking player. UO `bastogne1_add::ammo_max_think`
+(:509–515) consumes an actual ammo trigger but gives max MG30cal ammo to
+`level.player`, regardless of the activator; its later ordinary Moody-follow
+gate (:1025) measures only host proximity. The first-foxhole `player_save`
+protection loop (:4102) also affects only the host, although its independent
+objective-completion listener accepts an unfiltered trigger. These require
+separate per-actor/collision review; they are not solved by the four existing
+activator substitutions. UO Bastogne2's host-only walk/talk checks at
+`bastogne2_event1to2:2110/2125` are candidates, but parallel scripted routes
+exist, so this scan does not declare them proven unavoidable progression
+blockers. UF's host-held next-map confirmation remains host world control,
+not a reason to let every player independently change the mission.
+
+The next actual native action tests are specified in `selected-cases.json`:
+
+- **CoD 1 Pathfinder:** after normal approach, the joiner alone uses the
+  legbag (`trigger_use` *27; object at 171,3857,4), then the unlocked beacon
+  (object at −1391,5255,0). Original `objectives` :1222–1236 and
+  `beacon_think` :1114–1135 already have unfiltered trigger waits. Require
+  legbag removal/objective 1 done, then actual beacon model/sound change and
+  objective 2 done. These are real mandatory actions, not merely loaded maps.
+- **UO Bastogne1:** complete the original Jeep and barn approach normally,
+  then let only the joiner enter the first required `player_save` foxhole
+  brush while objective 3 is active. The actively threaded `alpha_killer`
+  :2816–2823 emits `objective_3_complete`; `objectives_add` :309–319 then
+  advances objective 3→4. The MG30cal pickup objective nearby is commented
+  out and must not be reported as this mandatory objective.
+- **SP Improved Brecourt:** follow the real successful cover/rescue path to
+  normal Moody objective 4. Keep the host >100 units away; move an eligible
+  joiner to ≤100. The current old overlay is the negative control; allowing
+  the host into range is the original-behavior positive control. The scoped
+  fix must produce the original handoff and real bomb unlock/objective 4
+  event once, while the host remains outside. Dead/downed-only approaches
+  must not advance it. The normal branch is proximity based; the Use prompt
+  belongs to the distinct fallback branch.
+- **UF Dendre1:** after the actual assault/APC prerequisites and `door2`
+  opening, the joiner alone operates field-radio `trigger_use` *21 using its
+  original HINT_ACTIVATE/Use interaction. `radio` :320–348 completes objective
+  2, swaps the authored radio models, deletes the trigger and plays
+  `uk_fire_mission`/`uk_arty_gtg`; normal sequential `main` proceeds to
+  `mortars`. This authored radio is separate from the optional UF support
+  weapon and does not justify overriding artillery costs or availability.
+
+The inspected configs bind Use to F/`+activate`. Future automation must send
+actual owner movement/look/`+activate`/`-activate` input and independently
+observe the remote activator plus host outside the action zone, original
+objective/notification and changed world objects. No direct `useBy`, fabricated
+notify, actor teleport, objective setter or mission jump may stand in for that
+proof. An earned pre-action checkpoint can reproduce the setup; loading it
+alone never counts as success. None of these four mission-action cases has yet
+been run in this audit, and no full mission/campaign completion is claimed.

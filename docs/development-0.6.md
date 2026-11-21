@@ -35,7 +35,35 @@ g++ -std=c++17 -fsanitize=address,undefined tests/test_tree_ownership.cpp -o bui
 ./build/test_tree_ownership
 g++ -std=c++17 -fsanitize=address,undefined tests/test_mt_epoch.cpp -o build/test_mt_epoch
 ./build/test_mt_epoch
+g++ -std=c++17 -fsanitize=address,undefined tests/test_qa_dobj_mapping_barrier.cpp -o build/test_qa_dobj_mapping_barrier
+./build/test_qa_dobj_mapping_barrier
+g++ -std=c++17 -fsanitize=address,undefined tests/test_world_wire.cpp -o build/test_world_wire
+./build/test_world_wire
+g++ -std=c++17 -fsanitize=address,undefined tests/test_host_body_ownership.cpp -o build/test_host_body_ownership
+./build/test_host_body_ownership
+g++ -std=c++17 -fsanitize=address,undefined tests/test_host_body_policy.cpp -o build/test_host_body_policy
+./build/test_host_body_policy
+g++ -std=c++17 -fsanitize=address,undefined tests/test_peer_inventory.cpp -o build/test_peer_inventory
+./build/test_peer_inventory
+g++ -std=c++17 -fsanitize=address,undefined tests/test_save_provenance.cpp -o build/test_save_provenance
+./build/test_save_provenance
+g++ -std=c++17 -fsanitize=address,undefined tests/test_spawn_ticket.cpp -o build/test_spawn_ticket
+./build/test_spawn_ticket
+g++ -std=c++17 -fsanitize=address,undefined tests/test_weapon_selection.cpp -o build/test_weapon_selection
+./build/test_weapon_selection
+g++ -std=c++17 -fsanitize=address,undefined tests/test_asset_bootstrap.cpp -o build/test_asset_bootstrap
+./build/test_asset_bootstrap
 ```
+
+The asset-bootstrap fixture tests bounded model/ordered-weapon metadata transfer
+and rejects mismatched native weapon indices or item-registration flags. It does
+not certify actual native weapon/item registration, a ready lobby or production
+map-start ordering. The runtime must bind it to the existing session/world and
+gameplay identity and use real SHA256 before applying anything.
+Die Ressourcen-Fixture prüft die begrenzte Übertragung von Modell- und geordneten
+Waffenmetadaten und lehnt falsche native Waffenindizes oder Item-Freigaben ab.
+Sie bestätigt keine tatsächliche Registrierung, Lobby oder Produktionsstartfolge.
+Die Laufzeit muss Sitzung/Welt und Spielinhalt binden und echtes SHA256 prüfen.
 
 Native checker interoperability uses an isolated Wine prefix. / Der native
 Prüfer wird gegen ein getrenntes Wine-Prefix getestet:
@@ -183,6 +211,12 @@ python3 tools/qa_partition_probe.py --source "/path/to/owned/Call of Duty" \
   --chaos-checkout run/reference/coop-anything --partition-direction c2s
 python3 tools/qa_reload_cancel_probe.py --source "/path/to/owned/Call of Duty" \
   --run run/qa-cancel --runtime-dir run/reload-cancel-prototype
+python3 tools/qa_reconnect_probe.py --source "/path/to/owned/Call of Duty" \
+  --run run/qa-reconnect --runtime-dir run/world-wire-final \
+  --chaos-checkout run/reference/coop-anything
+python3 tools/qa_world_replay_probe.py --source "/path/to/owned/Call of Duty" \
+  --run run/qa-world-replay --runtime-dir run/world-wire-final \
+  --chaos-checkout run/reference/coop-anything
 ```
 
 Each run copies game files, freezes one build of the runtime for all slots, owns

@@ -1,0 +1,48 @@
+# Committed session recovery / Wiederverbindung nach dem Neustart
+
+## English
+
+A successfully started target process is not yet a resumed party. Its `running`
+event carries `recovering: true`, followed by `reconnecting`. The launcher stays
+in recovery until the requested map, role, renderer and party satisfy the native
+state check. Only `resumed` restores the active-session display.
+
+After 180 seconds, `recovery_waiting` explains the delay. This is informational:
+the game stays open and the party count stays intact. Explicit Retry gracefully
+stops only the owned process, clears commands belonging to its lifetime and
+restarts the same validated campaign, map, difficulty, endpoint and party.
+Fields attached to a Retry control cannot replace the committed specification.
+After `resumed`, that recovery specification is discarded.
+
+Before commitment, Cancel requests the native switch cancellation. After
+commitment, the button says **Leave session**: it ends this owned session cleanly
+and retains saves. It does not promise to restore an already ended world.
+
+The source tests exercise the actual supervisor loop with fake owned processes,
+including live-but-unconnected targets, stale Quit files, delayed readiness,
+pre/post-commit cancellation and a Retry after resumption. No native game run or
+new frozen bundle is implied by these tests. The health-preset launcher fix is
+retained. Earlier `6101`/`38ce` bundles remain the previous, immutable proof scope.
+
+## Deutsch
+
+Ein gestarteter Zielprozess bedeutet noch nicht, dass der Trupp wieder verbunden
+ist. Sein `running`-Ereignis enthält `recovering: true`; danach folgt
+`reconnecting`. Erst wenn Zielkarte, Rolle, Renderer und Gruppe im nativen Zustand
+passen, beendet `resumed` die Wiederverbindungsanzeige.
+
+Nach 180 Sekunden erklärt `recovery_waiting` die Verzögerung. Das Spiel bleibt
+offen; die Gruppengröße bleibt erhalten. **Erneut versuchen** beendet ausschließlich
+den eigenen Prozess geordnet, entfernt dessen alte Befehlsdateien und startet
+dieselbe geprüfte Kampagne mit unveränderter Mission, Schwierigkeit, Adresse und
+Gruppe. Zusätzliche Felder einer Retry-Nachricht ersetzen diesen Auftrag nicht.
+Nach erfolgreicher Wiederverbindung wird der Auftrag verworfen.
+
+Vor der Bestätigung bricht **Wechsel abbrechen** den nativen Wechsel ab. Nach der
+Bestätigung heißt die Aktion **Sitzung verlassen**: Sie beendet die eigene Sitzung
+geordnet und erhält die Spielstände. Eine bereits beendete Welt wird dadurch
+nicht rückgängig gemacht.
+
+Die Quelltests führen die echte Supervisor-Schleife mit kontrollierten
+Testprozessen aus. Ein nativer Spiellauf und neue Frozen-Bundles stehen für diese
+Änderung noch aus. Frühere Nachweise bleiben unverändert erhalten.

@@ -12,6 +12,12 @@ static bool read32(HANDLE process, uintptr_t address, unsigned& value) {
     SIZE_T count = 0;
     return ReadProcessMemory(process, reinterpret_cast<void*>(address), &value, 4, &count) && count == 4;
 }
+static void weaponName(HANDLE process, unsigned definitions, unsigned index, char* name, SIZE_T size) {
+    unsigned definition=0, pointer=0; SIZE_T count=0; name[0]=0;
+    if (index && index<256 && definitions && read32(process,definitions+index*4,definition) && definition && read32(process,definition+4,pointer) && pointer)
+        ReadProcessMemory(process,reinterpret_cast<void*>(pointer),name,size-1,&count);
+    name[size-1]=0;
+}
 int main(int argc, char** argv) {
     if (argc < 3 || argc > 4) return 2;
     unsigned slot = std::strtoul(argv[2], nullptr, 10);
@@ -25,26 +31,52 @@ int main(int argc, char** argv) {
         char path[4096] = {}; DWORD length = sizeof(path)-1;
         QueryFullProcessImageNameA(process, 0, path, &length);
         if (!strstr(path, argv[1])) { CloseHandle(process); continue; }
-        uintptr_t module = 0;
+        uintptr_t module = 0, cgame = 0;
         HANDLE modules = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, entry.th32ProcessID);
         MODULEENTRY32 me = {sizeof(me)};
         if (Module32First(modules, &me)) do {
             if (!_stricmp(me.szModule, "uo_gamex86.dll")) module = reinterpret_cast<uintptr_t>(me.modBaseAddr);
+            if (!_stricmp(me.szModule, "uo_cgamex86.dll")) cgame = reinterpret_cast<uintptr_t>(me.modBaseAddr);
         } while (Module32Next(modules, &me));
         CloseHandle(modules);
-        unsigned client=0, state=0, weaponstate=0, clientnum=999, weapon=0, flags=0, ads=0, hint=0, buttons=0;
+        unsigned client=0, state=0, weaponstate=0, clientnum=999, weapon=0, viewmodel=0, flags=0, ads=0, hint=0, buttons=0;
         bool valid = module && read32(process, module+0x1549c0+slot*0x2d0+0x108, client) && client &&
             read32(process, client+0x614, state) && read32(process, client+0xcc, weaponstate) && read32(process, client+0xc4, clientnum) &&
-            read32(process, client+0xc8, weapon);
+            read32(process, client+0xc8, weapon) && read32(process, client+0xd4, viewmodel);
         if (valid) {
             read32(process, client+0xc, flags); read32(process, client+0xd0, ads);
             read32(process, client+0x5b8, hint); read32(process, client+0x8230, buttons);
         }
         float fraction=0; std::memcpy(&fraction, &ads, sizeof(fraction));
         if (valid) {
-            std::printf("{\"pid\":%lu,\"slot\":%u,\"clientnum\":%u,\"weapon\":%u,\"weapon_state\":%u,\"raw_weapon_anim\":%u,\"weapon_anim\":%u,\"pm_flags\":%u,\"ads_fraction\":%.5f,\"cursor_hint\":%u,\"buttons\":%u",
-                entry.th32ProcessID, slot, clientnum, weapon, weaponstate, state, state & ~0x200u, flags, fraction, hint, buttons);
+            std::printf("{\"pid\":%lu,\"slot\":%u,\"clientnum\":%u,\"weapon\":%u,\"viewmodel\":%u,\"weapon_state\":%u,\"raw_weapon_anim\":%u,\"weapon_anim\":%u,\"pm_flags\":%u,\"ads_fraction\":%.5f,\"cursor_hint\":%u,\"buttons\":%u",
+                entry.th32ProcessID, slot, clientnum, weapon, viewmodel, weaponstate, state, state & ~0x200u, flags, fraction, hint, buttons);
             unsigned definitions=0; read32(process, module+0x151f34, definitions);
+            unsigned selecteddef=0, selectednameptr=0; char selectedname[128]={}; SIZE_T selectedread=0;
+            if (weapon && definitions && read32(process,definitions+weapon*4,selecteddef) && selecteddef && read32(process,selecteddef+4,selectednameptr) && selectednameptr)
+                ReadProcessMemory(process,reinterpret_cast<void*>(selectednameptr),selectedname,127,&selectedread);
+            std::printf(",\"selected_weapon_name\":\"%s\"",*selectedname?selectedname:"none");
+            unsigned modelpool=0; unsigned short modelhandle=0; char viewname[256]={}; SIZE_T modelread=0;
+            if (viewmodel && viewmodel<256 && read32(process,0x8f72f0,modelpool) && modelpool &&
+                ReadProcessMemory(process,reinterpret_cast<void*>(0x47c7fb4+(32+viewmodel)*2),&modelhandle,2,&modelread) && modelhandle)
+                ReadProcessMemory(process,reinterpret_cast<void*>(modelpool+modelhandle*8+4),viewname,255,&modelread);
+            std::printf(",\"viewmodel_name\":\"%s\"",*viewname?viewname:"none");
+            if (cgame) {
+                // CG weaponslot34460 and BG lookupB190 verify predictedPS
+                // base26D9E4, defs13D478/+4names; current snap used by
+                // weapon drawing22ECA is259548, snapshotPS starts+8.
+                unsigned selection=0, predicted=0, cgdefs=0, snap=0, snapweapon=0, snapclient=999, snaptime=0;
+                read32(process,cgame+0x24aecc,selection);
+                read32(process,cgame+0x26daac,predicted);
+                read32(process,cgame+0x13d478,cgdefs);
+                read32(process,cgame+0x259548,snap);
+                if (snap) { read32(process,snap+0xd0,snapweapon);read32(process,snap+0xcc,snapclient);read32(process,snap+4,snaptime); }
+                char selectionname[128]={}, predictedname[128]={}, snapshotname[128]={};
+                weaponName(process,cgdefs,selection,selectionname,sizeof(selectionname));
+                weaponName(process,cgdefs,predicted,predictedname,sizeof(predictedname));
+                weaponName(process,cgdefs,snapweapon,snapshotname,sizeof(snapshotname));
+                std::printf(",\"cgame\":{\"desired_weapon\":%u,\"desired_name\":\"%s\",\"predicted_weapon\":%u,\"predicted_name\":\"%s\",\"snapshot_weapon\":%u,\"snapshot_name\":\"%s\",\"snapshot_clientnum\":%u,\"snapshot_server_time\":%u}",selection,*selectionname?selectionname:"none",predicted,*predictedname?predictedname:"none",snapweapon,*snapshotname?snapshotname:"none",snapclient,snaptime);
+            }
             std::printf(",\"inventory\":{");
             const char* slots[]={"primary","primaryb","pistol","grenade","smokegrenade"};
             for (unsigned index=0; index<5; ++index) {
@@ -57,6 +89,19 @@ int main(int argc, char** argv) {
                     if (nameptr) ReadProcessMemory(process, reinterpret_cast<void*>(nameptr), name, 127, &count);
                 }
                 std::printf("%s\"%s\":\"%s\"",index?",":"",slots[index],*name?name:"none");
+            }
+            std::printf("}");
+            // UO native BG ammo reader C413/C416/C41C: weaponDef+1F0
+            // indexes PSclip+31C; C43E/C441/C447 uses+1E8 ->stock+11C.
+            std::printf(",\"slot_ammo\":{");
+            for (unsigned index=0; index<5; ++index) {
+                unsigned char id=0; SIZE_T got=0; unsigned definition=0, ammoindex=0, clipindex=0, stock=0, clip=0;
+                ReadProcessMemory(process,reinterpret_cast<void*>(client+0x52d+index),&id,1,&got);
+                if (id && definitions && read32(process,definitions+id*4,definition) && definition) {
+                    if (read32(process,definition+0x1e8,ammoindex) && ammoindex<128) read32(process,client+0x11c+ammoindex*4,stock);
+                    if (read32(process,definition+0x1f0,clipindex) && clipindex<128) read32(process,client+0x31c+clipindex*4,clip);
+                }
+                std::printf("%s\"%s\":{\"weapon_id\":%u,\"stock\":%u,\"clip\":%u}",index?",":"",slots[index],id,stock,clip);
             }
             std::printf("}");
             const bool references = argc == 4 && !std::strcmp(argv[3], "--model-references");

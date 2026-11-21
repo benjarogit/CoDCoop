@@ -46,7 +46,7 @@ def main(argv=None):
         for pattern in ('qa-model-ledger-*', 'qa-deferred-models.*', 'qa-model-export.*', 'qa-render-models.*', 'qa-render-preload.*'):
             for path in folder.glob(pattern): path.unlink()
         if args.union: (folder / 'qa-deferred-models.txt').write_bytes(args.union.read_bytes())
-    original_spawn, original_wait, original_move = qa.subprocess.Popen, qa.wait_for, qa.move_remote
+    original_spawn, original_wait, original_move, original_live = qa.subprocess.Popen, qa.wait_for, qa.move_remote, qa.assess_liveness
     report = {'scope': 'QA-only deferred-first-use; no production contract or campaign acceptance', 'map': args.map,
               'four_kit_union': str(args.union) if args.union else None, 'hunk_megs': args.hunk_megs,
               'probe_sha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest()}
@@ -86,6 +86,9 @@ def main(argv=None):
                 if errors: raise RuntimeError('native error during deferred registry probe: ' + errors[0])
             return predicate()
         return original_wait(checked, processes, timeout, description)
+    def liveness(before,after,count):
+        report.setdefault('liveness_samples',[]).append({'before':before,'after':after,'players':count})
+        return original_live(before,after,count)
     def move_remote(host_folder, peer_folder, slot, processes, timeout, action='+forward'):
         result = original_move(host_folder,peer_folder,slot,processes,timeout,action)
         if args.weapon_helper:
@@ -108,7 +111,7 @@ def main(argv=None):
         return result
     old = os.environ.get('CODCOOP_QA_DEFER_MODELS')
     os.environ['CODCOOP_QA_DEFER_MODELS'] = '1'
-    qa.subprocess.Popen, qa.wait_for, qa.move_remote = launch, waiting, move_remote
+    qa.subprocess.Popen, qa.wait_for, qa.move_remote, qa.assess_liveness = launch, waiting, move_remote, liveness
     try:
         result = qa.main(command)
         if relay:
@@ -130,7 +133,7 @@ def main(argv=None):
         return result
     finally:
         if relay and relay.running: relay.close()
-        qa.subprocess.Popen, qa.wait_for, qa.move_remote = original_spawn, original_wait, original_move
+        qa.subprocess.Popen, qa.wait_for, qa.move_remote, qa.assess_liveness = original_spawn, original_wait, original_move, original_live
         if old is None: os.environ.pop('CODCOOP_QA_DEFER_MODELS', None)
         else: os.environ['CODCOOP_QA_DEFER_MODELS'] = old
 

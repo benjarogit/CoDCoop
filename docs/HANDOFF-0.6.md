@@ -2,7 +2,219 @@
 
 Date / Datum: 2026-11-21. Development branch: `feat/0.6.0-coop-suite`.
 Starting point: `801dfd4` (published v0.5.4 assets are unchanged).
-Local source checkpoint: `4a6d36f` (WIP, not pushed or released).
+Local source checkpoints: `4a6d36f`, `3288c23` (WIP, not pushed or released).
+
+## Latest state / Neuester Stand — protocol9, dev.4
+
+This section supersedes the historical checkpoints below. / Dieser Abschnitt
+ersetzt die älteren Standangaben weiter unten. Development is unfinished;
+published v0.5.4 binaries have not been replaced.
+
+### Current checkpoint / Aktueller Zwischenstand
+
+- **State18 native save lifecycle:** frozen core
+  `dbda01bc97f5fdd3ec36748d6425ce69a7ab9bc89205aff61defbb255ed7b07a`
+  passes a real two-player cold A→B→saved-A load without distributing fresh
+  kits over preserved inventory. Host Garand192/7 and guest Carbine240/14,
+  including active hostPS/ownCG selection, survive; both fire afterwards.
+  Evidence: `run/uf-script-qa/history/preservation-dbda-COLD-A-NO-REFILL-STRICT-PASS-1795296164772889368/`.
+  The earlier native client-mismatch failure remains archived. The fix rearms
+  the existing narrowly signature-checked saved-remote adapter before native
+  deserialization, including DLL reload. Ordinary bounds checks remain active.
+  Scope: isolated raw512MiB UF probe with offline resource union, not production
+  bootstrap or full campaign acceptance.
+- **World lifecycle:** actual CoD1 and UO solo→host, host-alone fresh map and
+  fast map_restart each issue the current world/tickets once; real peer rejoin
+  and movement pass. Evidence:
+  `run/mainline-credits-qa/proof-COD1-DBDA-WARM-HOST-ALONE-FASTRESTART-PASS/`
+  and `run/mainline-credits-qa/proof-UO-DBDA-WARM-HOST-ALONE-FASTRESTART-PASS/`.
+- **Actor eligibility:** new frozen core
+  `cb7071e5c92f794a91634b63cc2afba87865ba35e267507bbe5c628512528a41`
+  derives script eligibility from current native identity, loaded world,
+  connection, health and downed state. Standing1HP remains eligible; downed1HP
+  does not. Pure ASan/UBSan test and MinGW build pass; real Brecourt handoff
+  probe is pending. Exact source: `run/actor-eligibility-prototype/`.
+- **Delayed switch:** actual two-player CoD1training→UOtraining passes at256MiB
+  with130s background verification, visible native waiting and one explicit
+  Retry. Invalid content cancels safely after the deadline; a synthetic new
+  JOIN is rejected before slot allocation while the two real players remain
+  active. Source-mode result: `run/switch-protocol9-bundled/result.json`
+  (archive being created). This is a process transition, not a campaign
+  playthrough. The frozen source graph in the result defines exactly what ran.
+- **Launcher follow-ups:** launch now sets the original difficulty/maximumHP
+  pair (1200/600/300/200); both native engines passed hard training with
+  deliberately poisoned prior HP configuration. Source recovery Retry now
+  restarts an owned committed-recovery process using the validated same session
+  specification. Source tests pass; native committed recovery and new frozen
+  bundles remain pending. See `docs/session-recovery.md`.
+- **Current default tests:**213 cases,193 pass and20 opt-in native skips:
+  `run/unit-protocol9-current.log`. Passing Python tests do not replace the
+  outstanding mission/platform acceptance matrix.
+
+- **User decision / Nutzerentscheidung:** every UF player chooses their own
+  equipment; the group plans distinct roles before mission start. Host authority
+  does not mean choosing another player's kit. Only this Linux machine is
+  available; native Windows10/11, mixed systems and separate-account Steam are
+  still external acceptance gates.
+- **Wire format:** source is `0.6.0-dev.4`, protocol9. All ordinary engine and
+  Coop packets carry a session/world generation. Genuine old-world replay was
+  rejected by type in both directions, followed by real current-world input:
+  `run/qa-world-replay/history/1795285718014202522/`, core
+  `22a3d14290f2ce6d7d8491b4b402c49767da26e24b86441f15b3101eb1c1a205`.
+  Both directions of protocol8/9 rejection were checked before native player
+  allocation. Reliable reload, cancellation during loading and a measured
+  20-second connection outage have separate real-instance proofs. Historical
+  protocol7/8 statements below describe their own binaries, not current source.
+- **Native lifetime:** UO actor/corpse cache trees are HUNK allocations; ordinary
+  script/Core replacement trees use the separate 512KB MT pool. Never free a
+  native HUNK tree through MT. The current ownership ledger survives DLL reload,
+  binds allocations to native MT epochs and releases owned remote-body trees
+  before checkpoint reinitialization. Five real loads plus active hot reload
+  passed in ordinary UO and in genuine protocol9 prepared EN/DE installations.
+  Prepared proof: core
+  `6b84be2ab6a185d4aefbe878c847df653df30f6ce25b822cfaa373229327dd99`,
+  `run/prepared9-policy-qa/proof-PREPARED9-ENDE-6b84-AUTOPOLICY-HOTRELOAD-FIVELOAD-PASS-1795290073423710388/`.
+  This used the prepared automatic policy, without the raw host-GC override.
+  Personal files were restored and independently verified in
+  `run/prepared9-post-game-restoration-verified.json`.
+- **Historical inventory failure / Historischer Inventarfehler:**
+  the first four-role probe preserved numerical inventory but lost Springfield
+  and BAR active selection. This is fixed by the later strict selection proofs
+  below. The original numerical PASS report
+  is retained with a supplemental active-weapon FAIL audit in
+  `run/qa-cod1-four/history/four-role-ammo-PASS-activeweapon-FAIL-1795289399920232132/`.
+  Do not call this a complete four-role checkpoint or rendering pass.
+- **Selection fix / Waffenwahl:** native SP GSC
+  `switchToWeapon` writes the host's global cgame selection; it has no actor
+  parameter. A targeted, reliable, ticket-bound selection bridge and a one-time
+  checkpoint selection seed are implemented in State16. Selection waits for the
+  actual own-player snapshot and registered weapon definition; early commands
+  must not overwrite the restored weapon with zero. Native usercmd weapon is
+  byte+6, not the older comment's high byte+7. Normal user switching must resume
+  after acknowledgement. First strict two-role PASS, core `e9820fae…`, in
+  `run/uf-script-qa/history/selection-e982-two-STRICT-PASS-1795292190790199867/`:
+  Garand/Carbine, exact ammunition and active names in host PS plus actual local
+  cgame desired/predicted/current own snapshot, real shots before and after CP,
+  final weapon/HUD images inspected. Latest selection-only frozen core:
+  `ddc1a6d301b61651e827835368d6d90d35a9458b1c62a71ed08281a3e0cb790b`
+  in `run/selection-prototype/`; it additionally checks the actual CG weapon
+  definition table, bounds unterminated names and avoids redundant Cvar writes.
+  Four-role strict PASS on `ddc1…`:
+  `run/qa-cod1-four/history/four-selection-ddc-STRICT-PASS-1795292654322543580/`.
+  Thompson270/25, Springfield55/4, BAR200/17 and Garand192/7 survived native
+  save/load with matching active hostPS and own cgame names; all four consumed
+  ammunition through real post-load firing and final weapon/HUD images were
+  inspected. Scope: original non-LAA EXE,512MiB raw QA and an offline approved
+  resource union. It does not certify the production256MiB/bootstrap path.
+  Ordinary user-switch/replay follow-up also PASS:
+  `run/uf-script-qa/history/selection-ddc-USERCHOICE-NEGATIVES-CP-PASS-1795292850597022590/`.
+  The remote selected Greaser normally; duplicate Carbine selection, wrong
+  ticket/session/world and independent invalid host requests did not overwrite
+  it. Greaser270/30 and previously fired Carbine240/14 survived native CP;
+  post-load firing produced Greaser270/28. Final images were inspected. An
+  earlier runner stopped on its own repeated-status-log oracle, not a native
+  failure; the corrected runner checks persisted status plus fresh matching ACK.
+  Root now owns Core; agent native probes use immutable
+  snapshots. **Correct native snapshot pointer:** CURRENT UO `cg+259548`, NEXT
+  `cg+25954c` (the native promotion instruction proves this); the older Stats
+  comments were reversed and are fixed in current source.
+- **Save ownership / Spielstand-Zuordnung:** State15 records completed native
+  save-file SHA256 plus bounded owner sidecars through the existing GVM syscall
+  observer. Session, endpoint lease, slot and spawn ticket prevent a replacement
+  player from inheriting the previous occupant's equipment. Native CoD1 and UO
+  Alice→Bob→old-save/own-save/corrupt-sidecar scenarios passed on frozen source.
+  Latest pre-selection snapshot:
+  `run/inventory-prototype/0f68ffe10ae3b40c785043f1b09ee6ba738056b22b79fc75244ae7459d44eddf/`.
+  State18 cold/cross-map load intent and fresh-ticket timing now have the
+  concrete proofs in the current checkpoint above. Only numerical
+  loadout data is preserved; this does not certify script-owned mines, HUD or
+  mounted-weapon state across loading.
+- **Resource bootstrap remains blocking / Ressourcenabgleich bleibt offen:**
+  model first-use allocation, native-tree borrowing and the DObj mapping barrier
+  have isolated positive/negative evidence but remain QA-gated. Kit probes use
+  an offline approved ledger, not a production lobby transfer. A missing
+  `gear_US_carbinebelt` after an ordinary UO reload demonstrates that bootstrap
+  also matters outside UF. `src/asset_bootstrap.h` tests bounded, canonical
+  resource reassembly, including the complete ordered native weapon-index/name
+  table and item-registration flags. Same names with different indices are
+  explicitly rejected by its matching contract. This is not integrated and
+  does not prove that native peer registration actually matches. Production requires
+  approved models, native weapon/item/alternate definitions and host gameplay
+  settings before peer map initialization, with an actual ready/acknowledge gate.
+- **Installer coherence / Installer-Konsistenz:** Core exports readonly DATA
+  `Coop_Protocol`. Both Python and native validators check the bounded PE export
+  without loading the DLL and reject stale or malformed runtimes even with a
+  re-pinned receipt. Staging compares Core, checker and manifest protocols.
+  Metadata-enforced Linux and Windows frozen protocol9 workers and complete
+  prepared EN/DE clones passed interoperability checks. Native checker13 cases
+  passed separately under Wine. `run/prepared9-readonly-interop.json` records
+  genuine frozen-worker/native checks. Final full installers/AppImage and public
+  packaging are held until the native equipment/resource pipeline is accepted.
+- **New real switch failure / Neuer echter Wechselfehler:** the frozen bundled
+  protocol9 supervisor on core `6b84…` blocked its heartbeat/control loop while
+  hashing a cold installation. The peer correctly found the deliberately
+  unreceipted PK3, but Native SwitchTick's120-second early return stopped reading
+  its late negative ACK; the cancellation gate failed. Preserved negative:
+  `run/switch-protocol9-bundled/history/1795292887895856700/result.json` and exact
+  frozen runner/provenance.
+  Both QA games/supervisors were stopped cleanly; prepared source copies were
+  read only. Do not relabel this as a successful campaign switch.
+- **Switch fix / Wechselkorrektur:**
+  one bounded read-only verifier runs off the supervisor loop. Cancelled or
+  replaced work cannot ACK a later transaction, heartbeat/Stop remain responsive,
+  unexpected worker errors fail closed, and no commit is permitted before the
+  exact verification succeeds. Native timeout still exposes a wait, but reads
+  late negative ACKs. Explicit retry rounds resume every peer and reject old
+  READY/COMMIT controls without skipping participants. Native runtime-state
+  projects waiting to a bilingual launcher Retry/Cancel state. Frozen core
+  `a9079cf51b1d124ca5f12b5908826b0a1aefdb350e13cd4fb9efa73726a1b122`
+  and exact source are in `run/switch-wait-prototype/`.15 focused supervisor
+  tests passed (`run/session-async-unit.log`). Actual source-supervisor CoD1→UO
+  process restart PASS at256MiB, including the genuine altered-client negative,
+  fresh host save, automatic target startup/reconnect, live commands, actual
+  difficulty/memory queries and clean exits. Exact preserved evidence:
+  `run/switch-source-pass-a907-1795293734216938069/` (438 evidence files plus
+  archive SHA index). This run did not require a timeout/retry, so it does not
+  certify the new retry-round path. Source staging is in
+  `run/switch-wait-final-overlay/` (not public packaging). A new bundled repeat
+  uses `run/switch-bundled-6101-overlay/`; it remains pending.
+- **New frozen workers / Neue gebündelte Worker:** source GUI/session graph
+  is frozen in `run/worker9-async-proof/{linux,windows}/` with complete tree
+  manifests in `run/worker9-async-handoff.json`. Linux entry SHA:
+  `6101ecb5b80d9b45aa4d4259c078cb218ee0bf8f79fd953f5051c813a46174b4`;
+  Windows entry SHA:
+  `38cea7ea1f7c02554a72a5b8e1b67e2669a7d1d03eb24e8c27134a48b61df0d2`.
+  Both actual workers passed seal/prepare/read-only preservation and explicit
+  old7/8 rejection on isolated small PE fixtures.34 focused GUI/session tests
+  passed;189 Linux ELFs require at most GLIBC2.35. No AppImage/setup release
+  was built. The previous entire bundles are retained, not overwritten in proof.
+- **Downloads and offline repair / Downloads und Offline-Reparatur:**
+  `run/installer-download-qa/result.json` records10 genuine loopback TCP cases
+  (5Python,5production WinINet under Wine),18 backend regressions and read-only
+  checks of all three pinned GitHub assets (HEAD,Range,total,size/SHA digest).
+  Full Content-Range bounds and declared response lengths are now validated.
+  An isolated network namespace denied external TCP; the actual CLI repaired a
+  deliberately damaged Core and owned UO overlay from the offline payload,
+  passed complete verification and preserved8 genuine settings/save files plus
+  their live read-only source hashes. The interrupted earlier driver and its
+  resumed checkpoints are preserved. Native probe SHA:
+  `d9032610309071f6ecf0a20ab43b0addd7d54b766f844a1409e31dbddbc5beee`.
+  CI now builds that production-code probe and runs it directly on Windows;
+  this is still not native Windows gameplay certification.
+- **Remaining acceptance / Offene Abnahme:** native pre-mission equipment lobby,
+  production resource bootstrap, full active-kit checkpoint behavior, cold-save
+  ownership, complete mission playthroughs and natural campaign transitions,
+  installer finalization, Windows hardware and separate-account Steam tests.
+  Neither loading maps nor the isolated mechanics proofs count as campaign
+  completion. No stable0.6 release is authorized by the current evidence.
+- **Latest source checks / Letzte Quellcode-Prüfungen:** Python discovery200
+  cases,180 passed,20 explicitly opted-out native cases skipped
+  (`run/unit-protocol9-switch-async.log`, before the pending preservation patch).
+  This count is not native acceptance:
+  checker interoperability has its separate13-case Wine run. The six new C++
+  fixtures for host ownership/policy, numerical inventory, save provenance,
+  spawn tickets and bounded resource transfer passed ASan/UBSan locally and are
+  now included in the development CI. Re-run after the pending selection patch.
 
 ## Current checkpoint / Aktueller Arbeitsstand
 

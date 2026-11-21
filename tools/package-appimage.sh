@@ -23,7 +23,7 @@ fi
 "$PYTHON" -c 'import importlib.metadata as m; assert m.version("PySide6")=="6.12.0"; assert m.version("PyInstaller")=="6.22.3"; assert m.version("pyinstaller-hooks-contrib")=="2026.10"; assert m.version("altgraph")=="0.17.5"'
 "$PYTHON" -m PyInstaller --noconfirm --clean --onedir --name CoDCoop-Setup \
     --distpath build/appimage-dist --workpath build/appimage-work --specpath build \
-    --hidden-import frozen_runtime --hidden-import configparser --hidden-import zipfile --hidden-import urllib.request \
+    --hidden-import frozen_runtime --hidden-import runtime_protocol --hidden-import configparser --hidden-import zipfile --hidden-import urllib.request \
     --hidden-import ssl --hidden-import hashlib --hidden-import shlex --hidden-import subprocess \
     --hidden-import tempfile --hidden-import json --hidden-import shutil --hidden-import struct \
     --add-data "$ROOT/tools/install-linux.py:." --add-data "$ROOT/tools/coop_suite.py:." \

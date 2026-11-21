@@ -18,6 +18,7 @@ import zipfile
 from build_campaign_patch import (build as build_campaign_patch, PROFILES,
                                   build_trigger_patch, build_mainline_patch)
 from coop_suite import canonical, sha256, resolve
+from runtime_protocol import require_runtime_protocol
 
 ROOT = Path(__file__).resolve().parents[1]
 YAP_ZIP_SHA = 'cdc9131a189796143ace80f9ecb9f19c347bdb8553558b5fd26e6f7d08bb2ae9'
@@ -44,7 +45,7 @@ def laa_bytes(original):
     return bytes(data)
 
 
-def stage(game, output, yap_archive, yap_extras, include_base=False, launcher_source=None, base_archive=None, runtime_source=None):
+def stage(game, output, yap_archive, yap_extras, include_base=False, launcher_source=None, base_archive=None, runtime_source=None, checker_prefix=None):
     game, output = Path(game).resolve(), Path(output).resolve()
     if output.exists():
         raise ValueError('output already exists; choose a fresh payload directory')
@@ -53,6 +54,13 @@ def stage(game, output, yap_archive, yap_extras, include_base=False, launcher_so
     if sha256(yap_archive) != YAP_ZIP_SHA or sha256(yap_extras) != YAP_EXTRAS_SHA:
         raise ValueError('YAP release archive does not match the pinned r169 artifact')
     manifest = json.loads((ROOT/'content/variants.json').read_text())
+    runtime_source = Path(runtime_source or ROOT/'build')
+    if checker_prefix is not None:
+        prefix = Path(checker_prefix).resolve()
+        if prefix == game or prefix == output or game.is_relative_to(prefix) or output.is_relative_to(prefix):
+            raise ValueError('native checker must use a separate isolated Wine prefix')
+    # Reject stale binaries before copying or publishing any payload output.
+    require_runtime_protocol(runtime_source, manifest['protocol'], checker_prefix)
     temporary = Path(tempfile.mkdtemp(prefix='codcoop-stage-', dir=output.parent))
     try:
         def copy(src, rel):
@@ -66,6 +74,7 @@ def stage(game, output, yap_archive, yap_extras, include_base=False, launcher_so
         copy(ROOT/'tools/coop_suite.py','coop/coop_suite.py')
         copy(ROOT/'tools/coop_session.py','coop/coop_session.py')
         copy(ROOT/'tools/frozen_runtime.py','coop/frozen_runtime.py')
+        copy(ROOT/'tools/runtime_protocol.py','coop/runtime_protocol.py')
         copy(ROOT/'tools/launch-gui.py','coop/launch-gui.py')
         copy(ROOT/'tools/uf_equipment_preferences.py','coop/uf_equipment_preferences.py')
         copy(ROOT/'tools/uf_equipment_roster_view.py','coop/uf_equipment_roster_view.py')
@@ -80,7 +89,6 @@ def stage(game, output, yap_archive, yap_extras, include_base=False, launcher_so
         for source in sorted(launcher_source.rglob('*')):
             if source.is_file():
                 copy(source,'coop/launcher/'+source.relative_to(launcher_source).as_posix())
-        runtime_source=Path(runtime_source or ROOT/'build')
         for name in ('ddraw.dll','codcoop_core.dll','steam_api.dll','suite-check.exe'):
             copy(runtime_source/name,name if name!='suite-check.exe' else 'coop/suite-check.exe')
         # Keep runtime and original assets distinct. Extra campaigns retain their
@@ -182,10 +190,11 @@ def main():
     parser.add_argument('--include-base',action='store_true',help='include base PK3s plus reviewed English localization for a local offline payload')
     parser.add_argument('--base-archive',type=Path,default=ROOT/'run/base-ready-v054.zip',help='pinned v0.5.4 Ready ZIP supplying reviewed English UO files')
     parser.add_argument('--runtime-source',type=Path,help='immutable directory with the four reviewed build DLL/checker inputs; defaults to build/')
+    parser.add_argument('--checker-prefix',type=Path,help='initialized isolated Wine prefix for native checker capabilities on Linux')
     args=parser.parse_args()
     args.output.parent.mkdir(parents=True,exist_ok=True)
     try:
-        lock=stage(args.game_source,args.output,args.yap_archive,args.yap_extras,args.include_base,args.launcher_source,args.base_archive,args.runtime_source)
+        lock=stage(args.game_source,args.output,args.yap_archive,args.yap_extras,args.include_base,args.launcher_source,args.base_archive,args.runtime_source,args.checker_prefix)
     except (OSError,ValueError,subprocess.SubprocessError,zipfile.BadZipFile) as error:
         parser.exit(1,'CoDCoop payload failed: '+str(error)+'\n')
     print('Local payload prepared:',args.output)

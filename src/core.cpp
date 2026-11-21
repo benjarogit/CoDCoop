@@ -12,6 +12,7 @@
 #include <deque>
 #include <vector>
 #include "api.h"
+#include "actor_eligibility.h"
 #include "game.h"
 #include "hook.h"
 #include "steam.h"
@@ -25,9 +26,18 @@
 #include "host_rules.h"
 #include "archive_rules.h"
 #include "reload_delivery.h"
+#include "world_wire.h"
 #include "qa_renderer_preload.h"
 #include "qa_dobj_mapping_barrier.h"
 #include "mt_epoch_hook.h"
+#include "host_body_ownership.h"
+#include "host_body_policy.h"
+#include "peer_inventory.h"
+#include "save_provenance.h"
+#include "spawn_ticket.h"
+#include "weapon_selection.h"
+#include "inventory_preservation.h"
+#include "saved_remote_patch.h"
 
 static const CoreApi* g_api;
 
@@ -82,7 +92,8 @@ _CallVM:
 
 namespace {
 
-constexpr uint32_t CTRL = 0xFFFFFFFE;  // prefijo de nuestros paquetes; el motor usa -1 (sin conexion) o una secuencia
+constexpr uint32_t CTRL = world_wire::CONTROL;
+constexpr int CONTROL_HEADER = (int)world_wire::HEADER_BYTES;
 enum : uint8_t { M_JOIN = 'J', M_ACCEPT = 'A', M_FULL = 'F', M_CS = 'C', M_CSDONE = 'G', M_ENTS = 'E', M_DOBJ = 'D', M_ANIM = 'N',
                  M_WORLD_READY = 'r', M_DOWNED = 'W', M_RELOAD = 'R', M_MAP = 'M', M_PING = 'P', M_BYE = 'B',
                  M_CINEMATIC = 'v', M_CINEMATIC_ACK = 'a', M_RULES = 'h', M_RULES_ACK = 'i', M_RELOAD_ACK = 't' };
@@ -119,9 +130,18 @@ struct PendingReload {
     char map[64];
     uint32_t movieCutoff;
 };
-constexpr uint32_t STATE_VERSION = 10;
+constexpr uint32_t STATE_VERSION = 18; // completed native-world identity for preservation receipts
 struct State {
     int role;
+    host_body_owner::Store hostBodies;
+    peer_inventory::Store inventories;
+    uint64_t inventoryLeaseCounter,loadedInventoryLease[g::MAX_CLIENTS];
+    bool inventoryLoading;
+    uint32_t spawnTicketCounter,spawnTicket[g::MAX_CLIENTS];
+    weapon_selection::Control selection;
+    inventory_preservation::Store preservation;
+    uint32_t memoryEpoch;
+    bool memoryRequired,memoryReady;
     reload_delivery::Token reloadToken;
     PendingReload reloadPending[g::MAX_CLIENTS];
     MovieControl movie;
@@ -156,13 +176,35 @@ struct State {
     uint64_t steamPeer[steam::MAX_PEERS];  // amigos de Steam detras de las direcciones falsas (steam::Addr)
 };
 State* S;
+peer_inventory::Endpoint InventoryEndpoint(const sockaddr_in& peer);
+void QueueWeaponSelection(int n,int weapon,bool seed);
+void PublishActorEligibility(int only=-1);
+inventory_preservation::Identity PreservationIdentity(int n);
+void WeaponSelectionTick();
+void SelectionUsercmd(int n,uint8_t* cmd,bool local);
+struct Reader;
+void SelectionPeerMessage(Reader r);
+void SelectionResetStatus(int n);
+void PreservationIssued(int n);
+void PreservationWait(int n,bool keepFresh=false);
+void PreservationCommit(int n,bool preserved);
+bool PreservationFresh(int n);
+void PreservationBeforeInit(int intent);
+void PreservationObserveReady();
+void PreservationTick();
+void PreservationWorld(const char* map);
+void HookLoad(uint8_t* game,bool on);
+bool SavedRemoteLoadReady();
 suite::Identity g_identity{};
 bool g_profileReady;
 animwire::Assembler g_animAssembler;
+bool ConfigureBodyMemory(bool prepared);
+void BodyMemoryFailure(const char* reason);
 bool PrepareIdentity()
 {
     std::string error;
     g_profileReady = suite::LoadIdentity(g::uo, g::CvarString("fs_game"), g_identity, error);
+    if (g_profileReady && !ConfigureBodyMemory(!suite::IsQA()||suite::PreparedQA())) return false;
     if (!g_profileReady) {
         Log("suite: %s", error.c_str());
         CoopStatus("%s", error.c_str());
@@ -196,6 +238,9 @@ void JoinerLeave(const char* why);
 
 // diagnostico: contadores que se vuelcan al log cada 5 s
 int g_statSnaps, g_statEnts, g_statRecv, g_statCtrl;
+uint32_t g_staleWorldPackets, g_untaggedEnginePackets, g_taggedEngineSent, g_taggedEngineReceived;
+uint32_t g_staleWorldTypes[256];
+void StaleWorldPacket(uint8_t type) { ++g_staleWorldPackets; ++g_staleWorldTypes[type]; }
 void StatsTick()
 {
     static DWORD last;
@@ -211,9 +256,9 @@ void StatsTick()
         Log("stats 5s: snaps=%d ents=%d recv=%d ctrl=%d cls.state=%d serverMsgSeq=%d cl.snap(time=%d num=%d)", g_statSnaps,
             g_statEnts, g_statRecv, g_statCtrl, g::cls_state, g::clc_serverMessageSequence, g::cl_snapServerTime, g::cl_snapNum);
         if (uint8_t* cg = (uint8_t*)GetModuleHandleA(g::CgameDll())) {
-            uint8_t* snap = *(uint8_t**)(cg + g::A(0x10b8ac, 0x25954c));  // cg.snap
+            uint8_t* snap = *(uint8_t**)(cg + g::A(0x10b8a8, 0x259548));  // cg.snap CURRENT; transition promotes next into this slot
             Log("  cgame %p: cg.snap=%p serverTime=%d nextSnap=%p", cg, snap, snap ? *(int*)(snap + 4) : -1,
-                *(void**)(cg + g::A(0x10b8a8, 0x259548)));
+                *(void**)(cg + g::A(0x10b8ac, 0x25954c)));
         }
     }
     g_statSnaps = g_statEnts = g_statRecv = g_statCtrl = 0;
@@ -346,7 +391,10 @@ void SendTo(const sockaddr_in& to, const void* data, int len)
 struct Writer {
     uint8_t buf[MAX_PACKET + 64];
     int len = 0;
-    explicit Writer(uint8_t type) { Put(&CTRL, 4); buf[len++] = type; Put(&g_identity, sizeof g_identity); }
+    explicit Writer(uint8_t type, bool tagged = true) {
+        Put(&CTRL, 4); buf[len++] = type; Put(&g_identity, sizeof g_identity);
+        if (tagged) Put(S->reloadToken);
+    }
     void Put(const void* p, int n) { if (!packet::Append(buf, MAX_PACKET, len, p, n)) Log("network: oversized control packet rejected"); }
     template <class T> void Put(T v) { Put(&v, sizeof v); }
 };
@@ -604,8 +652,11 @@ void JoinerMovie(Reader r)
     AckMovie();
 }
 
+#include "save_provenance.inc"
+
 void MovieTick()
 {
+    campaign_cinematics::observer=S->role==HOST?InventoryFSObserver:nullptr;
     campaign_cinematics::Sync(g::gvm, S->role == HOST, HostScriptMovie);
     if (S->role == JOINER && S->joined && S->receivedMovie && !S->receivedMovieStatus && MoviePlaying()) {
         S->receivedMovieStatus = 1; AckMovie();
@@ -871,8 +922,92 @@ bool VehicleWeapon(int w)
     return g::VehicleClass(*(int*)(defs[w] + g::WD_CLASS));
 }
 
+peer_inventory::Endpoint InventoryEndpoint(const sockaddr_in& peer)
+{
+    return {peer.sin_addr.s_addr, peer.sin_port};
+}
+
+void SetCoopCvarChanged(const char* key,const char* value)
+{if(strcmp(g::CvarString(key),value))g::Cvar_Set(key,value);}
+
+void PublishSpawnTickets()
+{
+    char value[32],key[48];
+    const auto session=spawn_ticket::Split(S->reloadToken.session);
+    const uint32_t parts[]={session.a,session.b,session.c};
+    for(int i=0;i<3;++i) {snprintf(key,sizeof key,"coop_spawn_session_%c",'a'+i);snprintf(value,sizeof value,"%u",parts[i]);SetCoopCvarChanged(key,value);}
+    for(int n=0;n<g::MAX_CLIENTS;++n) {snprintf(key,sizeof key,"coop_spawn_ticket_%d",n);snprintf(value,sizeof value,"%u",S->spawnTicket[n]);SetCoopCvarChanged(key,value);}
+    snprintf(value,sizeof value,"%u",S->reloadToken.generation);SetCoopCvarChanged("coop_spawn_world",value);
+}
+
+bool FreshSpawnTicket(int n)
+{
+    if(!spawn_ticket::Next(S->spawnTicketCounter,S->spawnTicket[n])) {S->spawnTicket[n]=0;PublishSpawnTickets();CoopStatus("Player spawn ticket limit reached. Restart hosting.");return false;}
+    PublishSpawnTickets();
+    PreservationIssued(n);
+    if(n>0)SelectionResetStatus(n);
+    Log("inventory: fresh role ticket slot=%d ticket=%u",n,S->spawnTicket[n]);return true;
+}
+
+bool UFPlannedSlot(int n)
+{
+    if(!(g::uo&&g_identity.variant==4&&suite::IsQA()&&n>=0&&n<g::MAX_CLIENTS&&
+        !strcmp(g::CvarString("coop_qa_kit_enable"),"1")&&!strcmp(g::CvarString("coop_qa_kit_authority"),"host")&&
+        !strcmp(g::CvarString("coop_qa_kit_commit"),"1")&&!strcmp(g::CvarString("coop_qa_kit_status"),"PLAN_VALIDATED"))) return false;
+    std::string catalog=g::CvarString("coop_qa_kit_catalog"),epoch=g::CvarString("coop_qa_kit_epoch"),map=g::CvarString("coop_qa_kit_map");
+    char mode[48];snprintf(mode,sizeof mode,"coop_qa_kit_%d_mode",n);
+    return !catalog.empty()&&!epoch.empty()&&map==g::CvarString("mapname")&&
+        catalog==g::CvarString("coop_qa_kit_verified_catalog")&&epoch==g::CvarString("coop_qa_kit_verified_epoch")&&
+        !strcmp(g::CvarString(mode),"manual");
+}
+
+bool OwnInventoryInstalled(int n)
+{
+    const auto& record = S->inventories.slots[n];
+    return record.installed && peer_inventory::Current(record,n,S->reloadToken,
+        InventoryEndpoint(S->remote[n].addr),g::CvarString("mapname"));
+}
+
+void CapturePeerInventory(int n, const char* reason, bool restoredCheckpoint=false)
+{
+    auto& record=S->inventories.slots[n];
+    bool observedWorld=g_gameLifecycleReady&&patch_owner::JumpTargets((uint8_t*)g::A(0x44f270,0x451570),(uintptr_t)Hook_QAPreVM);
+    if(restoredCheckpoint&&record.reserved&&(!observedWorld||!record.lease||S->loadedInventoryLease[n]!=record.lease)) {
+        record.captured=record.installed=false;
+        FreshSpawnTicket(n);
+        Log("inventory: restored guest ownership unverified slot=%d; fresh-role fallback required",n);
+        g::Com_Printf("^3COOP: saved player %d ownership is unverified; returning guest receives a fresh role.\n",n+1);
+        CoopStatus("Saved guest ownership is unverified. Returning player %d needs a fresh role.",n+1);
+        return;
+    }
+    uint8_t* ps=g::PlayerState(n);
+    if (!ps || !peer_inventory::Current(record,n,S->reloadToken,record.endpoint,g::CvarString("mapname"))) return;
+    int weapon=*(int*)(ps+g::PS_WEAPON), viewmodel=*(int*)(ps+g::PS_VIEWMODEL);
+    if(weapon<0 || weapon>=g::MAX_WEAPONS || viewmodel<0 || viewmodel>255) {
+        record.captured=record.installed=false;
+        Log("inventory: invalid native numeric IDs slot=%d weapon=%d viewmodel=%d",n,weapon,viewmodel); return;
+    }
+    if(peer_inventory::Capture(record,n,S->reloadToken,record.endpoint,g::CvarString("mapname"),
+        ps+g::PS_AMMO,g::PS_LOADOUT_END-g::PS_AMMO,weapon,viewmodel))
+        Log("inventory: captured own slot=%d weapon=%d viewmodel=%d world=%u reason=%s",n,weapon,viewmodel,S->reloadToken.generation,reason);
+}
+
+void RestorePeerInventory(int n)
+{
+    uint8_t* ps=g::PlayerState(n);
+    auto& record=S->inventories.slots[n];
+    if(ps && peer_inventory::Restore(record,n,S->reloadToken,InventoryEndpoint(S->remote[n].addr),g::CvarString("mapname"),
+        ps+g::PS_AMMO,g::PS_LOADOUT_END-g::PS_AMMO,*(int*)(ps+g::PS_WEAPON),*(int*)(ps+g::PS_VIEWMODEL))) {
+        Log("inventory: restored own slot=%d weapon=%d viewmodel=%d world=%u",n,record.weapon,record.viewmodel,S->reloadToken.generation);
+        QueueWeaponSelection(n,record.weapon,true);
+        PreservationCommit(n,true);
+    }
+}
+
 void GiveHostLoadout(int n)
 {
+    if(UFPlannedSlot(n)) return; // host-owned kit adapter supplies this actual actor's fresh role
+    if (OwnInventoryInstalled(n)) return; // an intentionally empty owned kit is authoritative too
     uint8_t* host = g::PlayerState(0);
     if (!host) return;
     uint8_t* ps = g::PlayerState(n);
@@ -976,6 +1111,7 @@ void Cmd_CoopGive()
 // remoto queda con el de por defecto (viewmodel_hands_us), que el nivel no cargo y se ve blanco.
 void CopyHostViewmodel(int n)
 {
+    if (OwnInventoryInstalled(n)) return;
     if (uint8_t* ps = g::PlayerState(n)) *(int*)(ps + g::PS_VIEWMODEL) = *(int*)(g::PlayerState(0) + g::PS_VIEWMODEL);
 }
 
@@ -1032,10 +1168,12 @@ void HostDropGhosts()
 {
     uint8_t* reloading = g::Cvar_FindVar("g_reloading");
     if (g::sv_state != 2 || !g::svs_clients || !g::sv_gameClients || (reloading && *(int*)(reloading + 0x20))) return;
+    S->inventoryLoading=false;
     for (int n = 1; n < g::MAX_CLIENTS; ++n) {
         if (S->remote[n].active || *(int*)(g::Client(n) + g::CL_STATE) || !*(int*)(g::PlayerState(n) + g::GC_CONNECTED))
             continue;
         Log("host: el jugador %d vino en el checkpoint sin nadie en ese lugar, se desconecta", n);
+        CapturePeerInventory(n,"native restored checkpoint before ghost disconnect",true);
         g::GameCall(4, n);
     }
 }
@@ -1051,6 +1189,12 @@ void HostJoin(const sockaddr_in& from, Reader r)
     int qport = r.Get<int>(), lastIncoming = r.Get<int>(), serverCmdSeq = r.Get<int>(), relSeq = r.Get<int>();
     if (!r.Ok()) return;
     if (g::sv_state != 2) return;  // sin partida no hay a donde unirse
+    if(!SavedRemoteLoadReady()) {
+        CoopStatus("Native saved-player compatibility is unavailable. Joining is blocked; check the installed game DLL.");return;
+    }
+    if(S->preservation.init.valid&&S->preservation.init.intent!=0&&S->preservation.init.intent!=1) {
+        CoopStatus("Player join is waiting for recognized native save ownership.");return;
+    }
     uint8_t* reloading = g::Cvar_FindVar("g_reloading");
     if (reloading && *(int*)(reloading + 0x20)) return;  // mision fallida: esperar a que cargue el checkpoint
     HostDropGhosts();
@@ -1064,8 +1208,11 @@ void HostJoin(const sockaddr_in& from, Reader r)
     }
     int n = FindSlot(from);
     if (n < 0) {
-        for (int i = 1; i < g::MAX_CLIENTS; ++i)
-            if (*(int*)(g::Client(i) + g::CL_STATE) == 0) { n = i; break; }
+        // Return to the actual reserved seat, irrespective of arrival order.
+        for (int i=1;i<g::MAX_CLIENTS;++i)
+            if(peer_inventory::Owner(S->inventories.slots[i],i,S->reloadToken.session,InventoryEndpoint(from))) { n=i; break; }
+        if(n<0) for (int i = 1; i < g::MAX_CLIENTS; ++i)
+            if (!S->inventories.slots[i].reserved && *(int*)(g::Client(i) + g::CL_STATE) == 0) { n = i; break; }
         if (n < 0) {
             Writer w(M_FULL);
             SendTo(from, w.buf, w.len);
@@ -1076,7 +1223,15 @@ void HostJoin(const sockaddr_in& from, Reader r)
         memset(rm->dobjSig, 0xff, sizeof rm->dobjSig);  // la primera vez se manda todo, incluso "sin DObj"
         rm->active = true;
         rm->addr = from;
+        auto& inventory=S->inventories.slots[n];
+        if(!peer_inventory::Owner(inventory,n,S->reloadToken.session,InventoryEndpoint(from))) {
+            if(!++S->inventoryLeaseCounter) ++S->inventoryLeaseCounter;
+            peer_inventory::Reserve(inventory,n,S->reloadToken,InventoryEndpoint(from),hostMap,S->inventoryLeaseCounter);
+            if(!FreshSpawnTicket(n)) {rm->active=false;inventory={};return;}
+        }
 
+        if(!inventory.captured&&!PreservationFresh(n)) FreshSpawnTicket(n);
+        PreservationWait(n,true);
         // como SVC_DirectConnect (0x448d70) pero en el slot n y continuando los contadores del que entra
         uint8_t* cl = g::Client(n);
         memset(cl, 0, g::CLIENT_SIZE);
@@ -1130,6 +1285,8 @@ void HostJoin(const sockaddr_in& from, Reader r)
         *(uint8_t**)(cl + g::CL_GENTITY) = g::Entity(n);
         *(int*)(cl + g::CL_DELTA) = -1;
         g::GameCall(3, n);
+        RestorePeerInventory(n); // ClientConnect/Begin retain their normal native lifecycle
+        if(!OwnInventoryInstalled(n)) PreservationCommit(n,false);
         FixClientNum(n);
         // Initial launcher starts do not know how many friends will join. Carry
         // the actual party into the next mission, while preserving a larger
@@ -1152,6 +1309,7 @@ void HostJoin(const sockaddr_in& from, Reader r)
     S->rules.ack[n] = 0; // acceptance must be acknowledged even by a rejoining slot
     const char* map = g::CvarString("mapname");
     w.Put(map, (int)strlen(map) + 1);
+    w.Put<uint32_t>(weapon_selection::CAPABILITY);w.Put<uint32_t>(S->spawnTicket[n]);
     SendTo(from, w.buf, w.len);
     SendGamestate(n);
 }
@@ -1289,7 +1447,7 @@ void SendDObjs(int n)
             offset += count;
         } while (offset < total);
     }
-    if (aw.len > 5 + (int)sizeof(suite::Identity)) SendTo(rm->addr, aw.buf, aw.len);
+    if (aw.len > CONTROL_HEADER) SendTo(rm->addr, aw.buf, aw.len);
 }
 
 void FreeTreeInfos(uint8_t* tree)
@@ -1330,7 +1488,58 @@ void KeepOldTrees()
 }
 void QAMTReset(uint32_t epoch)
 {
-    Log("QA MT native reset: epoch=%u queued_old_trees=%d",epoch,g_oldTreeCount);
+    if(S) S->memoryEpoch=epoch;
+    Log("memory: native MT reset epoch=%u queued_old_trees=%d",epoch,g_oldTreeCount);
+}
+void BodyMemoryFailure(const char* reason)
+{
+    Log("memory: ownership protection unavailable: %s",reason);
+    CoopStatus("%s",reason);g::Com_Printf("^1COOP: %s\n",reason);
+    if(!S) return;
+    Writer bye(M_BYE);bye.Put<uint8_t>(1);
+    if(S->role==HOST) {
+        bye.Put(S->reloadToken);
+        for(int n=1;n<g::MAX_CLIENTS;++n) {
+            if(S->remote[n].active) SendTo(S->remote[n].addr,bye.buf,bye.len);
+            if(S->reloadPending[n].delivery.active) SendTo(S->reloadPending[n].address,bye.buf,bye.len);
+        }
+    } else if(S->role==JOINER) SendTo(S->host,bye.buf,bye.len);
+    bool active=S->role!=NONE;
+    S->memoryReady=false;S->hostBodies.count=0;
+    memset(S->bodyTree,0,sizeof S->bodyTree);memset(S->ownTree,0,sizeof S->ownTree);g_oldTreeCount=0;
+    for(auto& remote:S->remote) remote.active=false;
+    S->role=NONE;S->joined=S->frozen=S->waitingForMap=false;
+    memset(S->reloadPending,0,sizeof S->reloadPending);
+    if(active) g::Cbuf_AddText("disconnect\n");
+}
+bool ConfigureBodyMemory(bool prepared)
+{
+    int overrideValue=-1;char flag[8]={};
+    if(suite::IsQA()&&GetEnvironmentVariableA("CODCOOP_QA_HOST_BODY_GC",flag,sizeof flag)) {
+        if(!strcmp(flag,"0"))overrideValue=0;else if(!strcmp(flag,"1"))overrideValue=1;
+        else {BodyMemoryFailure("Invalid QA memory-policy value.");return false;}
+    }
+    bool required=host_body_policy::Required(g::uo,suite::IsQA(),prepared,overrideValue);
+    if(g::uo&&!suite::IsQA()&&!prepared&&(S->memoryRequired||S->hostBodies.count)) {
+        BodyMemoryFailure("Cannot verify player-body memory protection after reload. Restart using CoDCoop Launcher.");return false;
+    }
+    if(!required&&S->hostBodies.count) {
+        BodyMemoryFailure("Restart the game before changing player-body memory policy.");return false;
+    }
+    S->memoryRequired=required;
+    qa_mt_epoch::counter.value=S->memoryEpoch?S->memoryEpoch:1;
+    S->memoryEpoch=qa_mt_epoch::counter.value;
+    bool observe=false;flag[0]=0;
+    if(g::uo&&suite::IsQA()&&GetEnvironmentVariableA("CODCOOP_QA_MT_EPOCH",flag,sizeof flag))observe=!strcmp(flag,"1");
+    bool allocator=true;
+    if(g::uo&&(required||observe))allocator=qa_mt_epoch::Sync(true,QAMTReset);
+    bool lifecycle=HookQADeferred(true);
+    if(!lifecycle) {BodyMemoryFailure("Required native save-ownership lifecycle hook is unavailable. Restart from CoDCoop Launcher.");return false;}
+    S->memoryReady=!required||(allocator&&lifecycle);
+    if(!S->memoryReady) {
+        BodyMemoryFailure("Required UO memory hooks are unavailable or owned by another plugin. Restart from CoDCoop Launcher.");return false;
+    }
+    return true;
 }
 void FreeOldTrees()
 {
@@ -1619,6 +1828,8 @@ int g_bodyParts[g::MAX_CLIENTS];                     // modelos del cuerpo sin c
 
 // Partes: las preferidas de cada jugador si el nivel las cargo; si no, las de algun aliado del nivel (asi en las
 // misiones britanicas y sovieticas salen soldados de esa campaña). Sin cuerpo ni cabeza cargados no hay cuerpo.
+#include "qa_host_body_gc.inc"
+
 void HostCreateBody(int n)
 {
     g_bodyAnim[n] = -1;  // arbol nuevo (puede caer en la misma direccion que el viejo)
@@ -1657,6 +1868,7 @@ void HostCreateBody(int n)
     uint8_t* tree = xanim ? g::XAnimCreateTree(xanim) : nullptr;
     DObjCreate(models, count, tree, n, 0);
     S->bodyTree[n] = tree;
+    QATrackHostBody(n,tree);
     Log("cuerpo %d: creado (%s + %s%s%s, arma '%s')", n, ModelName(parts[0]), ModelName(parts[1]), parts[2] ? " + " : "",
         parts[2] ? ModelName(parts[2]) : "", weapon);
 }
@@ -1674,6 +1886,7 @@ bool BodyWeaponMatches(int n)
 
 void HostFreeBody(int n)
 {
+    if (QAFreeHostBody(n)) return;
     uint8_t* tree = S->bodyTree[n];
     S->bodyTree[n] = nullptr;
     if (g::serverObjMap[n]) g::Com_ServerDObjFree(n, true);
@@ -1694,6 +1907,7 @@ void Cmd_CoopBodyDraw()
 // Con algun remoto conectado cada jugador tiene cuerpo; solo, como en el SP.
 void HostUpdateBodies()
 {
+    QAHostBodySweep(false,"unreferenced host body");
     if (!g::svs_clients) return;
     bool anyRemote = false;
     for (int n = 1; n < g::MAX_CLIENTS; ++n) anyRemote |= S->remote[n].active;
@@ -1982,6 +2196,8 @@ bool CoopActive()
 bool PlayerInGame(int n) { return g::svs_clients && *(int*)(g::Client(n) + g::CL_STATE) == 1; }
 uint8_t* PlayerState(int n) { return g::PlayerState(n); }
 
+#include "actor_eligibility.inc"
+
 bool AnyOtherStanding(int n)
 {
     for (int m = 0; m < g::MAX_CLIENTS; ++m)
@@ -1993,6 +2209,7 @@ void SetHealth(int n, int health)
 {
     *(int*)(g::Entity(n) + g::GE_HEALTH) = health;
     *(int*)(PlayerState(n) + g::PS_HEALTH) = health;
+    PublishActorEligibility(n);
 }
 
 // aviso en la consola (las ultimas lineas se ven arriba de la pantalla). Texto en Latin-1 como la fuente.
@@ -2059,6 +2276,7 @@ void SetDowned(int n, bool downed)
     S->reviveTime[n] = 0;
     int& flags = *(int*)(g::Entity(n) + g::GE_FLAGS);
     flags = downed ? flags | FL_NOTARGET : flags & ~FL_NOTARGET;
+    PublishActorEligibility(n);
     Log("jugador %d: %s", n, downed ? "caido" : "levantado");
     DownedMessage(n, downed, 0);
 }
@@ -2127,12 +2345,14 @@ void Cmd_CoopKill()
 }
 
 // Caido: solo puede mirar. Se filtra el usercmd que el juego lee con SV_GetUsercmd (0x449a10, EAX = cliente).
-// usercmd: +4 botones (1 disparar, 0x40 usar, 0x4000 cuerpo a tierra, 0x8000 agachado; el byte alto es el
-// arma), +0x14 adelante, +0x15 costado, +0x16 arriba (-127 abajo).
+// usercmd: +4 two-byte buttons (1 fire,0x40 use,0x4000 prone,0x8000 crouch),
+// +6 weapon byte (UO40bd96 / Game19543); +0x14 forward,+0x15 side,+0x16 up.
 }  // namespace
 extern "C" void __cdecl FilterUsercmd(int n, uint8_t* cmd)
 {
-    if (!S || n < 0 || n >= g::MAX_CLIENTS || !S->downed[n]) return;
+    if (!S || n < 0 || n >= g::MAX_CLIENTS) return;
+    if(S->role==HOST&&n>0) SelectionUsercmd(n,cmd,false);
+    if(!S->downed[n]) return;
     uint32_t& buttons = *(uint32_t*)(cmd + 4);
     buttons = (buttons & 0xffff0000) | 0x4000;
     cmd[0x14] = cmd[0x15] = 0;
@@ -2142,6 +2362,7 @@ extern "C" void __cdecl FilterUsercmd(int n, uint8_t* cmd)
 // veria parado y disparando hasta que llega la correccion del servidor
 extern "C" void __cdecl FilterLocalUsercmd(uint8_t* cmd)
 {
+    if(S&&S->role==JOINER) SelectionUsercmd(S->slot,cmd,true);
     if (S && S->role != NONE) FilterUsercmd(S->role == JOINER ? S->slot : 0, cmd);
 }
 namespace {
@@ -2481,13 +2702,33 @@ void HookUsercmd(bool on)
 // con "G_LoadGame: client mis-match in savegame". Se carga igual (el `jne` que saltea el error pasa a `jmp`): los
 // remotos guardados quedan en el juego sin cliente del motor, y HostDropGhosts los desconecta. No guardarlos rompia
 // otras entidades que los nombran (el camion con el remoto enganchado: cierre al cargar en UO).
+saved_remote_patch::Ownership g_loadPatch;
+bool SavedRemoteLoadReady()
+{
+    uint8_t* game=(uint8_t*)GetModuleHandleA(g::GameDll());
+    uint8_t* branch=game?game+saved_remote_patch::Offset(g::uo):nullptr;
+    return game&&saved_remote_patch::Valid(branch,(uintptr_t)game,g::uo)&&branch[0]==0xeb;
+}
 void HookLoad(uint8_t* game, bool on)
 {
-    uint8_t* jne = game + (g::uo ? 0x30b74 : 0x2de6f);  // jne +0x0d (cliente conectado) antes de "push msg; call"
-    if ((jne[0] == 0x75 || jne[0] == 0xEB) && jne[1] == 0x0d && jne[2] == 0x68) {
-        const uint8_t op = on ? 0xEB : 0x75;
-        if (jne[0] != op && hook::Write((uintptr_t)jne, &op, 1) && on)
-            Log("checkpoint: carga tambien a los remotos guardados");
+    if(!game)return;
+    uint8_t* jne=game+saved_remote_patch::Offset(g::uo);
+    if(!saved_remote_patch::Valid(jne,(uintptr_t)game,g::uo)) {
+        static uint8_t* reported;
+        if(on&&reported!=game) {
+            reported=game;Log("checkpoint: native saved-player signature mismatch; joining and preservation are blocked");
+            CoopStatus("Unsupported native saved-player code. Joining and equipment preservation are blocked.");
+        }
+        return;
+    }
+    if(on&&jne[0]==0x75) {
+        const uint8_t op=0xeb;
+        if(hook::Write((uintptr_t)jne,&op,1)) {
+            g_loadPatch={(uintptr_t)jne,true};Log("checkpoint: carga tambien a los remotos guardados");
+        }
+    } else if(!on&&saved_remote_patch::CanRestore(g_loadPatch,jne,(uintptr_t)game,g::uo)) {
+        const uint8_t op=0x75;
+        if(hook::Write((uintptr_t)jne,&op,1))g_loadPatch={};
     }
 }
 
@@ -2729,6 +2970,7 @@ DWORD g_hostSeen;                  // remoto: ultimo paquete del host
 
 void HostDropRemote(int n, bool explicitLeave = false)
 {
+    S->selection.host[n]={};S->selection.producer[n]={};
     Log("host: se libera el lugar del jugador %d (ultimo paquete hace %lu ms)", n, GetTickCount() - g_lastSeen[n]);
     if (S->bodyTree[n]) HostFreeBody(n);
     S->downed[n] = false;
@@ -2739,6 +2981,9 @@ void HostDropRemote(int n, bool explicitLeave = false)
         g::Cvar_Set("coop_expected_players", expected);
         Log("party: player %d explicitly left; expected players now %s", n + 1, expected);
     }
+    if(explicitLeave) {S->inventories.slots[n]={};S->preservation.slots[n]={};}
+    else CapturePeerInventory(n,"temporary disconnect before native cleanup");
+    PreservationWait(n);
     g::GameCall(4, n);
     *(int*)(g::Client(n) + g::CL_STATE) = 0;
     g_lastSeen[n] = 0;
@@ -2801,6 +3046,14 @@ void HostReloadTick()
 void HostDropRemotes(const char* map, bool freeBodies)
 {
     if (!++S->reloadToken.generation) ++S->reloadToken.generation;
+    memset(S->selection.host,0,sizeof S->selection.host);memset(S->selection.producer,0,sizeof S->selection.producer);
+    for(int n=1;n<g::MAX_CLIENTS;++n)SelectionResetStatus(n);
+    // A new native world must supply its restored numeric data, never reuse a
+    // pre-load kit or stale weapon/model IDs. Seats remain owned by their peers.
+    for(int n=1;n<g::MAX_CLIENTS;++n)
+        peer_inventory::Transition(S->inventories.slots[n],S->reloadToken,map);
+    PreservationWorld(map);
+    PublishSpawnTickets();
     S->movie.name[0] = 0; // a subsequent mission must not replay a delayed old film
     // Los cuerpos se liberan solo antes de un mapa nuevo (Hook_SpawnServer). Con la mision fallida el juego sigue
     // corriendo la pantalla de derrota y le pide al motor el DObj de los jugadores (trap -> 0x449bf0, que se cae si
@@ -2825,6 +3078,9 @@ void HostDropRemotes(const char* map, bool freeBodies)
     HostReloadTick();
 }
 
+#include "weapon_selection.inc"
+#include "inventory_preservation.inc"
+
 // g_reloading copia el tipo de salida del nivel (gamex86 0x2001e6b0): 1 = mision fallida (pantalla de "La mision
 // ha fracasado" hasta que carga el checkpoint), 4 = nivel terminado (pantalla de victoria), 2 = justo antes de
 // "spmap <siguiente>", 0x10 = otra salida. Aca solo el 1; el nivel siguiente lo atiende Hook_SpawnServer.
@@ -2833,12 +3089,21 @@ int g_hostWorldTime;
 bool g_hostWorldKnown;
 void HostCheckReload()
 {
+    PreservationObserveReady();
     if (S->role != HOST) { g_hostWorldKnown = false; return; }
+    // A nested engine syscall may pump networking while GAME_INIT is still
+    // constructing the new world. Neither commit nor baseline that half-world.
+    if(g::currentVM==g::gvm)return;
+    auto& init=S->preservation.init;
+    if(init.valid&&init.nativeReady&&!init.handled&&g::currentVM!=g::gvm&&g::sv_state==2&&g::sv_gameClients) {
+        if(!init.announced) HostDropRemotes(g::CvarString("mapname"),false);
+        init.handled=true;g_hostWorldKnown=false;
+    }
     if (g::sv_state == 2 && g::svs_clients && g::sv_gameClients) {
         int id = CvarInt("sv_serverid");
         bool changed = g_hostWorldKnown && (id != g_hostWorldId || g::sv_time < g_hostWorldTime);
         g_hostWorldId = id; g_hostWorldTime = g::sv_time; g_hostWorldKnown = true;
-        if (changed && (CoopActive() || HostReloadPending())) {
+        if (changed) {
             // Native loadgame can set and clear g_reloading entirely inside
             // one command execution. Catch its server generation before any
             // rolled-back snapshots reach a still-running remote cgame.
@@ -2860,9 +3125,13 @@ const uintptr_t SPAWN_SERVER = g::A(0x44c1b0, 0x44e3f0), SPAWN_SERVER_CALL = g::
 
 void __cdecl Hook_SpawnServer(const char* map, int x)
 {
-    if (S && S->role == HOST && (CoopActive() || HostReloadPending())) {
+    if(suite::IsQA())Log("QA native SpawnServer engine=%s map=%s save_intent=%d fresh_ticket=%d",g::uo?"uo":"cod1",map,x,spawn_ticket::FreshMission(x));
+    if (S && S->role == HOST) {
         Log("host: carga el mapa %s, los remotos lo cargan y vuelven", map);
+        S->preservation.init.valid=false;
         HostDropRemotes(map, true);
+        S->preservation.expectSpawnInit=true;
+        g_hostWorldKnown=false;
     }
     ((void(__cdecl*)(const char*, int))SPAWN_SERVER)(map, x);
     HookDamage(true); // install fresh game-module hooks before another player can join
@@ -2911,6 +3180,7 @@ void JoinerSendJoin()
 
 void QueueJoinerMap(const char* map)
 {
+    S->selection.peer={};S->selection.acceptedTicket=0;
     // All reload entry paths, including timeout recovery, hand ownership to
     // normal native world loading in the same way as an explicit host reload.
     if (g::uo) KeepOldTrees();
@@ -3003,6 +3273,9 @@ void JoinerControl(uint8_t type, Reader r)
     case M_CINEMATIC:
         if (S->joined) JoinerMovie(r);
         break;
+    case weapon_selection::MESSAGE:
+        SelectionPeerMessage(r);
+        break;
     case suite::READY:
         if (!S->compatible && !S->joined) {
             S->compatible = true;
@@ -3029,6 +3302,11 @@ void JoinerControl(uint8_t type, Reader r)
         uint32_t ruleSerial = r.Get<uint32_t>(); auto ruleValues = r.Get<host_rules::Values>();
         const char* map = MapName(r);
         if (!r.Ok() || hostTime < 0 || slot < 1 || slot >= g::MAX_CLIENTS || qport < 1 || qport > 65535 || !*map) return;
+        r.p+=strlen(map)+1;
+        uint32_t capability=r.Get<uint32_t>(),ticket=r.Get<uint32_t>();
+        if(!weapon_selection::Capability(capability,ticket,r.Ok()&&r.p==r.end)) {
+            JoinerLeave("The host core lacks required player-selection capability. Install the same complete suite.");return;
+        }
         if (!reload_delivery::Valid(world)) return;
         if (S->reloadToken.session && !reload_delivery::Same(world, S->reloadToken) &&
             !reload_delivery::Newer(world, S->reloadToken)) return;
@@ -3040,6 +3318,8 @@ void JoinerControl(uint8_t type, Reader r)
             JoinerLeave("Could not preserve local YAP settings before joining."); return;
         }
         S->rules.required = ruleSerial;
+        if(S->selection.acceptedTicket!=ticket||!reload_delivery::Same(world,S->reloadToken))S->selection.peer={};
+        S->selection.acceptedTicket=ticket;
         S->reloadToken = world;
         if (S->recoveringConnection) {
             snprintf(S->hostMap, sizeof S->hostMap, "%s", map);
@@ -3138,9 +3418,9 @@ void JoinerControl(uint8_t type, Reader r)
         if (!*map || !reload_delivery::Valid(token)) return;
         bool duplicate = reload_delivery::Same(token, S->reloadToken);
         if (!duplicate && (!S->joined || !reload_delivery::Newer(token, S->reloadToken))) return;
+        if (!duplicate) S->reloadToken = token; // the ACK header must echo the newly accepted world
         Writer ack(M_RELOAD_ACK); ack.Put(token); SendTo(S->host, ack.buf, ack.len);
         if (duplicate) return; // acknowledge again without reloading the world twice
-        S->reloadToken = token;
         if (campaign_cinematics::Newer(movieCutoff, S->receivedMovie)) S->receivedMovie = movieCutoff;
         S->movieWorldSuspended = false;
         g_animAssembler.Reset();
@@ -3211,6 +3491,7 @@ void JoinerKeepAlive()
 // "disconnect" lo cierra y le pediria al motor los que se liberaran.
 void JoinerLeave(const char* why)
 {
+    S->selection={};
     S->reloadToken = {};
     S->recoveringConnection = false;
     S->waitingForMap = false;
@@ -3370,7 +3651,12 @@ void Cmd_CoopHost()
 {
     RestoreHostRules();
     if (!PrepareIdentity()) return;
+    PreservationObserveReady();
     if (S->role != HOST) {
+        auto observedInit=S->preservation.init;
+        bool observedSolo=S->role==NONE&&observedInit.valid&&observedInit.nativeReady&&observedInit.session==0&&g_gameLifecycleReady&&
+            g::currentVM!=g::gvm&&g::sv_state==2&&g::cls_state==2&&g::svs_clients&&g::sv_gameClients&&
+            observedInit.nativeWorldId==CvarInt("sv_serverid")&&!_stricmp(observedInit.map,g::CvarString("mapname"));
         HCRYPTPROV provider = 0;
         uint64_t nonce = 0;
         bool ready = CryptAcquireContextA(&provider, nullptr, nullptr, PROV_RSA_AES, CRYPT_VERIFYCONTEXT) &&
@@ -3378,6 +3664,17 @@ void Cmd_CoopHost()
         if (provider) CryptReleaseContext(provider, 0);
         if (!ready) { CoopStatus("Could not initialize a new co-op session. Retry hosting."); return; }
         S->reloadToken = {nonce, 1};
+        S->selection={};
+        S->inventories={};
+        S->preservation={};
+        S->spawnTicketCounter=0;memset(S->spawnTicket,0,sizeof S->spawnTicket);FreshSpawnTicket(0);
+        if(observedSolo) {
+            observedInit.session=S->reloadToken.session;observedInit.world=S->reloadToken.generation;
+            observedInit.announced=observedInit.handled=true;observedInit.committed=0;
+            S->preservation.init=observedInit;S->preservation.serial=observedInit.serial;
+            if(observedInit.intent!=0)PreservationWait(0);
+            Log("inventory: hosting observed native init serial=%u intent=%d map=%s",observedInit.serial,observedInit.intent,observedInit.map);
+        }
         memset(S->reloadPending, 0, sizeof S->reloadPending);
     }
     int port = g::cmd_argc > 1 ? atoi(g::Argv(1)) : 28960;
@@ -3401,6 +3698,7 @@ void Cmd_CoopHost()
 // coopjoin <ip>[:puerto]; sin argumento usa la IP escrita en el menu Cooperativo (cvar coop_ip)
 void Cmd_CoopJoin()
 {
+    S->selection={};
     S->reloadToken = {};
     S->recoveringConnection = false;
     RestoreHostRules();
@@ -3487,6 +3785,10 @@ void Cmd_CoopLeave()
             S->remote[n].active = false;
         }
         memset(S->reloadPending, 0, sizeof S->reloadPending);
+        S->inventories={};
+        S->selection={};g::Cvar_Set("coop_select_api","0");
+        if (QAHostBodyGCEnabled())
+            for(int n=0;n<g::MAX_CLIENTS;++n) if(S->bodyTree[n]) QAFreeHostBody(n);
         S->role = NONE;
         g::Cvar_Set("coop_expected_players", "1");
         g_noPause = false;
@@ -3607,6 +3909,36 @@ void QATick()
         g_qaBorrowEnabled ? "true" : "false", nativeBorrowed, g_qaBorrowCount);
     fprintf(f,"\"mt_epoch\":{\"enabled\":%s,\"value\":%u,\"queued_old_trees\":%d},",
         qa_mt_epoch::enabled ? "true" : "false",qa_mt_epoch::counter.value,g_oldTreeCount);
+    fprintf(f,"\"world_wire\":{\"generation\":%u,\"stale_discarded\":%u,\"untagged_discarded\":%u,\"engine_sent\":%u,\"engine_received\":%u,\"stale_by_type\":{",
+        S->reloadToken.generation,g_staleWorldPackets,g_untaggedEnginePackets,g_taggedEngineSent,g_taggedEngineReceived);
+    bool firstStale = true;
+    for (unsigned type = 0; type < 256; ++type) if (g_staleWorldTypes[type]) {
+        fprintf(f,"%s\"%u\":%u",firstStale ? "" : ",",type,g_staleWorldTypes[type]); firstStale = false;
+    }
+    fprintf(f,"}},");
+    fprintf(f,"\"host_body_gc\":{\"required\":%s,\"ready\":%s,\"enabled\":%s,\"tracked\":%u,\"freed\":%u,\"forgotten\":%u,\"mt_used_units8\":%u,\"mt_allocations\":%u},",
+        S->memoryRequired?"true":"false",S->memoryReady?"true":"false",QAHostBodyGCEnabled()?"true":"false",S->hostBodies.count,S->hostBodies.freed,S->hostBodies.forgotten,
+        g::uo?*(unsigned*)0x8f73f8:0,g::uo?*(unsigned*)0x8f71c4:0);
+    fprintf(f,"\"peer_inventory\":[");
+    for(int n=1;n<g::MAX_CLIENTS;++n) {
+        const auto& record=S->inventories.slots[n];
+        uint8_t* ps=g::sv_state==2&&g::sv_gameClients&&PlayerInGame(n)?g::PlayerState(n):nullptr;
+        uint8_t digest[32]{};char hash[65]={};
+        if(ps&&suite::Sha256(ps+g::PS_AMMO,g::PS_LOADOUT_END-g::PS_AMMO,digest))
+            for(unsigned k=0;k<32;++k) snprintf(hash+k*2,3,"%02x",digest[k]);
+        fprintf(f,"%s{\"slot\":%d,\"lease\":%llu,\"reserved\":%s,\"captured\":%s,\"installed\":%s,\"loaded_lease\":%llu,\"endpoint_port\":%u,\"weapon\":%d,\"viewmodel\":%d,\"numeric_sha256\":\"%s\",\"spawn_ticket\":%u}",n==1?"":",",n,
+            (unsigned long long)record.lease,record.reserved?"true":"false",record.captured?"true":"false",record.installed?"true":"false",
+            (unsigned long long)S->loadedInventoryLease[n],ntohs(record.endpoint.port),ps?*(int*)(ps+g::PS_WEAPON):0,ps?*(int*)(ps+g::PS_VIEWMODEL):0,hash,S->spawnTicket[n]);
+    }
+    fprintf(f,"],");
+    fprintf(f,"\"weapon_selection\":{\"accepted_ticket\":%u,\"peer_serial\":%u,\"peer_weapon\":%u,\"peer_queued\":%s,\"peer_completed\":%s,\"host\":[",
+        S->selection.acceptedTicket,S->selection.peer.request.serial,S->selection.peer.request.weapon,S->selection.peer.queued?"true":"false",S->selection.peer.completed?"true":"false");
+    for(int n=1;n<g::MAX_CLIENTS;++n) {
+        const auto& pending=S->selection.host[n];
+        fprintf(f,"%s{\"slot\":%d,\"serial\":%u,\"ticket\":%u,\"weapon\":%u,\"active\":%s,\"ack\":%s,\"command_seen\":%s}",n==1?"":",",n,
+            pending.request.serial,pending.request.ticket,pending.request.weapon,pending.active?"true":"false",pending.ack?"true":"false",pending.commandSeen?"true":"false");
+    }
+    fprintf(f,"]},");
     int fixture = CvarInt("coop_qa_render_entity");
     bool fixtureModel = false;
     if (fixture > 0 && fixture < g::MAX_GENTITIES && g::sv_state == 2) {
@@ -3882,6 +4214,7 @@ const CmdDef kCmds[] = {
 }  // namespace
 
 #define EXPORT extern "C" __declspec(dllexport)
+EXPORT const uint32_t Coop_Protocol = suite::PROTOCOL;
 
 EXPORT uint32_t Coop_StateVersion() { return (uint32_t)sizeof(State) ^ (STATE_VERSION << 28); }
 EXPORT int Coop_StateSize() { return (int)sizeof(State); }
@@ -3899,16 +4232,25 @@ EXPORT void Coop_Init(const CoreApi* api, void* state, int fresh)
     }
     HookArchiveVariables(true);
     HookQAEndRegistration(true);
-    HookQADeferred(true);
-    char mtProbe[8] = {};
-    if (g::uo && suite::IsQA() && GetEnvironmentVariableA("CODCOOP_QA_MT_EPOCH",mtProbe,sizeof mtProbe) && !strcmp(mtProbe,"1"))
-        Log("QA MT epoch hook installed=%d",qa_mt_epoch::Sync(true,QAMTReset));
+    suite::Identity preparedIdentity{};std::string preparedError;
+    bool prepared=g::uo&&(!suite::IsQA()||suite::PreparedQA())&&
+        suite::LoadIdentity(g::uo,g::CvarString("fs_game"),preparedIdentity,preparedError);
+    ConfigureBodyMemory(prepared);
+    PublishActorEligibility();
     Log("nucleo listo (rol %d, %s)", S->role, fresh ? "estado nuevo" : "estado conservado");
     if (!steam::SelfTest()) Log("steam: FALLA la autoprueba de direcciones falsas / nombres");
 }
 
 EXPORT void Coop_Shutdown()
 {
+    SetCoopCvarChanged("coop_actor_api","0");
+    for(int n=0;n<g::MAX_CLIENTS;++n) {
+        char key[64];snprintf(key,sizeof key,"coop_actor_%d_state",n);
+        SetCoopCvarChanged(key,"WAIT");
+        snprintf(key,sizeof key,"coop_actor_%d_identity",n);
+        SetCoopCvarChanged(key,"");
+    }
+    campaign_cinematics::observer=nullptr;
     g_archiveSwap.End();
     RestoreHostRules();
     HookArchiveVariables(false);
@@ -3976,7 +4318,11 @@ EXPORT void __cdecl Coop_SendPacket(int sock, const void* data, int len, const n
         std::vector<uint8_t> packet((const uint8_t*)data, (const uint8_t*)data + len);
         packet[4] = (uint8_t)S->qport;
         packet[5] = (uint8_t)(S->qport >> 8);
-        SendTo(ToSock(*to), packet.data(), (int)packet.size());
+        auto framed = world_wire::Engine(g_identity, S->reloadToken, packet.data(), packet.size());
+        if (!framed.empty()) { SendTo(ToSock(*to), framed.data(), (int)framed.size()); ++g_taggedEngineSent; }
+    } else if (S->role == HOST && sock == NS_SERVER && FindSlot(ToSock(*to)) > 0) {
+        auto framed = world_wire::Engine(g_identity, S->reloadToken, data, (size_t)len);
+        if (!framed.empty()) { SendTo(ToSock(*to), framed.data(), (int)framed.size()); ++g_taggedEngineSent; }
     } else SendTo(ToSock(*to), data, len);
 }
 
@@ -4004,10 +4350,13 @@ EXPORT int __cdecl Coop_GetPacket(int sock, msg_t* msg, netadr_t* from)
     }
     PollCmdFile();
     HostCheckReload();
+    PreservationTick();
+    PublishActorEligibility();
     JoinerMapTick();
     HostReloadTick();
     MovieTick();
     HostRulesTick();
+    WeaponSelectionTick();
     QATick();
     SwitchTick();
     WriteSupervisorState();
@@ -4047,25 +4396,51 @@ EXPORT int __cdecl Coop_GetPacket(int sock, msg_t* msg, netadr_t* from)
             ++g_statCtrl;
             const uint8_t type = buf[4];
             suite::Identity peer{};
-            const bool hasHeader = n >= 5 + (int)sizeof peer;
-            if (hasHeader) memcpy(&peer, buf + 5, sizeof peer);
-            const char* mismatch = !hasHeader ? "Older CoDCoop protocol; install the complete 0.6 suite." : suite::Difference(g_identity, peer);
-            if (waitingReload) {
-                if (fromHost && hasHeader && !mismatch && type == M_RELOAD) {
-                    Reader pending{buf + 5 + sizeof peer, buf + n};
+            const bool hasIdentity = n >= 5 + (int)sizeof peer;
+            if (hasIdentity) memcpy(&peer, buf + 5, sizeof peer);
+            const char* mismatch = !hasIdentity ? "Older CoDCoop protocol; install the complete 0.6 suite." : suite::Difference(g_identity, peer);
+            world_wire::Header frame{};
+            const bool hasHeader = world_wire::Parse(buf, (size_t)n, frame);
+            const auto token = hasHeader ? frame.world : reload_delivery::Token{};
+            if (S->role == JOINER && type == suite::REJECT && hasIdentity && peer.protocol != suite::PROTOCOL) {
+                // Protocol8 and earlier put the readable rejection immediately
+                // after Identity. Preserve that explanation across the break.
+                Reader legacy{buf + 5 + sizeof peer, buf + n};
+                JoinerControl(type, legacy);
+                continue;
+            }
+            if (S->role == HOST && (type == suite::HELLO || type == M_JOIN)) {
+                if (!g_profileReady || mismatch || !hasHeader) {
+                    if (hasIdentity && SwitchAllowsPending(peer.variant)) continue;
+                    Writer reject(suite::REJECT, hasIdentity && peer.protocol == suite::PROTOCOL);
+                    const char* why = !g_profileReady ? "Host suite has not been verified." :
+                                      (mismatch ? mismatch : "Incomplete session header; update the complete suite.");
+                    reject.Put(why, (int)strlen(why) + 1);
+                    SendTo(a, reject.buf, reject.len);
+                    continue;
+                }
+                if (type == suite::HELLO || !world_wire::Current(token, S->reloadToken)) {
+                    Writer ready(suite::READY); SendTo(a, ready.buf, ready.len);
+                    continue; // a join must echo the current negotiated world
+                }
+            } else if (S->role == HOST && peerSlot < 1 && type != M_RELOAD_ACK) continue;
+            if (type != suite::REJECT && mismatch) continue;
+            if (!hasHeader) continue;
+            Reader r{buf + CONTROL_HEADER, buf + n};
+            if (S->role == NONE && S->waitingForMap) {
+                if (fromHost && !mismatch && type == M_RELOAD && world_wire::Current(token, S->reloadToken)) {
+                    Reader pending = r;
                     auto token = pending.Get<reload_delivery::Token>();
                     if (pending.Ok() && reload_delivery::Same(token, S->reloadToken)) {
                         Writer ack(M_RELOAD_ACK); ack.Put(token); SendTo(S->host, ack.buf, ack.len);
                     }
                 }
-                if (fromHost && hasHeader && !mismatch && type == M_BYE) {
-                    Reader close{buf + 5 + sizeof peer, buf + n};
-                    JoinerControl(type, close);
-                }
+                if (fromHost && !mismatch && type == M_BYE && world_wire::Transition(token, S->reloadToken)) JoinerControl(type, r);
                 continue;
             }
-            if (S->role == HOST && hasHeader && !mismatch && type == M_RELOAD_ACK) {
-                Reader ack{buf + 5 + sizeof peer, buf + n};
+            if (S->role == HOST && !mismatch && type == M_RELOAD_ACK) {
+                if (!world_wire::Current(token, S->reloadToken)) { StaleWorldPacket(type); continue; }
+                Reader ack = r;
                 auto token = ack.Get<reload_delivery::Token>();
                 if (ack.Ok() && ack.p == ack.end) for (int slot = 1; slot < g::MAX_CLIENTS; ++slot) {
                     auto& pending = S->reloadPending[slot];
@@ -4075,32 +4450,52 @@ EXPORT int __cdecl Coop_GetPacket(int sock, msg_t* msg, netadr_t* from)
                 }
                 continue;
             }
-            if (S->role == HOST && (type == suite::HELLO || type == M_JOIN)) {
-                if (!g_profileReady || mismatch) {
-                    if (hasHeader && SwitchAllowsPending(peer.variant)) continue;
-                    Writer reject(suite::REJECT);
-                    const char* why = g_profileReady ? mismatch : "Host suite has not been verified.";
-                    reject.Put(why, (int)strlen(why) + 1);
-                    SendTo(a, reject.buf, reject.len);
-                    continue;
+            if (S->role == JOINER && type == suite::READY) {
+                if (S->joined || !reload_delivery::Valid(token)) continue;
+                if (S->reloadToken.session == token.session && reload_delivery::Valid(S->reloadToken) &&
+                    !world_wire::Transition(token, S->reloadToken)) { StaleWorldPacket(type); continue; }
+                if (S->reloadToken.session && S->reloadToken.session != token.session) {
+                    S->rules.received = S->rules.required = 0;
+                    S->receivedMovie = 0; S->receivedMovieStatus = 0;
                 }
-                if (type == suite::HELLO) {
-                    Writer ready(suite::READY);
-                    SendTo(a, ready.buf, ready.len);
-                    continue;
+                S->reloadToken = token;
+                S->compatible = false; // READY refreshes a stale preflight too
+            } else if (S->role == JOINER && (type == M_RELOAD || type == M_BYE)) {
+                if (!world_wire::Transition(token, S->reloadToken)) { StaleWorldPacket(type); continue; }
+                if (type == M_RELOAD) {
+                    Reader embedded = r;
+                    auto target = embedded.Get<reload_delivery::Token>();
+                    if (!embedded.Ok() || !reload_delivery::Same(target, token)) continue;
                 }
-            } else if (S->role == HOST && peerSlot < 1) continue;
-            if (type != suite::REJECT && mismatch) continue;
-            if (!hasHeader) continue;
-            Reader r{buf + 5 + sizeof peer, buf + n};
+            } else if (type != suite::REJECT && !world_wire::Current(token, S->reloadToken)) {
+                StaleWorldPacket(type); continue;
+            }
+            if (type == world_wire::ENGINE) {
+                if (!((S->role == HOST && peerSlot > 0) ||
+                      (S->role == JOINER && S->joined && !S->movieWorldSuspended))) continue;
+                int bytes = (int)(r.end - r.p);
+                if (bytes <= 0) continue;
+                memmove(buf, r.p, (size_t)bytes); n = bytes;
+                ++g_taggedEngineReceived;
+                goto engine_packet;
+            }
             if (SwitchControl(type, r, a)) continue;
             if (S->role == HOST && type == M_WORLD_READY && peerSlot > 0) {
                 S->remote[peerSlot].worldReady = true;
+                PublishActorEligibility(peerSlot);
                 if (*S->movie.name && MoviePlaying()) SendMovie(peerSlot);
             }
             else if (S->role == HOST && type == M_RULES_ACK && peerSlot > 0) {
                 uint32_t serial = r.Get<uint32_t>();
                 if (r.Ok() && r.p == r.end && serial == S->rules.serial) S->rules.ack[peerSlot] = serial;
+            }
+            else if(S->role==HOST&&type==weapon_selection::ACK&&peerSlot>0) {
+                uint32_t serial=r.Get<uint32_t>(),ticket=r.Get<uint32_t>();uint8_t status=r.Get<uint8_t>();
+                auto& selection=S->selection.host[peerSlot];
+                if(r.Ok()&&r.p==r.end&&selection.active&&selection.request.serial==serial&&selection.request.ticket==ticket&&ticket==S->spawnTicket[peerSlot]&&status<=2) {
+                    if(!status)selection.ack=true;
+                    else SelectionStatus(peerSlot,status==1?"WAIT_SNAPSHOT_OR_DEFINITION":"FAILED_PEER");
+                }
             }
             else if (S->role == HOST && type == M_CINEMATIC_ACK && peerSlot > 0) {
                 uint32_t serial = r.Get<uint32_t>(); uint8_t status = r.Get<uint8_t>();
@@ -4125,6 +4520,9 @@ EXPORT int __cdecl Coop_GetPacket(int sock, msg_t* msg, netadr_t* from)
             if (S->role == HOST && peerSlot > 0) g_lastSeen[peerSlot] = GetTickCount();
             continue;
         }
+        ++g_untaggedEnginePackets;
+        continue; // protocol9 never feeds untagged UDP data into a game world
+engine_packet:
         // Engine datagrams are accepted only from the selected/allocated peer.
         if (S->role == HOST) {
             if (peerSlot < 1 || n < 6) continue;
@@ -4161,6 +4559,7 @@ EXPORT void __cdecl Coop_HostFrame()
     lastTime = now;
     if (dt < 0 || dt > 0.2f) dt = 0;
     HostUpdateBodies();
+    if(S->role!=HOST) return; // ownership failure stopped this session visibly
     HostAnimateBodies(dt);
     HostDownedFrame(dt);
     HostVehicles();

@@ -8,6 +8,7 @@ import sys
 import unittest
 import zipfile
 from unittest import mock
+from pe_fixtures import core_pe, malformed_core
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
@@ -25,7 +26,7 @@ class SuiteTest(unittest.TestCase):
         for item in self.manifest['required']:
             p = self.game / item['path']
             p.parent.mkdir(parents=True, exist_ok=True)
-            p.write_bytes(item['path'].encode())
+            p.write_bytes(core_pe(suite.PROTOCOL) if item['path']=='codcoop_core.dll' else item['path'].encode())
             item['sha256'] = suite.sha256(p)
             item.pop('sha256_any', None)
         for root in ('Main', 'uo', 'sp_improved', 'UnitedFronts'):
@@ -45,6 +46,26 @@ class SuiteTest(unittest.TestCase):
         path = self.game / name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(data)
+
+    def repin_core(self, data):
+        """Simulate a package author pinning a stale/malformed Core's bytes."""
+        self.write('codcoop_core.dll',data)
+        for item in self.manifest['required']:
+            if item['path']=='codcoop_core.dll': item['sha256']=suite.sha256(self.game/'codcoop_core.dll')
+        self.write('coop/variants.json',suite.canonical(self.manifest))
+        lock=json.loads((self.game/'coop/runtime-lock.json').read_text())
+        lock['manifest_sha256']=suite.sha256(self.game/'coop/variants.json')
+        lock['files']['codcoop_core.dll']=suite.sha256(self.game/'codcoop_core.dll')
+        self.write('coop/runtime-lock.json',suite.canonical(lock))
+
+    def test_stale_or_malformed_core_cannot_be_sealed_even_with_matching_package_hashes(self):
+        examples=[core_pe(7),core_pe(8)]+[malformed_core(kind,suite.PROTOCOL) for kind in (
+            'missing','forwarded','writable','executable','out_of_bounds','export_count','ordinal','truncated')]
+        for data in examples:
+            with self.subTest(core=data[:16]):
+                self.repin_core(data)
+                with self.assertRaises(ValueError): suite.seal_installation(self.game)
+                self.assertFalse((self.game/'coop/install.json').exists())
 
     def test_complete_seal_and_prepare(self):
         suite.seal_installation(self.game)

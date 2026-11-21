@@ -3,7 +3,7 @@
 #include <cstring>
 
 namespace suite {
-constexpr uint32_t PROTOCOL = 8;
+constexpr uint32_t PROTOCOL = 9;
 constexpr uint8_t HELLO = 'H', READY = 'K', REJECT = 'V';
 // The engine can block its first network pump for minutes while loading assets.
 // A timeout measures a responsive search, not time spent inside that load.

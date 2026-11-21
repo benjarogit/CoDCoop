@@ -386,5 +386,64 @@ class LauncherBehavior(unittest.TestCase):
         self.run_window(operation)
 
 
+    def test_reconnecting_joiner_is_not_active_and_controls_remain_translated(self):
+        def operation(window):
+            window.mode.setCurrentIndex(1)
+            window.session=True
+            window.active_variant='cod1'
+            window.set_busy(True)
+            def emit(phase,**details):
+                with mock.patch.object(window.process,'readAllStandardOutput',return_value=(json.dumps(dict(phase=phase,**details))+'\n').encode()):
+                    window.read_output()
+            emit('running',variant='uo',pid=123,recovering=True)
+            self.assertEqual(window.status_key,'reconnecting')
+            self.assertTrue(window.recovering)
+            self.assertTrue(window.switching)
+            self.assertTrue(window.retry_session.isVisible())
+            self.assertTrue(window.cancel_switch.isVisible())
+            self.assertEqual(window.cancel_switch.text(),gui.TEXT['en']['stop'])
+            self.assertFalse(window.switch.isEnabled())
+            window.lang='de';window.translate()
+            self.assertEqual(window.cancel_switch.text(),gui.TEXT['de']['stop'])
+            emit('recovery_waiting',variant='uo',committed=True)
+            self.assertEqual(window.status_key,'recovery_waiting')
+            self.assertTrue(window.retry_session.isVisible())
+            emit('resumed',variant='uo')
+            self.assertEqual(window.status_key,'active')
+            self.assertFalse(window.recovering)
+            self.assertFalse(window.retry_session.isVisible())
+            self.assertFalse(window.cancel_switch.isVisible())
+            window.set_busy(False)
+        self.run_window(operation)
+
+    def test_cancel_changes_from_native_switch_abort_to_committed_session_leave(self):
+        def operation(window):
+            window.session=True;window.active_variant='cod1';window.set_busy(True)
+            def emit(phase,**details):
+                with mock.patch.object(window.process,'readAllStandardOutput',return_value=(json.dumps(dict(phase=phase,**details))+'\n').encode()):window.read_output()
+            emit('verifying',variant='uo')
+            self.assertFalse(window.recovering)
+            self.assertEqual(window.cancel_switch.text(),gui.TEXT['en']['cancel_switch'])
+            with mock.patch.object(window.process,'write',return_value=1) as write:
+                window.cancel_switch.click()
+                self.assertEqual(json.loads(bytes(write.call_args.args[0])),{'action':'cancel'})
+            emit('restarting',variant='uo')
+            self.assertTrue(window.recovering)
+            self.assertEqual(window.cancel_switch.text(),gui.TEXT['en']['stop'])
+            emit('error',recovering=True,error='target could not connect')
+            self.assertEqual(window.status_key,'recovery_waiting')
+            with mock.patch.object(window.process,'write',return_value=1) as write:
+                window.retry_session.click()
+                self.assertEqual(json.loads(bytes(write.call_args.args[0])),{'action':'retry'})
+            emit('recovery_cancelled',committed=True)
+            self.assertEqual(window.status_key,'stopping')
+            self.assertTrue(window.stopping)
+            self.assertFalse(window.retry_session.isVisible())
+            self.assertFalse(window.cancel_switch.isVisible())
+            self.assertFalse(window.stop.isEnabled())
+            window.set_busy(False)
+        self.run_window(operation)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -77,15 +77,24 @@ class SupervisorLifetimeTests(unittest.TestCase):
             request={'action':'prepare','transaction':8,'variant':'sp_improved','role':'host',
                      'port':28960,'map':'pathfinder','difficulty':2,'players':2}
             children=[]; steps=[]; launched=[]
+            real_sleep=session.time.sleep
+            iterations=[0]
             def spawn(*args, **kwargs):
                 # A stale quit must never reach either the first or recovered game.
                 self.assertFalse(any(game.glob('codcoop*.cmd*')))
                 child=Process(100+len(children));children.append(child)
                 launched.append(args[0]);return child
             def sleep(_):
+                iterations[0]+=1
+                if iterations[0]>2000: self.fail('supervisor recovery fixture stalled')
                 if not steps:
                     (game/'coop/switch.json').write_text(__import__('json').dumps(request));steps.append('prepare')
                 elif steps==['prepare']:
+                    # A real native host commits only after the asynchronous
+                    # local verification has acknowledged preparation.
+                    if 'prepared' not in phases:
+                        real_sleep(.001)
+                        return
                     request['action']='commit'
                     (game/'coop/switch.json').write_text(__import__('json').dumps(request));steps.append('commit')
                 elif steps==['prepare','commit']:

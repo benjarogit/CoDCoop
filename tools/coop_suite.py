@@ -5,6 +5,7 @@ No game state is trusted from the network. A receipt describes one complete
 installation; gameplay fingerprints omit approved localization and personal settings.
 """
 import argparse
+from runtime_protocol import core_protocol
 import configparser
 from datetime import datetime, timezone
 import hashlib
@@ -19,7 +20,7 @@ import tempfile
 from frozen_runtime import external_environment, spawn_owned
 
 HEX = re.compile(r"[0-9a-f]{64}\Z")
-PROTOCOL = 8
+PROTOCOL = 9
 RUNTIME = ("ddraw.dll", "codcoop_core.dll", "steam_api.dll", "plugins/yap/DDRAW.dll")
 
 
@@ -213,6 +214,8 @@ def fingerprints(game, manifest, files):
 
 
 def collect(game, manifest, manifest_hash):
+    if core_protocol(resolve(game, "codcoop_core.dll")) != PROTOCOL:
+        raise ValueError("Core protocol does not match manifest/checker protocol")
     game = Path(game).resolve()
     lock = read_lock(game, manifest, manifest_hash)
     inventory_path = "coop/languages/en/manifest.json"
@@ -319,7 +322,11 @@ def launch_arguments(game, variant_id, runner=None, host=None, map_name=None, ho
         raise ValueError("invalid difficulty")
     if type(expected_players) is not int or not 1 <= expected_players <= 4:
         raise ValueError("invalid expected player count")
-    args += ["+set", "g_gameskill", str(difficulty), "+set", "coop_expected_players", str(expected_players)]
+    # Match both original native menu preset values before world creation.
+    # Setting only the skill leaves health from a previous preset unchanged.
+    args += ["+set", "g_gameskill", str(difficulty), "+set", "g_player_maxhealth",
+             str((1200, 600, 300, 200)[difficulty]),
+             "+set", "coop_expected_players", str(expected_players)]
     if map_name:
         if not re.fullmatch(r"[A-Za-z0-9_-]{1,63}", map_name):
             raise ValueError("invalid map name")

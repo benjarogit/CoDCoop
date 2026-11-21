@@ -9,6 +9,8 @@ import os
 from pathlib import Path
 import subprocess
 import unittest
+from unittest import mock
+from pe_fixtures import core_pe, malformed_core
 
 import test_coop_suite as fixture_module
 suite = fixture_module.suite
@@ -28,16 +30,46 @@ class NativeInterop(unittest.TestCase):
         self.addCleanup(self.fixture.doCleanups)
         self.game=self.fixture.game
 
-    def native(self,action):
+    def native(self,action,variant=None):
         env=os.environ.copy()
         exe=str(Path(env['COOP_NATIVE_CHECKER']).resolve())
+        arguments=([action] if action=='capabilities' else [action,variant,native_path(self.game)] if variant is not None else [action,native_path(self.game)])
         if os.name=='nt':
-            command=[exe,action,native_path(self.game)]
+            command=[exe]+arguments
         else:
             env['WINEPREFIX']=str(Path(env['COOP_WINE_PREFIX']).resolve())
             env['WINEDEBUG']='-all'
-            command=['wine',exe,action,native_path(self.game)]
+            command=['wine',exe]+arguments
         return subprocess.run(command,env=env,capture_output=True,text=True,timeout=30)
+
+    def test_checker_reports_machine_readable_protocol_without_game_argument(self):
+        result=self.native('capabilities')
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertEqual(json.loads(result.stdout),{'kind':'codcoop_suite_checker','schema':1,'protocol':suite.PROTOCOL})
+
+    @unittest.skipUnless(os.environ.get('COOP_LEGACY_CHECKER'),'requires preserved pre-enforcement protocol9 checker')
+    def test_old_sealer_receipt_cannot_hide_a_stale_core_from_check_or_prepare(self):
+        for protocol in (7,8):
+            self.fixture.repin_core(core_pe(protocol))
+            with mock.patch.dict(os.environ,{'COOP_NATIVE_CHECKER':os.environ['COOP_LEGACY_CHECKER']}):
+                old=self.native('seal')
+            self.assertEqual(old.returncode,0,old.stderr)  # genuine old API reproduces the historical packaging gap
+            before=(self.game/'coop/profile.ini').read_bytes()
+            current=suite.check_installation(self.game)
+            self.assertFalse(current['ok'])
+            self.assertTrue(any('Core protocol' in error for error in current['errors']))
+            with self.assertRaises(ValueError):suite.prepare(self.game,'uo')
+            self.assertNotEqual(self.native('check').returncode,0)
+            self.assertNotEqual(self.native('prepare','uo').returncode,0)
+            self.assertEqual((self.game/'coop/profile.ini').read_bytes(),before)
+
+    def test_stale_or_malformed_core_cannot_be_sealed_even_when_hashes_match(self):
+        for data in [core_pe(7),core_pe(8)]+[malformed_core(kind,suite.PROTOCOL) for kind in (
+                'missing','forwarded','writable','executable','out_of_bounds','export_count','ordinal','truncated')]:
+            self.fixture.repin_core(data)
+            result=self.native('seal')
+            self.assertNotEqual(result.returncode,0,result.stdout)
+            self.assertFalse((self.game/'coop/install.json').exists())
 
     def test_native_and_python_receipts_are_identical(self):
         python=suite.seal_installation(self.game)

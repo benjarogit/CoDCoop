@@ -8,6 +8,7 @@ The AppImage/package build wraps this directory without changing its contents.
 import argparse
 import importlib.metadata
 import json
+import os
 from pathlib import Path, PurePosixPath
 import re
 import shutil
@@ -112,6 +113,9 @@ def main(argv=None):
             parser.error(f"{package} {expected} required; found {actual}")
     if not (root / "tools/coop_session.py").is_file():
         parser.error("coop_session.py is required before packaging the launcher")
+    catalog = root / 'campaign_patches/uf_equipment_catalog.json'
+    if not catalog.is_file():
+        parser.error('the source-derived UF equipment catalog is required for launcher preferences')
     destination = (args.output or root / "build/launcher").resolve()
     name = "CoD-Coop-Launcher"
     command = [sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean", "--onedir", "--windowed",
@@ -119,6 +123,7 @@ def main(argv=None):
                "--workpath", str(root / ("build/launcher-work-" + sys.platform)),
                "--specpath", str(root / "build/launcher-spec"),
                "--paths", str(root / "tools"), "--hidden-import", "coop_suite", "--hidden-import", "coop_session",
+               "--add-data", str(catalog) + os.pathsep + ".",
                str(root / "tools/launch-gui.py")]
     result = subprocess.run(command, cwd=root, check=False)
     if result.returncode:

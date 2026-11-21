@@ -74,6 +74,72 @@ inline std::string Read(const std::wstring& path) {
     if (!ok || got != size) throw std::runtime_error("cannot read metadata");
     return out;
 }
+inline uint32_t CoreProtocol(const std::wstring& path) {
+    const auto data=Read(path);
+    auto bounded=[&](uint64_t offset,uint64_t size) {
+        if (offset>data.size() || size>data.size()-offset) throw std::runtime_error("truncated Core PE structure");
+    };
+    auto u16=[&](uint64_t offset)->uint16_t {
+        bounded(offset,2); const auto* p=reinterpret_cast<const unsigned char*>(data.data()+offset);
+        return uint16_t(p[0]) | uint16_t(p[1])<<8;
+    };
+    auto u32=[&](uint64_t offset)->uint32_t {
+        bounded(offset,4); const auto* p=reinterpret_cast<const unsigned char*>(data.data()+offset);
+        return uint32_t(p[0]) | uint32_t(p[1])<<8 | uint32_t(p[2])<<16 | uint32_t(p[3])<<24;
+    };
+    if (data.size()<64 || data.compare(0,2,"MZ")) throw std::runtime_error("Core is not a PE DLL");
+    uint64_t pe=u32(0x3c); bounded(pe,24);
+    if (pe<64 || data.compare(pe,4,std::string("PE\0\0",4))) throw std::runtime_error("invalid Core PE signature");
+    uint32_t count=u16(pe+6), optionalSize=u16(pe+20);
+    if (u16(pe+4)!=0x14c || count<1 || count>96 || !(u16(pe+22)&0x2000))
+        throw std::runtime_error("Core must be a bounded x86 PE DLL");
+    uint64_t optional=pe+24; bounded(optional,optionalSize);
+    if (optionalSize<104 || u16(optional)!=0x10b || u32(optional+92)<1)
+        throw std::runtime_error("unsupported Core PE optional header");
+    uint32_t exportRva=u32(optional+96), exportSize=u32(optional+100);
+    if (exportSize<40) throw std::runtime_error("Core has no export directory");
+    struct Section {uint32_t address,size,raw,flags;}; std::vector<Section> sections;
+    uint64_t table=optional+optionalSize; bounded(table,uint64_t(count)*40);
+    for (uint32_t i=0;i<count;++i) {
+        uint64_t offset=table+uint64_t(i)*40;
+        Section s={u32(offset+12),u32(offset+16),u32(offset+20),u32(offset+36)};
+        if (s.size && (s.raw<table+uint64_t(count)*40 || uint64_t(s.raw)+s.size>data.size()))
+            throw std::runtime_error("Core PE section exceeds file bounds");
+        sections.push_back(s);
+    }
+    struct Mapping {uint64_t offset,end;uint32_t flags;};
+    auto mapped=[&](uint32_t rva,uint64_t size)->Mapping {
+        Mapping result{}; unsigned found=0;
+        for (const auto& s:sections) if (rva>=s.address && uint64_t(rva)-s.address<=s.size && size<=uint64_t(s.size)-(uint64_t(rva)-s.address)) {
+            result={uint64_t(s.raw)+rva-s.address,uint64_t(s.raw)+s.size,s.flags}; ++found;
+        }
+        if (found!=1) throw std::runtime_error("Core PE RVA is unmapped or ambiguous");
+        return result;
+    };
+    auto directory=mapped(exportRva,40).offset;
+    uint32_t functions=u32(directory+20), names=u32(directory+24);
+    if (functions<1 || functions>4096 || names<1 || names>4096) throw std::runtime_error("Core PE export count exceeds bound");
+    auto ft=mapped(u32(directory+28),uint64_t(functions)*4).offset;
+    auto nt=mapped(u32(directory+32),uint64_t(names)*4).offset;
+    auto ot=mapped(u32(directory+36),uint64_t(names)*2).offset;
+    unsigned found=0; uint32_t result=0;
+    for (uint32_t i=0;i<names;++i) {
+        auto name=mapped(u32(nt+uint64_t(i)*4),1); uint64_t end=name.offset;
+        auto limit=std::min(name.end,name.offset+128);
+        while (end<limit && data[end]) ++end;
+        if (end==limit) throw std::runtime_error("unterminated Core PE export name");
+        if (data.compare(name.offset,end-name.offset,"Coop_Protocol")) continue;
+        uint32_t ordinal=u16(ot+uint64_t(i)*2);
+        if (ordinal>=functions) throw std::runtime_error("invalid Core PE export ordinal");
+        uint32_t valueRva=u32(ft+uint64_t(ordinal)*4);
+        if (valueRva>=exportRva && uint64_t(valueRva)<uint64_t(exportRva)+exportSize) throw std::runtime_error("Core protocol cannot be forwarded");
+        auto value=mapped(valueRva,4);
+        if (!(value.flags&0x40000000) || (value.flags&0xa0000000)) throw std::runtime_error("Core protocol must be readonly nonexecutable DATA");
+        result=u32(value.offset); ++found;
+    }
+    if (found!=1) throw std::runtime_error("Core requires one readonly Coop_Protocol DATA export");
+    return result;
+}
 inline std::string Hash(const std::wstring& path, const std::string* data = nullptr) {
     HCRYPTPROV provider = 0; HCRYPTHASH hash = 0;
     if (!CryptAcquireContextW(&provider, nullptr, nullptr, PROV_RSA_AES, CRYPT_VERIFYCONTEXT) ||
@@ -222,6 +288,8 @@ inline bool Validate(const std::wstring& game, bool seal, std::string& error) {
         if (manifest.at("schema")!=1 || manifest.at("protocol")!=PROTOCOL || manifest.at("complete_suite_required")!=true ||
             lock.at("suite_version")!=manifest.at("suite_version") || lock.at("manifest_sha256")!=mh)
             throw std::runtime_error("unsupported or mismatched suite manifest/runtime lock");
+        if (CoreProtocol(Resolve(game,"codcoop_core.dll"))!=PROTOCOL)
+            throw std::runtime_error("Core protocol does not match manifest/checker protocol");
         std::vector<std::string> ids;
         for (const auto& v: manifest.at("variants")) ids.push_back(v.at("id"));
         if (ids!=std::vector<std::string>{"cod1","uo","sp_improved","united_fronts"}) throw std::runtime_error("incomplete campaign set");

@@ -631,10 +631,29 @@ static std::string ExpectedArchive(const std::wstring& name) {
 static bool VerifyArchive(const std::wstring& path, const std::string& expected) {
     try { return suite::Hash(path)==expected; } catch (...) { return false; }
 }
-static bool Download(const std::wstring& url, const std::wstring& path, const std::wstring& label)
+static bool DownloadNumber(const std::wstring& text, DWORD& value) {
+    if (text.empty()) return false;
+    uint64_t number=0;
+    for (wchar_t c:text) {
+        if (c<L'0' || c>L'9' || number>(uint64_t(MAXDWORD)-(c-L'0'))/10) return false;
+        number=number*10+(c-L'0');
+    }
+    value=(DWORD)number; return true;
+}
+static bool DownloadRange(const std::wstring& range, DWORD offset, DWORD expectedSize, DWORD& responseEnd) {
+    if (range.rfind(L"bytes ",0)!=0) return false;
+    auto dash=range.find(L'-',6), slash=range.find(L'/',dash==std::wstring::npos?0:dash+1);
+    if (dash==std::wstring::npos || slash==std::wstring::npos) return false;
+    DWORD first=0,last=0,total=0;
+    if (!DownloadNumber(range.substr(6,dash-6),first) || !DownloadNumber(range.substr(dash+1,slash-dash-1),last) ||
+        !DownloadNumber(range.substr(slash+1),total) || first!=offset || total!=expectedSize || first>last || last>=total) return false;
+    responseEnd=last+1; return true;
+}
+static bool DownloadPinned(const std::wstring& url, const std::wstring& path, const std::wstring& label,
+                           const std::string& expected, DWORD expectedSize)
 {
-    const std::string expected=ExpectedArchive(url);
-    if (Exists(path) && VerifyArchive(path,expected)) return true;
+    if (!suite::Hex(expected) || !expectedSize) return false;
+    if (Exists(path) && FileSize(path)==expectedSize && VerifyArchive(path,expected)) return true;
     // WinINet is loaded dynamically so the existing build command stays valid.
     HMODULE library=LoadLibraryW(L"wininet.dll");
     if (!library) return false;
@@ -646,8 +665,6 @@ static bool Download(const std::wstring& url, const std::wstring& path, const st
     if (!open || !openUrl || !query || !read || !close) { FreeLibrary(library); return false; }
     std::wstring part=path+L".part";
     DWORD offset=Exists(part)?FileSize(part):0;
-    const DWORD expectedSize=url.find(L"German")!=std::wstring::npos?657419767:
-                             url.find(L"Extras")!=std::wstring::npos?922302300:1036938510;
     if (offset==expectedSize && VerifyArchive(part,expected)) return MoveFileExW(part.c_str(),path.c_str(),MOVEFILE_REPLACE_EXISTING);
     if (offset>=expectedSize) { DeleteFileW(part.c_str()); offset=0; }
     std::wstring headers=offset?L"Range: bytes="+std::to_wstring(offset)+L"-\r\n":L"";
@@ -658,12 +675,16 @@ static bool Download(const std::wstring& url, const std::wstring& path, const st
     if (request) {
         DWORD status=0, size=sizeof status;
         if (query(request,HTTP_QUERY_STATUS_CODE|HTTP_QUERY_FLAG_NUMBER,&status,&size,nullptr) && (status==200 || status==206)) {
-            bool rangeOk=true;
+            bool rangeOk=true; DWORD responseEnd=expectedSize;
             if (status==206) {
                 wchar_t range[128]={}; size=sizeof range;
-                std::wstring prefix=L"bytes "+std::to_wstring(offset)+L"-";
-                rangeOk=query(request,HTTP_QUERY_CONTENT_RANGE,range,&size,nullptr) && std::wstring(range).rfind(prefix,0)==0;
+                rangeOk=query(request,HTTP_QUERY_CONTENT_RANGE,range,&size,nullptr) && DownloadRange(range,offset,expectedSize,responseEnd);
             } else offset=0;
+            wchar_t length[128]={}; size=sizeof length;
+            if (query(request,HTTP_QUERY_CONTENT_LENGTH,length,&size,nullptr)) {
+                DWORD declared=0;
+                rangeOk=rangeOk && DownloadNumber(length,declared) && declared==responseEnd-offset;
+            } else if (GetLastError()!=ERROR_HTTP_HEADER_NOT_FOUND) rangeOk=false;
             HANDLE file=rangeOk?CreateFileW(part.c_str(),GENERIC_WRITE,0,nullptr,offset?OPEN_EXISTING:CREATE_ALWAYS,FILE_ATTRIBUTE_NORMAL,nullptr):INVALID_HANDLE_VALUE;
             if (file!=INVALID_HANDLE_VALUE) {
                 SetFilePointer(file,offset,nullptr,FILE_BEGIN);
@@ -672,13 +693,14 @@ static bool Download(const std::wstring& url, const std::wstring& path, const st
                 while (true) {
                     if (!read(request,block,sizeof block,&got)) { ok=false; break; }
                     if (!got) break;
-                    if (got>expectedSize-total || !WriteFile(file,block,got,&written,nullptr) || written!=got) { ok=false; break; }
+                    if (got>responseEnd-total || !WriteFile(file,block,got,&written,nullptr) || written!=got) { ok=false; break; }
                     total+=got; int pct=(int)((unsigned long long)total*100/expectedSize);
                     if (pct!=last) { Say(label,pct); last=pct; }
                 }
                 FlushFileBuffers(file); CloseHandle(file);
-                ok=ok && total==expectedSize && VerifyArchive(part,expected);
-                if (total==expectedSize && !VerifyArchive(part,expected)) DeleteFileW(part.c_str());
+                const bool verified=total==expectedSize && VerifyArchive(part,expected);
+                ok=ok && verified;
+                if (total==expectedSize && !verified) DeleteFileW(part.c_str());
                 if (ok) ok=MoveFileExW(part.c_str(),path.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH);
             }
         }
@@ -687,6 +709,11 @@ static bool Download(const std::wstring& url, const std::wstring& path, const st
     if (session) close(session);
     FreeLibrary(library);
     return ok;
+}
+static bool Download(const std::wstring& url, const std::wstring& path, const std::wstring& label) {
+    const DWORD expectedSize=url.find(L"German")!=std::wstring::npos?657419767:
+                             url.find(L"Extras")!=std::wstring::npos?922302300:1036938510;
+    return DownloadPinned(url,path,label,ExpectedArchive(url),expectedSize);
 }
 
 // ---------------------------------------------------------------- unzip

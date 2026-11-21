@@ -2,6 +2,8 @@
 #include "qa_deferred_models.h"
 #include "tree_ownership.h"
 extern "C" { void* g_qaVMTrampoline; void* g_qaIndexTrampoline; }
+void QAPreGameInitHostBodies();
+bool g_gameLifecycleReady;
 qa_deferred::Ledger g_qaLedger;
 uintptr_t g_qaGameBase;
 bool g_qaDeferredEnabled, g_qaBorrowEnabled;
@@ -119,7 +121,16 @@ extern "C" void Hook_QADeferredIndex();
 extern "C" void Hook_QAPreVM();
 extern "C" void __cdecl QABeforeVM(void* vm, const int* args)
 {
-    if (!g_qaDeferredEnabled || vm != g::gvm || args[0] != 0) return;
+    if (vm != g::gvm || args[0] != 0) return;
+    if(suite::IsQA())Log("QA native GAME_INIT engine=%s arg1=%d arg2=%d save_intent=%d level_time=%d",g::uo?"uo":"cod1",args[1],args[2],args[3],args[4]);
+    PreservationBeforeInit(args[3]);
+    // Cold map loads replace gamex86 before entering GAME_INIT. Install the
+    // existing saved-remote compatibility patch before native deserialization,
+    // rather than waiting until SpawnServer returns after the load has failed.
+    if(S&&S->role==HOST)HookLoad((uint8_t*)GetModuleHandleA(g::GameDll()),true);
+    PrepareInventoryGameInit();
+    QAPreGameInitHostBodies();
+    if (!g_qaDeferredEnabled) return;
     uintptr_t base = (uintptr_t)GetModuleHandleA(g::GameDll());
     if (!base) return;
     constexpr unsigned char signature[] = {0x80,0x3b,0,0x75,3,0x33,0xc0,0xc3};
@@ -148,25 +159,31 @@ extern "C" void __cdecl QABeforeVM(void* vm, const int* args)
     Log("QA deferred: hooked BEFORE GAME_INIT %u map=%s imported=%u initflag=%d", g_qaInitCount,
         map.c_str(), (unsigned)g_qaLedger.entries.size(), *(int*)(base + 0x307f28));
 }
-void HookQADeferred(bool on)
+bool HookQADeferred(bool on)
 {
     if (on) {
         char value[8] = {};
-        if (!g::uo || !suite::IsQA() || !GetEnvironmentVariableA("CODCOOP_QA_DEFER_MODELS", value, sizeof value) || strcmp(value, "1")) return;
-        const unsigned char signature[8] = {0x8b,0x4c,0x24,0x34,0x8b,0x54,0x24,0x30};
-        if (memcmp((void*)0x451570, signature, 8)) { Log("QA deferred: VM_Call signature mismatch"); return; }
-        g_qaVMTrampoline = hook::Inline(0x451570, (void*)Hook_QAPreVM, 8);
-        g_qaDeferredEnabled = g_qaVMTrampoline != nullptr;
-        value[0] = 0;
-        g_qaBorrowEnabled = g_qaDeferredEnabled && GetEnvironmentVariableA("CODCOOP_QA_BORROW_TREES", value, sizeof value) && !strcmp(value, "1");
-        Log("QA deferred: pre-init interception enabled=%d", g_qaDeferredEnabled);
+        bool requested=g::uo&&suite::IsQA()&&GetEnvironmentVariableA("CODCOOP_QA_DEFER_MODELS",value,sizeof value)&&!strcmp(value,"1");
+        uintptr_t vmAddress=g::A(0x44f270,0x451570);
+        const unsigned char signature[8]={0x8b,0x4c,0x24,0x34,0x8b,0x54,0x24,0x30};
+        if(!g_qaVMTrampoline) {
+            if(memcmp((void*)vmAddress,signature,8)) {Log("memory: VM_Call signature mismatch");return false;}
+            g_qaVMTrampoline=hook::Inline(vmAddress,(void*)Hook_QAPreVM,8);
+        }
+        g_gameLifecycleReady=g_qaVMTrampoline&&patch_owner::JumpTargets((uint8_t*)vmAddress,(uintptr_t)Hook_QAPreVM);
+        g_qaDeferredEnabled=requested&&g_gameLifecycleReady;
+        value[0]=0;
+        g_qaBorrowEnabled=g_qaDeferredEnabled&&GetEnvironmentVariableA("CODCOOP_QA_BORROW_TREES",value,sizeof value)&&!strcmp(value,"1");
+        Log("memory: pre-init lifecycle=%d QA deferred=%d",g_gameLifecycleReady,g_qaDeferredEnabled);
+        return g_gameLifecycleReady;
     } else {
-        g_qaDeferredEnabled = g_qaBorrowEnabled = false;
+        g_gameLifecycleReady = g_qaDeferredEnabled = g_qaBorrowEnabled = false;
         bool retained = false;
         const unsigned char vm[8] = {0x8b,0x4c,0x24,0x34,0x8b,0x54,0x24,0x30};
         const unsigned char index[8] = {0x80,0x3b,0,0x75,3,0x33,0xc0,0xc3};
         if (g_qaVMTrampoline) {
-            if (patch_owner::JumpTargets((uint8_t*)0x451570, (uintptr_t)Hook_QAPreVM) && hook::Write(0x451570, vm, 8)) {
+            uintptr_t vmAddress=g::A(0x44f270,0x451570);
+            if (patch_owner::JumpTargets((uint8_t*)vmAddress, (uintptr_t)Hook_QAPreVM) && hook::Write(vmAddress, vm, 8)) {
                 VirtualFree(g_qaVMTrampoline, 0, MEM_RELEASE); g_qaVMTrampoline = nullptr;
             } else retained = true;
         }
@@ -181,4 +198,5 @@ void HookQADeferred(bool on)
         if (retained) { HMODULE module = nullptr; bool pinned = GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN,
             reinterpret_cast<LPCSTR>(&Hook_QAPreVM), &module); Log("QA deferred: retained chain PIN=%d", pinned); }
     }
+    return true;
 }

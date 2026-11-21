@@ -4,14 +4,26 @@
 
 The launcher source can save one local player's preferences and present a
 read-only group projection. Neither feature applies a kit, confirms a player
-through a network connection, or authorizes a campaign start. Protocol 8 adds
-reliable reload control; it does **not** enable individual equipment.
+through a network connection, or authorizes a campaign start. Protocol9 adds
+session/world-bound transport; the protocol number does **not** enable an
+individual-equipment lobby.
 
 Der Launcher-Quellstand speichert persönliche Wünsche und kann einen
 schreibgeschützten Gruppenstand anzeigen. Er übernimmt keine Ausrüstung,
 bestätigt keinen Spieler über das Netzwerk und gibt keinen Kampagnenstart frei.
-Protokoll 8 verbessert die Lade-Steuerung; es aktiviert **keine** individuelle
-Ausrüstung.
+Protokoll9 bindet die Übertragung an Sitzung und Welt; die Protokollnummer
+aktiviert **keine** individuelle Ausrüstungslobby.
+
+The State16 native actor-selection bridge is now proven separately with two
+and four real UF players, their own cgame weapon selection, checkpoint retention
+and real firing. Those probes supply an offline approved resource union and
+host-plan fixture. They do not establish a production pre-mission lobby or
+resource transport. See the immutable evidence in `HANDOFF-0.6.md`.
+
+Die native Waffenwahl pro Spieler ist mit zwei und vier echten UF-Spielern,
+Checkpoint und Schüssen belegt. Diese Tests liefern Ressourcen und Hostplan
+vorbereitet aus Testdateien. Eine produktive Lobby oder Ressourcenübertragung
+vor Missionsstart ist damit nicht nachgewiesen; Belege stehen in der Übergabe.
 
 ## Explicit presentation API / Ausdrückliche Anzeige-Schnittstelle
 
@@ -98,7 +110,11 @@ Spieler.
 ## Packaging / Paketierung
 
 Source staging includes the preference adapter, roster-view adapter and catalog
-beside `coop/launch-gui.py`. A future frozen build must include the catalog as
-`_MEIPASS/uf_equipment_catalog.json`; static imports collect the adapters. No
-frozen rebuild or production transport integration is part of this source-only
-presentation change.
+beside `coop/launch-gui.py`. Frozen bundles include the catalog as
+`_MEIPASS/uf_equipment_catalog.json`; static imports collect the adapters.
+The protocol9 async workers include this graph; their hashes and actual checks are in
+`run/worker9-async-handoff.json`. The native lobby capability remains absent,
+so bundling the dialog does not grant ready/start or apply anyone's kit.
+Die neueren gebündelten Protokoll9-Worker enthalten Katalog und Anzeigeadapter.
+Die native Lobby-Freigabe fehlt weiterhin; die enthaltene Oberfläche bestätigt
+keinen Missionsstart und übernimmt keine Ausrüstung.

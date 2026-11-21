@@ -3,7 +3,7 @@
 // the network; no executable path or console command is accepted from a peer.
 constexpr uint8_t SWITCH_PREPARE = 'T', SWITCH_READY = 'Y', SWITCH_COMMIT = 'I', SWITCH_ACK = 'L', SWITCH_CANCEL = 'X';
 struct SwitchTransaction {
-    uint32_t id;
+    uint32_t id, retryRound;
     uint8_t target, participants, ready, committed;
     int phase; // 0 idle, 1 prepare, 2 save, 3 commit, 4 peer commit acknowledged
     DWORD started, sent;
@@ -19,6 +19,29 @@ const char* VariantName(int n)
 }
 bool SwitchInProgress() { return g_switch.phase != 0; }
 bool SwitchAllowsPending(uint8_t variant) { return g_switch.phase >= 3 && g_switch.target == variant; }
+uint8_t SwitchParty()
+{
+    uint8_t members=1;
+    for(int n=1;n<g::MAX_CLIENTS;++n) {
+        const auto& seat=S->inventories.slots[n];
+        // A transport timeout retains the seat. Only an explicit departure or
+        // ending the session removes that owner from the confirmed party.
+        if(S->remote[n].active || (seat.reserved&&seat.lease&&seat.world.session==S->reloadToken.session))
+            members|=uint8_t(1<<n);
+    }
+    return members;
+}
+bool SwitchMemberAddress(const sockaddr_in& from)
+{
+    for(int n=1;n<g::MAX_CLIENTS;++n) {
+        if(!(g_switch.participants&(1<<n)))continue;
+        const auto& remote=S->remote[n];const auto& seat=S->inventories.slots[n];
+        if(remote.active&&remote.addr.sin_addr.s_addr==from.sin_addr.s_addr&&remote.addr.sin_port==from.sin_port)return true;
+        if(seat.reserved&&seat.lease&&seat.world.session==S->reloadToken.session&&
+           seat.endpoint.address==from.sin_addr.s_addr&&seat.endpoint.port==from.sin_port)return true;
+    }
+    return false;
+}
 bool SupervisorPresent()
 {
     WIN32_FILE_ATTRIBUTE_DATA data{};
@@ -52,7 +75,7 @@ void SwitchNotice(const char* action)
 void SendSwitch(const sockaddr_in& to, uint8_t type)
 {
     Writer w(type);
-    w.Put<uint32_t>(g_switch.id); w.Put<uint8_t>(g_switch.target);
+    w.Put<uint32_t>(g_switch.id); w.Put<uint32_t>(g_switch.retryRound); w.Put<uint8_t>(g_switch.target);
     w.Put<uint8_t>(g_switch.participants); w.Put<int>(g_switch.difficulty); PutStr(w, g_switch.map);
     SendTo(to, w.buf, w.len);
 }
@@ -75,7 +98,8 @@ bool SwitchSafePoint()
 {
     if (S->role != HOST || g::sv_state != 2 || !PlayerInGame(0) || PregameOpen() || LevelExiting()) return false;
     for (int n = 0; n < g::MAX_CLIENTS; ++n) {
-        if (n && !S->remote[n].active) continue;
+        if (n && !(g_switch.participants & (1 << n))) continue;
+        if (n && !S->remote[n].active) return false;
         if (!PlayerInGame(n) || S->downed[n]) return false;
         uint8_t* ps = PlayerState(n);
         if (!ps || *(int*)(ps + g::PS_HEALTH) <= 0 || *(int*)(ps + 4) != 0 ||
@@ -112,9 +136,8 @@ void Cmd_CoopSwitch()
     g_switch.difficulty = difficulty;
     g_switch.target = (uint8_t)target;
     g_switch.phase = 1;
-    g_switch.participants = 1;
+    g_switch.participants = SwitchParty();
     g_switch.started = GetTickCount();
-    for (int n = 1; n < g::MAX_CLIENTS; ++n) if (S->remote[n].active) g_switch.participants |= (uint8_t)(1 << n);
     SwitchNotice("prepare");
     BroadcastSwitch(SWITCH_PREPARE);
     CoopStatus("Checking all players before changing campaign; waiting for a safe checkpoint.");
@@ -127,15 +150,28 @@ void Cmd_CoopSwitchCancel()
 void Cmd_CoopSwitchRetry()
 {
     if (S->role != HOST || !g_switch.phase) return;
+    if (g_switch.phase < 3) {
+        if (!++g_switch.retryRound) ++g_switch.retryRound;
+        g_switch.ready &= 1; // peers must acknowledge the new retry round
+        g_switch.phase=1;
+    }
     g_switch.started = GetTickCount();
     g_switch.sent = 0;
     if (g_switch.phase < 3) SwitchNotice("prepare");
+    Log("switch: retry transaction=%u round=%u",g_switch.id,g_switch.retryRound);
     CoopStatus("Retrying the pending campaign change.");
 }
 bool SwitchControl(uint8_t type, Reader r, const sockaddr_in& from)
 {
+    if(type==M_JOIN&&S->role==HOST&&g_switch.phase&&!SwitchMemberAddress(from)) {
+        Writer reject(suite::REJECT);
+        const char* reason="A campaign change is pending. Wait for the squad to reconnect before joining.";
+        reject.Put(reason,(int)strlen(reason)+1);SendTo(from,reject.buf,reject.len);
+        return true; // never allocate an unconfirmed late member in the old world
+    }
     if (type != SWITCH_PREPARE && type != SWITCH_READY && type != SWITCH_COMMIT && type != SWITCH_ACK && type != SWITCH_CANCEL) return false;
     uint32_t id = r.Get<uint32_t>();
+    uint32_t retryRound = r.Get<uint32_t>();
     uint8_t target = r.Get<uint8_t>();
     uint8_t participants = r.Get<uint8_t>();
     int difficulty = r.Get<int>();
@@ -147,17 +183,27 @@ bool SwitchControl(uint8_t type, Reader r, const sockaddr_in& from)
             CoopStatus("The host requested a campaign change; start with CoDCoop Launcher to follow.");
             return true;
         }
-        if (g_switch.phase && (g_switch.id != id || g_switch.target != target)) return true;
+        if (g_switch.phase && (g_switch.id != id || g_switch.target != target ||
+            g_switch.participants != participants || g_switch.difficulty != difficulty || strcmp(g_switch.map,map))) return true;
         if (!g_switch.phase) {
             g_switch.id = id; g_switch.target = target; g_switch.participants = participants; g_switch.phase = 1;
             g_switch.started = GetTickCount();
+            g_switch.retryRound = retryRound;
             g_switch.difficulty = difficulty;
             snprintf(g_switch.map, sizeof g_switch.map, "%s", map);
             SwitchNotice("prepare");
             CoopStatus("Host selected a new campaign. Verifying the full installation.");
+        } else if (retryRound != g_switch.retryRound) {
+            if (g_switch.phase >= 3 || int32_t(retryRound-g_switch.retryRound)<=0) return true;
+            // Same immutable decision and completed local verification. Retry
+            // refreshes the peer's wait too; it never silently drops a member
+            // or starts another full hash pass while the old one is pending.
+            g_switch.retryRound=retryRound;
+            g_switch.started=GetTickCount();g_switch.sent=0;
+            Log("switch: resumed transaction=%u round=%u",id,retryRound);
         }
     } else {
-        if (!g_switch.phase || g_switch.id != id || g_switch.target != target || g_switch.participants != participants || g_switch.difficulty != difficulty || strcmp(g_switch.map, map)) return true;
+        if (!g_switch.phase || g_switch.id != id || g_switch.retryRound != retryRound || g_switch.target != target || g_switch.participants != participants || g_switch.difficulty != difficulty || strcmp(g_switch.map, map)) return true;
         int n = FindSlot(from);
         if (type == SWITCH_CANCEL) { AbortSwitch("a player cancelled"); return true; }
         if (S->role == HOST && n > 0) {
@@ -175,8 +221,8 @@ void SwitchTick()
 {
     if (!g_switch.phase) return;
     DWORD now = GetTickCount();
-    if (now - g_switch.started > 120000) {
-        CoopStatus("Campaign change is waiting for a player or save. Retry or cancel; nobody was skipped.");
+    if(S->role==HOST&&g_switch.phase<3&&SwitchParty()!=g_switch.participants) {
+        AbortSwitch("the squad changed; confirm the campaign again for the current players");
         return;
     }
     if (!(g_switch.ready & 1)) {
@@ -189,6 +235,12 @@ void SwitchTick()
                 g_switch.ready |= 1;
             }
         }
+    }
+    // A late negative verification must still cancel the old transaction.
+    // Timing out pauses progression, not receipt processing or cancellation.
+    if (now - g_switch.started > 120000) {
+        CoopStatus("Campaign change is waiting for a player or save. Retry or cancel; nobody was skipped.");
+        return;
     }
     if (S->role == JOINER) {
         if (now - g_switch.sent < 500) return;
@@ -240,9 +292,11 @@ void WriteSupervisorState()
     FILE* f = fopen((dir + "runtime-state.tmp").c_str(), "wb");
     if (!f) return;
     bool rendered = g::cgvm && g::cls_state == 2 && g::cl_snapNum > 0 && g::cl_snapServerTime > 0;
-    fprintf(f, "{\"variant\":\"%s\",\"role\":\"%s\",\"joined\":%s,\"render_ready\":%s,\"live_players\":%d,\"tick\":%lu,\"map\":\"%s\"}\n",
+    bool switchWaiting=g_switch.phase && uint32_t(now-g_switch.started)>120000;
+    fprintf(f, "{\"variant\":\"%s\",\"role\":\"%s\",\"joined\":%s,\"render_ready\":%s,\"live_players\":%d,\"tick\":%lu,\"map\":\"%s\",\"switch\":{\"transaction\":%u,\"phase\":%d,\"retry_round\":%u,\"waiting\":%s}}\n",
             VariantName(g_identity.variant), S->role == HOST ? "host" : S->role == JOINER ? "joiner" : "none",
-            S->joined ? "true" : "false", rendered ? "true" : "false", live, now, g::CvarString("mapname"));
+            S->joined ? "true" : "false", rendered ? "true" : "false", live, now, g::CvarString("mapname"),
+            g_switch.id,g_switch.phase,g_switch.retryRound,switchWaiting?"true":"false");
     fclose(f);
     MoveFileExA((dir + "runtime-state.tmp").c_str(), (dir + "runtime-state.json").c_str(), MOVEFILE_REPLACE_EXISTING);
 }

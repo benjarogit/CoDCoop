@@ -41,6 +41,12 @@
   changes by session and generation, retry after packet loss, and acknowledge
   duplicates without starting the same load twice. A real two-second outage
   during a map change now recovers; full delayed-world-packet coverage is open.
+- Development `0.6.0-dev.4` uses protocol9: tag native engine and Coop state
+  packets with their session and world generation before processing them.
+  Preserve readable incompatibility messages for earlier development clients.
+- Wait visibly and reconnect through native world loading after a longer link
+  outage. Stop old native input sends while rejoining; cancel loading peers
+  when the host closes, and invalidate deferred tree indices on disconnect.
 - Preserve local archived YAP settings even when quitting directly while joined.
 - Correct the native DObj-destruction wrapper's missing stack argument.
 - Add individual United Fronts equipment preferences and a validated role/ready
@@ -95,6 +101,13 @@ mechanics remain acceptance gates. See [handoff](docs/HANDOFF-0.6.md).
   und Duplikate ohne erneutes Laden bestätigen. Ein echter zweisekündiger
   Ausfall beim Kartenwechsel wird aufgefangen; verzögerte Pakete alter Welten
   müssen noch umfassend geprüft werden.
+- Entwicklungsstand `0.6.0-dev.4` verwendet Protokoll9: Engine- und Coop-Zustandspakete
+  vor der Verarbeitung ihrer Sitzung und Weltgeneration zuordnen. Ältere
+  Entwicklungsstände erhalten weiterhin verständliche Inkompatibilitätsmeldungen.
+- Nach längerem Verbindungsausfall sichtbar warten und über reguläres Laden
+  wieder verbinden. Alte Eingabepakete während des Beitritts sperren, ladende
+  Mitspieler beim Beenden des Hosts informieren und zurückgestellte Baumindizes
+  beim Trennen verwerfen.
 - Persönlich gespeicherte YAP-Werte auch beim direkten Beenden während des
   Beitritts erhalten.
 - Fehlendes Stack-Argument im nativen DObj-Aufruf korrigieren.

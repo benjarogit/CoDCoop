@@ -17,6 +17,7 @@ import select
 import shlex
 import shutil
 import socket
+import struct
 import subprocess
 import sys
 import threading
@@ -27,6 +28,51 @@ from coop_suite import PROTOCOL, atomic_write, check_installation, seal_installa
 from qa_coop import command, read_state, assess_liveness, process_log_errors
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def probe_unconfirmed_join(folder, port):
+    """One synthetic late JOIN; the original host/joiner remain real games.
+
+    This is a negative packet/allocation gate, not a third-player gameplay test.
+    The host supplies its actual current world through ordinary HELLO/READY.
+    """
+    profile=configparser.ConfigParser()
+    profile.read(folder/'coop/profile.ini')
+    settings=profile['coop']
+    if int(settings['protocol'])!=9 or PROTOCOL!=9:
+        raise ValueError('late JOIN probe requires the documented protocol9 wire')
+    variants={'cod1':1,'uo':2,'sp_improved':3,'united_fronts':4}
+    identity=struct.pack('<IBBH32s',PROTOCOL,1 if settings['engine']=='cod1' else 2,
+                         variants[settings['variant']],1,bytes.fromhex(settings['digest']))
+    def frame(kind,world):return struct.pack('<IB',0xfffffffe,ord(kind))+identity+world
+    state=read_state(folder)
+    if not state or any(player['active'] for player in state['players'][2:]):
+        raise RuntimeError('late JOIN gate needs exactly the genuine two-player fixture')
+    with socket.socket(socket.AF_INET,socket.SOCK_DGRAM) as peer:
+        peer.bind(('127.0.0.1',0));peer.settimeout(3)
+        peer.sendto(frame('H',bytes(12)),('127.0.0.1',port))
+        ready,_=peer.recvfrom(65535)
+        if len(ready)!=57 or ready[:5]!=struct.pack('<IB',0xfffffffe,ord('K')) or ready[5:45]!=identity:
+            raise RuntimeError('late JOIN probe did not negotiate the real host world')
+        packet=frame('J',ready[45:57])+struct.pack('<4i',peer.getsockname()[1],0,0,0)+state['map'].encode('ascii')+b'\0'
+        peer.sendto(packet,('127.0.0.1',port))
+        rejected,_=peer.recvfrom(65535)
+    if len(rejected)<59 or rejected[:5]!=struct.pack('<IB',0xfffffffe,ord('V')) or rejected[5:57]!=ready[5:57]:
+        raise RuntimeError('unconfirmed late JOIN was not rejected before native slot allocation')
+    reason=rejected[57:].split(b'\0',1)[0].decode('ascii')
+    if 'campaign change is pending' not in reason:
+        raise RuntimeError('late JOIN rejection has no actionable campaign-change reason')
+    deadline=time.monotonic()+3
+    after=None
+    while time.monotonic()<deadline:
+        after=read_state(folder)
+        if after and after['tick']>state['tick']:break
+        time.sleep(.05)
+    if not after or after['tick']<=state['tick'] or any(player['active'] or player['state'] for player in after['players'][2:]):
+        raise RuntimeError('late JOIN touched an unconfirmed native player slot')
+    return {'scope':'synthetic negative packet gate with two genuine live players',
+            'hello_sha256':hashlib.sha256(ready).hexdigest(),'join_sha256':hashlib.sha256(packet).hexdigest(),
+            'rejection':reason,'before':state,'after':after}
 
 
 def read_json(path):
@@ -139,13 +185,14 @@ class Supervisor:
         self.log.close()
 
 
-def wait_for(predicate, supervisors, timeout, description, folders=(), allow_start=False):
+def wait_for(predicate, supervisors, timeout, description, folders=(), allow_start=False, tick=None):
     deadline = time.monotonic() + timeout
     next_start = 0
     while time.monotonic() < deadline:
         for supervisor in supervisors:
             if supervisor.process.poll() is not None:
                 raise RuntimeError(description + ': supervisor exited ' + str(supervisor.process.returncode))
+        if tick is not None: tick()
         if allow_start and time.monotonic() > next_start:
             for n, folder in enumerate(folders):
                 state = read_state(folder)
@@ -259,8 +306,15 @@ def main(argv=None):
     parser.add_argument('--joiner-language', choices=('en','de'))
     parser.add_argument('--german-archive', type=Path, help='pinned offline German ZIP for mixed-language installation')
     parser.add_argument('--hunkmegs', type=int, choices=(128,256,512), default=256, help='production default 256; changes are explicit and engine-verified')
+    parser.add_argument('--verification-delay',type=int,default=0,help='QA-only source supervisor: delay real background validation121..180s to test visible native wait/late rejection/explicit Retry')
+    parser.add_argument('--check-late-join',action='store_true',help='synthetic unconfirmed JOIN must reject before allocation while the real pair verifies; requires delayed source mode')
+    parser.add_argument('--check-committed-retry',action='store_true',help='QA-only delay target joiner launch; explicitly Retry a real live target host still awaiting its committed party')
     parser.add_argument('--frozen-worker', action='store_true', help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
+    if args.verification_delay and (args.supervisor_mode!='source' or not 120<args.verification_delay<=180):
+        parser.error('controlled verification delay requires source mode and121..180s')
+    if args.check_late_join and (not args.verification_delay or args.skip_negative):
+        parser.error('late JOIN check requires delayed verification and the negative preparation phase')
     source, payload, output = args.source.resolve(), args.payload.resolve(), args.run.resolve()
     if args.from_variant == args.to_variant:
         parser.error('choose a different target campaign')
@@ -293,7 +347,7 @@ def main(argv=None):
         # the installer. Shared-checkout edits must not alter a running gate.
         frozen = output/'runner'/str(time.time_ns())/'tools'
         frozen.mkdir(parents=True)
-        for name in ('qa_switch.py', 'qa_coop.py', 'install-linux.py', 'coop_suite.py', 'coop_session.py', 'frozen_runtime.py'):
+        for name in ('qa_switch.py', 'qa_coop.py', 'qa_delayed_verification.py', 'install-linux.py', 'coop_suite.py', 'coop_session.py', 'frozen_runtime.py', 'runtime_protocol.py'):
             shutil.copy2(ROOT/'tools'/name, frozen/name)
         provenance = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in frozen.iterdir()}
         (frozen.parent/'provenance.json').write_text(json.dumps(provenance, indent=2))
@@ -311,6 +365,7 @@ def main(argv=None):
                'supervisor_mode': args.supervisor_mode,
                'languages': {'host': args.host_language, 'joiner': args.joiner_language},
                'hunkmegs': args.hunkmegs, 'quality': 'installer production high preset',
+               'verification_delay_seconds':args.verification_delay,
                'frozen_tools': read_json(ROOT/'provenance.json')}
     folders = [output/'host', output/'join1']
     supervisors, logs, display_process = [], [], None
@@ -342,8 +397,25 @@ def main(argv=None):
                           '"+set", "r_customwidth", "640", "+set", "r_customheight", "480", '
                           '"+set", "r_mode_auto", "0", "+set", "logfile", "2", '
                           '"+set", "com_hunkmegs", "'+str(args.hunkmegs)+'"])\n')
+        recovery_gate=output/'qa-release-target-joiner'
+        recovery_gate.unlink(missing_ok=True)
+        if args.check_committed_retry:
+            # Delay only the QA target-joiner runner, never a native readiness
+            # value. The target host must create a real live world and wait for
+            # the original two-player party before its explicit Retry is sent.
+            original=runner.read_text()
+            target_exe='CoDSP.exe' if args.to_variant=='cod1' else 'CoDUOSP.exe'
+            gate_code=('import os,sys,time\nfrom pathlib import Path\n'
+                       'if Path(sys.argv[1]).name.lower()=='+repr(target_exe.lower())+' and "+coopjoin" in sys.argv:\n'
+                       '    deadline=time.monotonic()+240\n'
+                       '    while not Path('+repr(str(recovery_gate))+').exists():\n'
+                       '        if time.monotonic()>deadline: raise SystemExit("QA target joiner gate timed out")\n'
+                       '        time.sleep(.1)\n')
+            runner.write_text(gate_code+original)
         for n, folder in enumerate(folders):
             worker = [str(folder/'coop/launcher/CoD-Coop-Launcher'), '--internal-command', 'session'] if args.supervisor_mode == 'bundled' else [sys.executable, str(ROOT/'tools/coop_session.py')]
+            if args.verification_delay:
+                worker=[sys.executable,str(ROOT/'tools/qa_delayed_verification.py'),'--delay',str(args.verification_delay)]
             cmd = [*worker, '--game', str(folder),
                    '--variant', args.from_variant, '--map', args.from_map, '--difficulty', '1', '--port', str(args.port),
                    '--runner', shlex.join([sys.executable, str(runner)])]
@@ -374,9 +446,16 @@ def main(argv=None):
                 with zipfile.ZipFile(bad, 'w') as archive: archive.writestr('qa/negative.txt', 'not part of receipt')
                 starts = [len(s.game_pids()) for s in supervisors]
                 supervisors[0].control('switch', variant=args.to_variant, map=args.to_map, difficulty=args.difficulty)
+                def late_join():
+                    if not args.check_late_join or 'unconfirmed_late_join' in results:return
+                    state=read_json(folders[0]/'coop/runtime-state.json') or {}
+                    if state.get('switch',{}).get('phase')==1:
+                        results['unconfirmed_late_join']=probe_unconfirmed_join(folders[0],args.port)
                 def cancelled():
                     return any(e.get('phase') == 'cancelled' for s in supervisors for e in s.events)
-                wait_for(cancelled, supervisors, args.timeout, 'changed client rejected and transition cancelled', folders)
+                wait_for(cancelled, supervisors, args.timeout, 'changed client rejected and transition cancelled', folders,tick=late_join)
+                if args.check_late_join and 'unconfirmed_late_join' not in results:
+                    raise RuntimeError('negative late JOIN phase was not exercised')
                 if any(len(s.game_pids()) != count for s, count in zip(supervisors, starts)):
                     raise RuntimeError('a client restarted despite failed readiness')
                 if not runtime_ready(folders, args.from_variant, args.from_map):
@@ -389,8 +468,23 @@ def main(argv=None):
         saves_before = {str(p): p.stat().st_mtime_ns for p in folders[0].rglob('coop_switch.svg')}
         began = time.time_ns()
         supervisors[0].control('switch', variant=args.to_variant, map=args.to_map, difficulty=args.difficulty)
+        retried_transactions=set()
+        def retry_verified_wait():
+            # Exercise the real visible Retry action after a slow cold-disk
+            # preflight. Never retry a failed/incomplete verification or silently
+            # reduce the party; the production supervisor does not auto-retry.
+            state=read_json(folders[0]/'coop/runtime-state.json') or {}
+            change=state.get('switch',{})
+            transaction=change.get('transaction')
+            if (change.get('waiting') is not True or type(transaction) is not int or
+                    not transaction or transaction in retried_transactions): return
+            if not all(any(e.get('phase')=='prepared' and e.get('transaction')==transaction and
+                           e.get('variant')==args.to_variant for e in s.events) for s in supervisors): return
+            retried_transactions.add(transaction)
+            results.setdefault('verified_wait_retries',[]).append({'runtime':state,'events':[list(s.events) for s in supervisors]})
+            supervisors[0].control('retry')
         wait_for(lambda: all(len(s.game_pids()) >= 2 for s in supervisors), supervisors, args.timeout,
-                 'both supervisors restart their real games', folders)
+                 'both supervisors restart their real games', folders, tick=retry_verified_wait)
         saved = [p for p in folders[0].rglob('coop_switch.svg') if p.stat().st_size > 0 and
                  p.stat().st_mtime_ns > saves_before.get(str(p), 0) and p.stat().st_mtime_ns >= began - 2_000_000_000]
         if not saved:
@@ -398,6 +492,31 @@ def main(argv=None):
         results['checks'].append('host writes a nonempty fresh coop_switch.svg before restart')
         results['save'] = [{'path': str(p), 'size': p.stat().st_size,
                             'sha256': hashlib.sha256(p.read_bytes()).hexdigest()} for p in saved]
+        if args.check_committed_retry:
+            def live_waiting_host():
+                state=read_json(folders[0]/'coop/runtime-state.json') or {}
+                native=read_state(folders[0]) or {}
+                if (state.get('variant')==args.to_variant and state.get('map')==args.to_map and
+                        state.get('role')=='host' and state.get('render_ready') is True and
+                        state.get('live_players')==1 and native.get('expected_players')==2 and
+                        any(e.get('phase')=='reconnecting' for e in supervisors[0].events)):
+                    return state
+            waiting=wait_for(live_waiting_host,supervisors,args.timeout,'real target host waiting for committed peer',folders)
+            waiting_pid=supervisors[0].game_pids()[-1]
+            os.kill(waiting_pid,0)
+            live_before=read_state(folders[0]);time.sleep(2);live_after=read_state(folders[0])
+            if not live_before or not live_after or live_after.get('server_time',0)<=live_before.get('server_time',0):
+                raise RuntimeError('target host was not executing a native world before recovery Retry')
+            supervisors[0].control('retry',variant='../invalid',map='wrong',difficulty=0,players=1,host='invalid')
+            wait_for(lambda:len(supervisors[0].game_pids())>=3,supervisors,args.timeout,
+                     'explicit recovery Retry restarts the live owned target host',folders)
+            if supervisors[0].game_pids()[-1]==waiting_pid:
+                raise RuntimeError('recovery Retry reused the waiting native process')
+            recovery_gate.write_text('explicit host recovery Retry observed\n')
+            results['committed_host_retry']={'scope':'real target host; target joiner runner deliberately delayed',
+                'waiting_runtime':waiting,'waiting_pid':waiting_pid,'replacement_pid':supervisors[0].game_pids()[-1],
+                'native_before':live_before,'native_after':live_after}
+            results['checks'].append('explicit committed recovery Retry replaces a live native host without changing the committed map, skill or two-player party')
         after = wait_for(lambda: runtime_ready(folders, args.to_variant, args.to_map), supervisors, args.timeout,
                          'both players reconnect to target campaign/map', folders)
         new_pids = [s.game_pids()[-1] for s in supervisors]

@@ -312,21 +312,29 @@ def download(url, dest, expected_sha=None, expected_size=None):
             return dest
         os.unlink(part)
         offset = 0
-    headers = {"User-Agent": "cod-coop-suite-installer/0.6"}
+    headers = {"User-Agent": "cod-coop-suite-installer/0.6", "Accept-Encoding": "identity"}
     if offset:
         headers["Range"] = "bytes=%d-" % offset
     say("Downloading %s%s" % (url, " (resuming)" if offset else ""))
     req = urllib.request.Request(url, headers=headers)
     with urllib.request.urlopen(req, timeout=60) as r:
         partial = r.status == 206
+        response_end = expected_size
         if partial:
             content_range = r.headers.get("Content-Range", "")
-            if not content_range.startswith("bytes %d-" % offset):
+            match = re.fullmatch(r"bytes ([0-9]+)-([0-9]+)/([0-9]+)", content_range.strip())
+            if (not match or int(match[1]) != offset or int(match[3]) != expected_size
+                    or not offset <= int(match[2]) < expected_size):
                 raise ValueError("server returned an invalid resume range")
+            response_end = int(match[2]) + 1
         elif r.status != 200:
             raise ValueError("unexpected download response: %s" % r.status)
         if not partial:
             offset = 0  # A server ignoring Range must replace, never append.
+        content_length = r.headers.get("Content-Length")
+        if content_length is not None and (not re.fullmatch(r"[0-9]+", content_length.strip())
+                                           or int(content_length) != response_end - offset):
+            raise ValueError("server returned an invalid download length")
         done, last = offset, -5
         with open(part, "ab" if partial else "wb") as f:
             while True:
@@ -334,8 +342,8 @@ def download(url, dest, expected_sha=None, expected_size=None):
                 if not chunk:
                     break
                 done += len(chunk)
-                if done > expected_size:
-                    raise ValueError("download exceeds the pinned size")
+                if done > response_end:
+                    raise ValueError("download exceeds the declared response range")
                 f.write(chunk)
                 pct = done * 100 // expected_size
                 if pct >= last + 5:

@@ -7,6 +7,7 @@ import sys
 import tempfile
 import unittest
 import zipfile
+from unittest import mock
 from pathlib import Path
 
 TOOLS = Path(__file__).resolve().parents[1] / 'tools'
@@ -16,9 +17,122 @@ from campaign_inventory import analyze_script, uncomment
 from qa_campaign_probe import final_probe_status
 from qa_campaign_resources import entity_models, summarize_references
 from uf_equipment_catalog import menu_choices, roster_resources, chosen_aircraft, budget
+from qa_uf_kits import kit_fixture, selection_ack_matches, cgame_selection_matches, preservation_publication_matches
 
 
 class CampaignPatchTests(unittest.TestCase):
+    def test_selection_ack_cannot_reuse_old_world_ticket_even_with_same_sequence(self):
+        values = {'coop_select_1_status':'APPLIED'}
+        for key,value in {'seq':'1','ticket':'7','world':'22','session_a':'5','session_b':'9','session_c':'1'}.items():
+            values['coop_select_1_'+key]=value;values['coop_select_1_ack_'+key]=value
+        self.assertTrue(selection_ack_matches(values,1))
+        values['coop_select_1_ack_world']='21'
+        self.assertFalse(selection_ack_matches(values,1))
+        values['coop_select_1_ack_world']='22';values['coop_select_1_ack_ticket']='6'
+        self.assertFalse(selection_ack_matches(values,1))
+
+    def test_preservation_proof_requires_current_owner_world_and_explicit_native_decision(self):
+        values={'coop_spawn_session_a':'12','coop_spawn_session_b':'34','coop_spawn_session_c':'1',
+                'coop_spawn_ticket_1':'8','coop_spawn_world':'56',
+                'coop_inventory_1_state':'PRESERVED','coop_inventory_1_identity':'12|34|1|1|8|56'}
+        self.assertTrue(preservation_publication_matches(values,1,'PRESERVED'))
+        for field,value in [('coop_inventory_1_state','WAIT'),('coop_inventory_1_identity','12|34|1|1|7|56'),
+                            ('coop_inventory_1_identity','12|34|1|1|8|55'),('coop_inventory_1_identity','12|34|1|2|8|56'),
+                            ('coop_spawn_ticket_1','0'),('coop_spawn_session_c','4'),('coop_spawn_world','056')]:
+            with self.subTest(field=field,value=value):
+                invalid=dict(values);invalid[field]=value
+                self.assertFalse(preservation_publication_matches(invalid,1,'PRESERVED'))
+        self.assertFalse(preservation_publication_matches(values,1,'FRESH'))
+        self.assertFalse(preservation_publication_matches({},1,'PRESERVED'))
+        values['coop_inventory_1_state']='FRESH'
+        self.assertTrue(preservation_publication_matches(values,1,'FRESH'))
+
+    def test_selected_weapon_needs_actual_own_snapshot_and_both_local_states(self):
+        host={'weapon':98,'selected_weapon_name':'springfield'}
+        local={'cgame':{'snapshot_clientnum':1,'snapshot_server_time':2000,'desired_name':'springfield','predicted_name':'springfield','snapshot_name':'springfield'}}
+        self.assertTrue(cgame_selection_matches(host,local,1))
+        local['cgame']['snapshot_clientnum']=0
+        self.assertFalse(cgame_selection_matches(host,local,1))
+        local['cgame']['snapshot_clientnum']=1;local['cgame']['desired_name']='none'
+        self.assertFalse(cgame_selection_matches(host,local,1))
+    def test_four_native_fixture_uses_legal_individual_roles_and_does_not_fire_unmounted_mg(self):
+        catalog = self.equipment_catalog()
+        kits, inventory, fired = kit_fixture(4)
+        resources = roster_resources(catalog, [{'family': 'american', 'slots': kit} for kit in kits], {'sp_ally': 'us_inf'})
+        self.assertEqual(len(resources['required_server_models']), 23)
+        self.assertEqual(len(resources['required_media_models']), 39)
+        self.assertEqual(inventory[0]['primary'], 'mg30cal')
+        self.assertEqual(inventory[2]['primary'], 'bazooka')
+        self.assertEqual(fired, ['primaryb', 'primary', 'primaryb', 'primary'])
+        self.assertEqual(len({json.dumps(kit,sort_keys=True) for kit in kits}), 4)
+
+    def test_actor_kit_adapter_is_opt_in_and_preserves_original_actor_give_ammo_calls(self):
+        import inspect
+        self.assertIs(inspect.signature(patch.build).parameters['qa_kits'].default, False)
+        source = b'''process_weapon_American(weaponcvar,type) {
+          weapon_num = getcvarint(weaponcvar);
+          level.player giveweapon("m1garand"); thread debug_console("kept"); level.player switchToWeapon("m1garand");
+        }
+        refill_ammo() { level.player giveStartAmmo("m1garand"); }
+        '''
+        catalog = {'sources': [{'member': 'maps/_UF_loadout.gsc', 'sha256': hashlib.sha256(source).hexdigest()}],
+                   'families': {'american': {'active_campaign_menu': True, 'enum': {'0': None, '3': 'm1garand'},
+                    'menu_slots': {slot: {'choices': {'0': {'weapon': None}, '3': {'weapon': 'm1garand'}}} for slot in ('primary','secondary','pistol','grenade')}}}}
+        helper = (patch.ROOT/'campaign_patches/uf_starting_kits.gsc').read_text()
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder); (root/'campaign_patches').mkdir()
+            (root/'campaign_patches/uf_equipment_catalog.json').write_text(json.dumps(catalog))
+            (root/'campaign_patches/uf_starting_kits.gsc').write_text(helper)
+            with mock.patch.object(patch, 'ROOT', root):
+                result = patch.uf_actor_kit_adapter(source).decode()
+                with self.assertRaisesRegex(ValueError, 'Unknown'):
+                    patch.uf_actor_kit_adapter(source+b'changed')
+        self.assertIn('self giveweapon("m1garand")', result)
+        self.assertIn('self giveStartAmmo("m1garand")', result)
+        self.assertIn('self Coop_SelectWeapon("m1garand", context);', result)
+        start,end=patch.function_span(result,'Coop_Process_american')
+        self.assertNotIn('switchToWeapon',uncomment(result[start:end]))
+        self.assertIn('thread maps\\_UF_loadout::debug_console(', result)
+        self.assertNotIn('level.player', result)
+        self.assertNotIn('getcvarint(weaponcvar)', result)
+        self.assertIn('coop_qa_kit_applied_', result)
+        self.assertIn('BLOCKED_ORIGINAL_SPECIAL_SCRIPT', result)
+
+    def test_cold_save_native_proof_precedes_external_receipt_and_never_refills_preserved_actor(self):
+        text = (patch.ROOT/'campaign_patches/uf_starting_kits.gsc').read_text()
+        start,end = patch.function_span(text,'WatchPlayers')
+        watch = uncomment(text[start:end])
+        self.assertLess(watch.index('InventoryDisposition('), watch.index('getcvar(identity_key) == native_identity'))
+        self.assertLess(watch.index('disposition == "PRESERVED"'), watch.index('ReadHostPlan(false)'))
+        begin = watch.index('if (disposition == "PRESERVED")')
+        end = watch.index('if (getcvar("coop_qa_kit_', begin)
+        preserved = watch[begin:end]
+        self.assertIn('setcvar(identity_key, native_identity)', preserved)
+        self.assertIn('continue;', preserved)
+        for forbidden in ('Apply(', 'Refill', 'giveweapon', 'giveStartAmmo', 'takeallweapons', 'player.coop_kit_epoch =', 'setcvar(key,'):
+            self.assertNotIn(forbidden, preserved)
+        start,end = patch.function_span(text,'InventoryDisposition')
+        boundary = uncomment(text[start:end])
+        self.assertIn('published_identity != (identity + "|" + world)', boundary)
+        self.assertIn('SpawnIdentity(slot) != identity', boundary)
+        self.assertIn('getcvar("coop_spawn_world") != world', boundary)
+        self.assertIn('state != "FRESH" && state != "PRESERVED"', boundary)
+        start,end = patch.function_span(text,'Apply')
+        apply = uncomment(text[start:end])
+        self.assertLess(apply.index('InventoryDisposition('), apply.index('takeallweapons'))
+        self.assertIn('!= "FRESH") return false;', apply)
+        self.assertIn('if (!(player Apply(', watch)
+
+    def test_actor_processors_reject_global_gameplay_coupling_but_keep_resource_union_hints(self):
+        safe = '''Coop_Process_american(weapon_num) {
+          level.precache_mine = 1; level.precache_plane = 1; self giveweapon("land_mine");
+        }
+        Coop_RefillOriginal() { self giveStartAmmo("land_mine"); }'''
+        self.assertEqual(patch.audit_uf_actor_adapter(safe)['Coop_Process_american'], ['precache_mine', 'precache_plane'])
+        for effect in ('setcvar("g_speed", "300");', 'level.faction = "german";', 'game["gaveweapons"] = 1;', 'self setnormalhealth(1);', 'level.precache_plane = 0;'):
+            with self.subTest(effect=effect), self.assertRaises(ValueError):
+                patch.audit_uf_actor_adapter(safe.replace('self giveweapon("land_mine");', effect))
+
     def test_live_model_references_use_negative_dobj_flags_and_keep_incomplete_snapshots_invalid(self):
         value = {'references_complete': True, 'reference_layout_valid': True,
                  'models': [{'index': 1, 'name': 'xmodel/body'}, {'index': 2, 'name': 'xmodel/hands'}, {'index': 3, 'name': 'xmodel/reserved'}],
@@ -468,6 +582,12 @@ class CampaignPatchTests(unittest.TestCase):
           }
         }
         camera_scene() { level.player setorigin(scene.origin); }
+        Moody_GetInjuredMan() {
+          if (level.flags["moodydied"] == false) {
+            while (distance(level.player.origin, level.moodyloc) > 100) wait 1;
+            thread got_explosives();
+          } else { original_fallback(); }
+        }
         '''
         old = patch.TRIGGER_PATCHES[path]
         try:
@@ -476,9 +596,34 @@ class CampaignPatchTests(unittest.TestCase):
         finally:
             patch.TRIGGER_PATCHES[path] = old
         self.assertIn(r'maps\_coop_players::is_player(other)', transformed)
-        self.assertEqual(transformed.count('thread got_explosives();'), 1)
+        self.assertEqual(transformed.count('thread got_explosives();'), 2)
+        self.assertNotIn('while (distance(level.player.origin, level.moodyloc) > 100) wait 1;', transformed)
+        self.assertIn(r'maps\_coop_brecourt_handoff::wait_for_recipient(level.moodyloc, 100)', transformed)
+        self.assertIn('level notify("coop_brecourt_handoff_recipient", coop_recipient)', transformed)
+        self.assertEqual(transformed.count('Coop_NormalHandoff();'), 1)
+        self.assertIn('original_fallback();', transformed)
         self.assertEqual(transformed.count('break;'), 1)
         self.assertIn('level.player setorigin(scene.origin)', transformed)
+
+    def test_normal_brecourt_handoff_requires_native_eligibility_and_keeps_old_core_host_gate(self):
+        text=(patch.ROOT/'campaign_patches/brecourt_handoff.gsc').read_text()
+        a,b=patch.function_span(text,'identity');identity=uncomment(text[a:b])
+        self.assertIn('getcvar("coop_actor_api") != "1"',identity)
+        self.assertIn('mode != "HOST"',identity)
+        self.assertIn('slot != 0',identity)
+        self.assertIn('"solo|" + native_world + "|0"',identity)
+        a,b=patch.function_span(text,'eligible');eligible=uncomment(text[a:b])
+        self.assertIn('!isalive(actor)',eligible)
+        self.assertIn('state != "ELIGIBLE" || published != expected',eligible)
+        self.assertIn('getentitynumber()',eligible)
+        self.assertNotRegex(eligible,r'health\s*[><=]')
+        a,b=patch.function_span(text,'wait_for_recipient');wait=uncomment(text[a:b])
+        self.assertIn('while (distance(level.player.origin, location) > radius) wait 1;',wait)
+        self.assertIn('return level.player;',wait)
+        self.assertIn('actor = nearest_recipient(location, radius)',wait)
+        self.assertNotIn('missionSuccess',text)
+        self.assertNotIn('objective_state',text)
+        self.assertNotIn('setorigin',text.lower())
 
     def test_unknown_trigger_revision_is_rejected(self):
         with self.assertRaisesRegex(ValueError, 'Unknown mission script'):

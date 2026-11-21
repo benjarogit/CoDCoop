@@ -41,8 +41,22 @@ jobs:
       - run: g++ -std=c++17 -Wall -Wextra -fsanitize=address,undefined tests/test_qa_deferred_models.cpp -o build/test_qa_deferred_models && ./build/test_qa_deferred_models
       - run: g++ -std=c++17 -Wall -Wextra -fsanitize=address,undefined tests/test_tree_ownership.cpp -o build/test_tree_ownership && ./build/test_tree_ownership
       - run: g++ -std=c++17 -Wall -Wextra -fsanitize=address,undefined tests/test_mt_epoch.cpp -o build/test_mt_epoch && ./build/test_mt_epoch
+      - run: g++ -std=c++17 -Wall -Wextra -fsanitize=address,undefined tests/test_qa_dobj_mapping_barrier.cpp -o build/test_qa_dobj_mapping_barrier && ./build/test_qa_dobj_mapping_barrier
+      - run: g++ -std=c++17 -Wall -Wextra -fsanitize=address,undefined tests/test_world_wire.cpp -o build/test_world_wire && ./build/test_world_wire
+      - run: g++ -std=c++17 -Wall -Wextra -fsanitize=address,undefined tests/test_host_body_ownership.cpp -o build/test_host_body_ownership && ./build/test_host_body_ownership
+      - run: g++ -std=c++17 -Wall -Wextra -fsanitize=address,undefined tests/test_host_body_policy.cpp -o build/test_host_body_policy && ./build/test_host_body_policy
+      - run: g++ -std=c++17 -Wall -Wextra -fsanitize=address,undefined tests/test_peer_inventory.cpp -o build/test_peer_inventory && ./build/test_peer_inventory
+      - run: g++ -std=c++17 -Wall -Wextra -fsanitize=address,undefined tests/test_save_provenance.cpp -o build/test_save_provenance && ./build/test_save_provenance
+      - run: g++ -std=c++17 -Wall -Wextra -fsanitize=address,undefined tests/test_spawn_ticket.cpp -o build/test_spawn_ticket && ./build/test_spawn_ticket
+      - run: g++ -std=c++17 -Wall -Wextra -fsanitize=address,undefined tests/test_weapon_selection.cpp -o build/test_weapon_selection && ./build/test_weapon_selection
+      - run: g++ -std=c++17 -Wall -Wextra -fsanitize=address,undefined tests/test_asset_bootstrap.cpp -o build/test_asset_bootstrap && ./build/test_asset_bootstrap
+      - run: g++ -std=c++17 -Wall -Wextra -fsanitize=address,undefined tests/test_inventory_preservation.cpp -o build/test_inventory_preservation && ./build/test_inventory_preservation
+      - run: g++ -std=c++17 -Wall -Wextra -fsanitize=address,undefined tests/test_saved_remote_patch.cpp -o build/test_saved_remote_patch && ./build/test_saved_remote_patch
+      - run: g++ -std=c++17 -Wall -Wextra -fsanitize=address,undefined tests/test_actor_eligibility.cpp -o build/test_actor_eligibility && ./build/test_actor_eligibility
       - run: i686-w64-mingw32-g++ -std=c++17 -O2 -static tests/test_dobj_free_abi.cpp -o build/test-dobj-abi.exe
       - run: i686-w64-mingw32-g++ -std=c++17 -O2 -static tests/test_mt_epoch_hook.cpp -o build/test-mt-epoch.exe
+      - run: i686-w64-mingw32-g++ -std=c++17 -Wall -Wextra -Werror -O2 -static tests/test_asset_bootstrap.cpp -o build/test-asset-bootstrap.exe
+      - run: i686-w64-mingw32-g++ -std=c++17 -O2 -s -static -municode -Wl,--no-insert-timestamp tests/native_download_probe.cpp -o build/native-download-probe.exe -lole32 -lshell32 -lurlmon -lcomctl32 -loleaut32 -luuid -ladvapi32
       - name: Upload development binaries (not a gameplay certification)
         uses: actions/upload-artifact@v4
         with:
@@ -53,6 +67,8 @@ jobs:
             build/suite-check.exe
             build/test-dobj-abi.exe
             build/test-mt-epoch.exe
+            build/test-asset-bootstrap.exe
+            build/native-download-probe.exe
   native-checker-windows:
     needs: engine-build
     runs-on: windows-2022
@@ -74,4 +90,10 @@ jobs:
           ./build/test-dobj-abi.exe
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           ./build/test-mt-epoch.exe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./build/test-asset-bootstrap.exe
           exit $LASTEXITCODE
+      - name: Native WinINet loopback fault/resume tests (no gameplay certification)
+        env:
+          COOP_NATIVE_DOWNLOAD_PROBE: build/native-download-probe.exe
+        run: python -m unittest discover -s tests -p test_installer_http.py -v

@@ -8,6 +8,11 @@ static std::string last;
 static intptr_t Original(const intptr_t*) { ++forwards; return 37; }
 static void Notice(const char* name) { ++notices; last = name; }
 static intptr_t LaterPlugin(const intptr_t* args) { return cc::Intercept(args); }
+static int observed;
+static void Observe(const intptr_t* args,intptr_t result,bool after) {
+    assert(args && (after ? result==37 : result==0));
+    assert((observed%2==1)==after); ++observed;
+}
 int main()
 {
     char name[cc::NAME_BYTES];
@@ -26,11 +31,14 @@ int main()
         assert(!cc::Parse(command, name));
     cc::Syscall first = Original;
     assert(cc::Sync(&first, true, Notice));
+    cc::observer=Observe;
     intptr_t args[] = {0x29, 2, reinterpret_cast<intptr_t>("cinematic cod_end.roq 0 force")};
     assert(first(args) == 37 && forwards == 1 && notices == 1 && last == "cod_end.roq");
+    assert(observed==2);
     args[0] = 0x2c; first(args); assert(forwards == 2 && notices == 1);
     args[0] = 0x29; args[1] = 0; first(args); assert(forwards == 3 && notices == 1);
     assert(cc::Sync(&first, false, nullptr));
+    assert(cc::observer==nullptr);
     assert(first == Original); args[1] = 2; first(args); assert(notices == 1);
     // A new game VM replaces the allocation; detach only its active slot.
     cc::Syscall second = Original;

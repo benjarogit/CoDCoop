@@ -9,6 +9,7 @@ namespace campaign_cinematics {
 constexpr std::size_t NAME_BYTES = 96;
 using Syscall = intptr_t (*)(const intptr_t*);
 using Notify = void (*)(const char* name);
+using Observer = void (*)(const intptr_t* args, intptr_t result, bool after);
 inline bool Newer(uint32_t sequence, uint32_t cutoff)
 {
     return sequence && (!cutoff || static_cast<int32_t>(sequence - cutoff) > 0);
@@ -44,6 +45,7 @@ inline bool Parse(const char* command, char (&name)[NAME_BYTES])
 
 inline Syscall previous = nullptr;
 inline Notify notify = nullptr;
+inline Observer observer = nullptr;
 inline void* attached = nullptr;
 inline bool notifying = false;
 
@@ -52,6 +54,7 @@ inline bool notifying = false;
 inline intptr_t Intercept(const intptr_t* args)
 {
     Syscall original = previous;
+    if(observer) observer(args,0,false);
     char name[NAME_BYTES];
     if (!notifying && notify && args && args[0] == 0x29 && args[1] == 2 &&
         Parse(reinterpret_cast<const char*>(args[2]), name)) {
@@ -59,7 +62,9 @@ inline intptr_t Intercept(const intptr_t* args)
         notify(name); // copy/send before the engine appends the local command
         notifying = false;
     }
-    return original ? original(args) : 0;
+    intptr_t result=original ? original(args) : 0;
+    if(observer) observer(args,result,true);
+    return result;
 }
 
 // Call each frame with the current gvm, on=true only for the authoritative
@@ -74,6 +79,7 @@ inline bool Sync(void* currentVM, bool on, Notify callback)
     auto* slot = static_cast<Syscall*>(currentVM);
     if (!on || !callback) {
         notify = nullptr;
+        observer = nullptr;
         // A later plugin may have retained Intercept in its own chain. Do not
         // erase its forwarding target or claim it is safe to unload our DLL.
         if (slot && previous && *slot != Intercept) return false;

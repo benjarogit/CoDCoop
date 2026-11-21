@@ -374,10 +374,30 @@ def transform_trigger(path, data):
     text = data.decode('latin-1')
     start, end = function_span(text, function)
     body = replace_active(text[start:end], pattern, replacement.replace('\\\\', '\\'), expected=1)
-    return (text[:start] + body + text[end:]).encode('latin-1')
+    text = text[:start] + body + text[end:]
+    if path == 'maps/brecourt.gsc':
+        start, end = function_span(text, 'Moody_GetInjuredMan')
+        body = replace_active(text[start:end],
+            r'\bwhile\s*\(\s*distance\s*\(\s*level\.player\.origin\s*,\s*level\.moodyloc\s*\)\s*>\s*100\s*\)\s*wait\s+1\s*;',
+            r'coop_recipient = maps\_coop_brecourt_handoff::wait_for_recipient(level.moodyloc, 100);' + '\n'
+            + r'        level notify("coop_brecourt_handoff_recipient", coop_recipient);', expected=1)
+        # Keep a single production normal-handoff routine so an isolated QA
+        # scene exercises the exact original branch, not a copied objective.
+        marker = re.search(r'\bif\s*\(\s*level\.flags\s*\[\s*"moodydied"\s*\]\s*==\s*false\s*\)', uncomment(body))
+        if marker is None:
+            raise ValueError('Missing pinned surviving-Moody branch')
+        opening = body.index('{', marker.end())
+        header = 'Coop_NormalHandoff()\n'
+        _, branch_end = function_span(header + body[opening:], 'Coop_NormalHandoff')
+        branch_end = opening + branch_end - len(header)
+        handoff = body[opening + 1:branch_end]
+        body = body[:opening + 1] + '\n        Coop_NormalHandoff();\n    ' + body[branch_end:]
+        text = text[:start] + body + text[end:]
+        text += '\nCoop_NormalHandoff()\n{' + handoff + '}\n'
+    return text.encode('latin-1')
 
 
-def build_trigger_patch(game, output, profile):
+def build_trigger_patch(game, output, profile, qa=False):
     """Patch only reviewed trigger activator predicates in installed sources."""
     from campaign_inventory import layer_files
     if profile not in ('cod1', 'uo', *PROFILES):
@@ -400,11 +420,24 @@ def build_trigger_patch(game, output, profile):
     output = Path(output)
     if any(p.resolve() == output.resolve() for p, _ in sources.values()):
         raise ValueError('Cannot overwrite source mission package')
-    metadata = {'schema': 1, 'profile': profile, 'changes': ['reviewed-player-trigger-activators', 'ai-melee-remote-player-stance'],
+    metadata = {'schema': 1, 'profile': profile, 'changes': ['reviewed-player-trigger-activators', 'brecourt-native-eligible-normal-handoff', 'ai-melee-remote-player-stance'],
                 'runtime_verified': False,
                 'sources': {name: hashlib.sha256(data).hexdigest() for name, (_, data) in sorted(sources.items())}}
     entries = [(name, transform_trigger(name, data)) for name, (_, data) in sorted(sources.items())]
+    if qa:
+        metadata['qa_only'] = True
+        metadata['qa_scope'] = 'isolated actor-arranged original normal handoff; not campaign playthrough'
+        for index,(name,data) in enumerate(entries):
+            if name != 'maps/brecourt.gsc': continue
+            text=data.decode('latin-1'); start,end=function_span(text,'main')
+            body=text[start:end]
+            cut=list(re.finditer(r'\bthread\s+maps\\_utility::set_ambient\s*\(',uncomment(body)))
+            if len(cut)!=1:raise ValueError('Unknown Brecourt isolated setup prefix')
+            body=body[:cut[0].start()] + '\n    friends();\n    maps\\_coop_brecourt_handoff_qa::main();\n'
+            entries[index]=(name,(text[:start]+body+text[end:]).encode('latin-1'))
+        entries.append(('maps/_coop_brecourt_handoff_qa.gsc',(ROOT/'campaign_patches/brecourt_handoff_qa.gsc').read_bytes()))
     entries.append(('maps/_coop_players.gsc', (ROOT / 'campaign_patches/coop_players.gsc').read_bytes()))
+    entries.append(('maps/_coop_brecourt_handoff.gsc', (ROOT / 'campaign_patches/brecourt_handoff.gsc').read_bytes()))
     entries.append(('codcoop/trigger-overlay.json', (json.dumps(metadata, sort_keys=True) + '\n').encode()))
     output.parent.mkdir(parents=True, exist_ok=True)
     tmp = output.with_suffix(output.suffix + '.part')
@@ -552,7 +585,105 @@ def uf_asset_aliases(archive):
     return [('xmodel/world_greasegun', archive.read('xmodel/weapon_greasegun'))]
 
 
-def build(source, output, profile, qa=False, world_policy="universal"):
+def audit_uf_actor_adapter(data):
+    text = data.decode('latin-1') if isinstance(data, bytes) else data
+    names = re.findall(r'(?m)^Coop_Process_(\w+)\(weapon_num(?:, context)?\)', uncomment(text))
+    result = {}
+    native_globals = set()
+    for name in ['Coop_Process_' + family for family in names] + ['Coop_RefillOriginal']:
+        start, end = function_span(text, name)
+        body = uncomment(text[start:end])
+        levels = re.findall(r'\blevel\.(\w+)', body)
+        if any(field not in ('precache_mine', 'precache_plane') for field in levels):
+            raise ValueError('Unexpected actor processor world state: ' + name)
+        remainder = re.sub(r'\blevel\.precache_(?:mine|plane)\s*=\s*1\s*;', '', body)
+        if re.search(r'\blevel\.|\bgame\s*\[|\b(?:setcvar|setnormalhealth|setmaxhealth)\s*\(|\bg_speed\b', remainder, re.I):
+            raise ValueError('Actor processor has unreviewed global gameplay effects: ' + name)
+        result[name] = sorted(set(levels))
+        if re.search(r'\bswitchtoweapon\s*\(', body, re.I): native_globals.add('switchToWeapon: UO global cg_weaponSelect side effect')
+    result['_native_global_method_findings'] = sorted(native_globals)
+    return result
+
+
+def uf_actor_kit_adapter(data):
+    """QA-only actor clones of pinned original processors; no host-CVar swap."""
+    from uf_equipment_preferences import catalog_digest
+    catalog = json.loads((ROOT/'campaign_patches/uf_equipment_catalog.json').read_text())
+    original = data.decode('latin-1')
+    source = next(s for s in catalog['sources'] if s['member'] == 'maps/_UF_loadout.gsc')
+    if hashlib.sha256(data).hexdigest() != source['sha256']:
+        raise ValueError('Unknown United Fronts actor loadout source revision')
+    helper = (ROOT/'campaign_patches/uf_starting_kits.gsc').read_text()
+    helper += '\nCoop_CatalogIdentity() { return "' + catalog_digest(catalog) + '"; }\n'
+    helper += '\nCoop_ValidChoice(family, slot, number)\n{\n'
+    for family, info in sorted(catalog['families'].items()):
+        if not info['active_campaign_menu']: continue
+        for slot, values in sorted(info['menu_slots'].items()):
+            condition = ' || '.join('number == '+number for number in sorted(values['choices'], key=int))
+            helper += '    if (family == "%s" && slot == "%s") return (%s);\n' % (family, slot, condition)
+    helper += '    return false;\n}\n\nCoop_Weapon(family, number)\n{\n'
+    for family, info in sorted(catalog['families'].items()):
+        if not info['active_campaign_menu']: continue
+        allowed = {key for values in info['menu_slots'].values() for key in values['choices']}
+        helper += '    if (family == "%s")\n    {\n' % family
+        for number in sorted(allowed, key=int):
+            weapon = info['enum'][number]
+            helper += '        if (number == %s) return "%s";\n' % (number, weapon or 'none')
+        helper += '    }\n'
+    helper += '    return "none";\n}\n'
+    helper += '''
+Coop_PrecacheKit(kit)
+{
+    for (i = 0; i < 4; i++)
+    {
+        weapon = Coop_Weapon(kit.family, kit.numbers[i]);
+        if (weapon != "none") precacheItem(weapon);
+        if (weapon == "smokegrenade") maps\\_UF_weapons::Coop_InitAirResources();
+    }
+}
+Coop_Process(family, weapon_num, context)
+{
+'''
+    for family, info in sorted(catalog['families'].items()):
+        if info['active_campaign_menu']:
+            helper += '    if (family == "%s") self Coop_Process_%s(weapon_num, context);\n' % (family, family)
+    helper += '}\n'
+    for family, info in sorted(catalog['families'].items()):
+        if not info['active_campaign_menu']: continue
+        name = 'process_weapon_' + family.capitalize()
+        start, end = function_span(original, name)
+        body = original[start:end]
+        body = replace_active(body, r'\bweapon_num\s*=\s*getcvarint\(weaponcvar\)\s*;', '', expected=1)
+        body = replace_active(body, r'\blevel\.player\b', 'self')
+        # Native SP switchToWeapon writes the host's global cg_weaponSelect.
+        # Preserve slot0 behavior; route actual remote actors through Core.
+        body = replace_active(body, r'\bself\s+switchtoweapon\s*\(([^;]+)\)\s*;',
+                              lambda match: 'self Coop_SelectWeapon(' + match[1] + ', context);')
+        # Keep original native giveweapon, switching and mine/plane indicators.
+        # Logging helper lives in the original module, not this generated one.
+        body = replace_active(body, r'\bthread\s+debug_console\s*\(', 'thread maps\\_UF_loadout::debug_console(')
+        helper += '\nCoop_Process_%s(weapon_num, context)\n{%s}\n' % (family, body)
+    start, end = function_span(original, 'refill_ammo')
+    body = replace_active(original[start:end], r'\blevel\.player\b', 'self')
+    helper += '\nCoop_RefillOriginal()\n{%s}\n' % body
+    audit_uf_actor_adapter(helper)
+    return helper.encode('latin-1')
+
+
+def uf_airborne_missing_load(data):
+    if hashlib.sha256(data).hexdigest() != '4be5bb5c6849f7c2b762ccdd27c2020b8c99a70cf64e8e8be98acc387ec698cf':
+        raise ValueError('Unknown UF airborne attachment precache source')
+    text = data.decode('latin-1')
+    start, end = function_span(text, 'Precache_US_Airborne')
+    prefix = ('\n    // Original US_Airborne random case0 still attaches this on both maps.\n'
+              '    if ((getcvar("mapname") == "foy" || getcvar("mapname") == "noville") && character\\_utility::useOptionalModels())\n'
+              '        precacheModel("xmodel/gear_US_load1");\n')
+    return (text[:start] + prefix + text[start:]).encode('latin-1')
+
+
+def build(source, output, profile, qa=False, world_policy="universal", qa_kits=False):
+    if qa_kits and profile != 'united_fronts':
+        raise ValueError('QA individual-kit adapter requires United Fronts')
     if world_policy not in ("universal", "selected"):
         raise ValueError("Unknown world resource policy")
     source, output = Path(source), Path(output)
@@ -564,6 +695,8 @@ def build(source, output, profile, qa=False, world_policy="universal"):
         load = z.read('maps/_load.gsc') if profile == 'united_fronts' else None
         pathfinder = z.read('maps/pathfinder.gsc') if profile == 'united_fronts' else None
         aliases = uf_asset_aliases(z) if profile == 'united_fronts' else []
+        kit_adapter = uf_actor_kit_adapter(z.read('maps/_UF_loadout.gsc')) if profile == 'united_fronts' and qa_kits else None
+        airborne_fix = uf_airborne_missing_load(z.read('maps/_UF_mod.gsc')) if profile == 'united_fronts' else None
         if profile == 'united_fronts':
             alias = z.read('xmodelalias/helmet_us_airborne_82nd.gsc')
             if hashlib.sha256(alias).hexdigest() != UF_HELMET_ALIAS_HASH:
@@ -580,6 +713,10 @@ def build(source, output, profile, qa=False, world_policy="universal"):
     if transformed_weapons is not None and world_policy == 'selected':
         transformed_weapons = select_uf_world_resources(transformed_weapons.decode('latin-1')).encode('latin-1')
     transformed_load = transform_uf_load(load, qa=qa) if load is not None else None
+    if kit_adapter is not None:
+        transformed_load = replace_active(transformed_load.decode('latin-1'),
+            r'maps\\_UF_loadout::give_loadout\s*\(\s*\)\s*;',
+            'maps\\_UF_loadout::give_loadout();\n    maps\\_coop_uf_kits::Start();', expected=1).encode('latin-1')
     transformed_pathfinder = transform_uf_pathfinder_assets(pathfinder) if pathfinder is not None else None
     output.parent.mkdir(parents=True, exist_ok=True)
     tmp = output.with_suffix(output.suffix + '.part')
@@ -590,6 +727,9 @@ def build(source, output, profile, qa=False, world_policy="universal"):
                 'runtime_verified': False}
     if qa:
         metadata['qa_only'] = True
+    if qa_kits:
+        metadata.update(qa_only=True, qa_individual_kits=True, kit_transport_implemented=False)
+        metadata['qa_processor_global_audit'] = audit_uf_actor_adapter(kit_adapter)
     if transformed_weapons is not None:
         metadata['world_resource_policy'] = world_policy
         metadata['world_resource_policy_status'] = 'experimental-candidate'
@@ -604,6 +744,9 @@ def build(source, output, profile, qa=False, world_policy="universal"):
         metadata['changes'].append('uf-player-local-bipod-triggers')
         metadata['changes'].append('uf-pathfinder-existing-helmet-precaches')
         metadata['changes'].append('uf-brolio-owned-greasegun-model-alias')
+        metadata['changes'].append('uf-foy-noville-authored-airborne-load1-early-precache')
+        metadata['source_uf_mod_sha256'] = '4be5bb5c6849f7c2b762ccdd27c2020b8c99a70cf64e8e8be98acc387ec698cf'
+        metadata['airborne_load1_source'] = {'package': 'Main/pak0.pk3', 'member': 'xmodel/gear_US_load1', 'sha256': 'a7fdc7e73b0fdff95e2c79492f60542e908ef237245fc7b867258af603a23607'}
         metadata['model_aliases'] = {'xmodel/world_greasegun': {'source': 'xmodel/weapon_greasegun', 'sha256': UF_GREASE_MODEL_HASH}}
         metadata['changes'].append('uf-native-mg-item-and-media-precaches')
         metadata['changes'].extend(['uf-shared-air-assets-independent-of-host-grenade', 'uf-projectile-caller-radio'])
@@ -613,6 +756,10 @@ def build(source, output, profile, qa=False, world_policy="universal"):
                    ('codcoop/menu-overlay.json', (json.dumps(metadata, sort_keys=True) + '\n').encode())]
         if transformed_weapons is not None:
             entries.append(('maps/_UF_weapons.gsc', transformed_weapons))
+        if kit_adapter is not None:
+            entries.append(('maps/_coop_uf_kits.gsc', kit_adapter))
+        if airborne_fix is not None:
+            entries.append(('maps/_UF_mod.gsc', airborne_fix))
             entries.append(('maps/_load.gsc', transformed_load))
             entries.append(('maps/pathfinder.gsc', transformed_pathfinder))
         entries.extend(aliases)
@@ -632,7 +779,8 @@ def main():
     parser.add_argument('--triggers-only', action='store_true', help='Build reviewed mission activator patches instead of menu/UF mechanics')
     parser.add_argument('--world-policy', choices=('universal', 'selected'), default='universal',
                         help='experimental UF world resource policy; selected does not decide party kit preferences')
-    parser.add_argument('--qa', action='store_true', help='UF only: append isolated runtime test fixtures (never distribute)')
+    parser.add_argument('--qa', action='store_true', help='Append isolated runtime fixtures (UF or trigger-only Brecourt; never distribute)')
+    parser.add_argument('--qa-kits', action='store_true', help='UF only: opt-in host-plan actor-kit experiment; no lobby transport, never distribute')
     parser.add_argument('--mainline', action='store_true', help='SP Improved only: preserve CoD ending/credits then follow into UO')
     parser.add_argument('--output', type=Path, required=True,
                         help='Local-only .pk3 in an isolated test installation; source is never overwritten')
@@ -642,10 +790,10 @@ def main():
             parser.error('--mainline requires --profile sp_improved')
         result = build_mainline_patch(args.game, args.output)
     elif args.triggers_only or args.profile not in PROFILES:
-        result = build_trigger_patch(args.game, args.output, args.profile)
+        result = build_trigger_patch(args.game, args.output, args.profile, qa=args.qa)
     else:
         folder, name = PROFILES[args.profile]
-        result = build(args.game / folder / name, args.output, args.profile, qa=args.qa, world_policy=args.world_policy)
+        result = build(args.game / folder / name, args.output, args.profile, qa=args.qa, world_policy=args.world_policy, qa_kits=args.qa_kits)
     print(json.dumps(result, indent=2))
 
 
