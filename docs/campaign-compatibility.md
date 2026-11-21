@@ -997,13 +997,14 @@ explosive handoff. After objective 4 becomes active, `Moody_GetInjuredMan`
 waits for host distance ≤100 at original CoD `maps/brecourt.gsc:836`,
 SP Improved :845 and UF :866. Only then does the original NPC animation lead
 to `got_explosives`, `Has_Explosives`, objective 4 done and bomb-trigger
-activation. The existing overlay changes only `explosives_objective_wait`,
-the separate failed-rescue/fallback branch. A remote near the surviving Moody
-therefore still cannot advance this normal gate while the host remains away.
+activation. At the initial audit the overlay changed only
+`explosives_objective_wait`, the separate failed-rescue/fallback branch. A
+remote near the surviving Moody could not advance the normal gate while the
+host remained away; the later scoped fix is described below.
 The surrounding goal, dialogue and hand animation operate on Moody/lastnode;
 there is no player camera/link or exclusive player inventory role to preserve
-at this gate. A narrow eligible-recipient replacement is now being prepared;
-it must reject dead/downed participants using actual native eligibility,
+at this gate. The eligible-recipient replacement must reject dead/downed
+participants using actual native eligibility,
 not equate `is_player` or `isalive` with being able to act. Coop downed players
 remain alive at health 1; excluding every health-1 player would incorrectly
 reject a legitimately standing survivor and is not an accepted substitute.
@@ -1060,5 +1061,77 @@ observe the remote activator plus host outside the action zone, original
 objective/notification and changed world objects. No direct `useBy`, fabricated
 notify, actor teleport, objective setter or mission jump may stand in for that
 proof. An earned pre-action checkpoint can reproduce the setup; loading it
-alone never counts as success. None of these four mission-action cases has yet
-been run in this audit, and no full mission/campaign completion is claimed.
+alone never counts as success. At the time of that source audit none of these
+four cases had been run. The bounded Brecourt follow-up below tests only the
+original post-goal handoff; the normal rescue/navigation route and the other
+three natural mission-action cases remain open.
+
+### Brecourt normal handoff: scoped implementation and native evidence
+
+The generated overlay now fixes the surviving-Moody gate in the pinned CoD1,
+inherited UO, SP Improved and United Fronts script revisions. It factors the
+original normal branch without changing Moody's goal, navigation, dialogue,
+hand animation, fallback branch or shared explosives. The original inclusive
+100-unit gate chooses the nearest eligible actual player; ties use slot order.
+`maps/_coop_brecourt_handoff.gsc` checks the native actor API and current
+session/slot/ticket/world identity. It rejects JOINER-local execution, stale
+identities, waiting actors and native downed/dead actors. With no native API it
+retains the original protagonist-only behavior. It never treats `isalive` or
+health1 alone as permission. Source hashes and exact source-shape checks fail
+closed before producing an overlay; original game assets are transformed
+locally rather than committed to this repository.
+
+`tools/qa_brecourt_handoff.py` is an explicit isolated scene, **not Brecourt
+completion**. Its opt-in QA overlay models the already-arrived post-goal
+precondition at the actual live Moody position. It removes scene Axis actors,
+opens the original post-document clip and arranges both players once with the
+existing native `cooplook` command. Thereafter the real Joiner approaches with
+actual acknowledged usercmd input. It invokes the same original post-goal
+function as production and observes the original `Has_Explosives`, objective4
+builtin and bomb triggers restored to their original world positions. It does
+not fabricate these success events or alter production NPC navigation. Full
+original battle/rescue/navigation acceptance remains open.
+
+Native CoD1 proofs use the immutable `cb7071e5c92f794a91634b63cc2afba87865ba35e267507bbe5c628512528a41`
+Core, two actual Wine processes and 256 MiB hunk. The real Joiner alone triggered
+the original handoff with the Host 391 units away; objective 4 completed and all
+four original bomb triggers became active. An actual native damage/downing
+counterexample kept the alive health 1 Joiner ineligible and the real handoff
+gate live without completion for 3.5 native seconds. A separately arranged
+standing health 1 player was accepted. The original Host action also completed.
+Each PASS includes normal rendering, engine-log checks and both actual game
+processes quitting successfully. The inspected Host/Joiner images show the
+original scene and completed-objective HUD. These proofs do not cover native
+Windows, complete missions, NPC navigation or combat AI.
+
+Durable local evidence (ignored game assets remain outside source control):
+
+- `run/qa-cod1-four/history/brecourt-cb7071-POSTGOAL-JOINER-PASS-1795300001531623044`
+- `run/qa-cod1-four/history/brecourt-cb7071-ACTUAL-DOWNED-GATE-NEGATIVE-PASS-1795300080686952272`
+- `run/qa-cod1-four/history/brecourt-cb7071-cod1-standing-one-hp-PASS-1795300110559756232`
+- `run/qa-cod1-four/history/brecourt-cb7071-cod1-HOST-CONTROL-PASS-1795300434037251644`
+- `run/campaign-investigation/brecourt-joiner-postgoal-contact.png`
+
+The zero-health test remains a **failed live-gate test setup**, not a passing
+death-lifecycle proof. An entity-only GSC health 0 write was observed as 600 on
+the subsequent probe. The native command writing both entity/playerState did
+produce health 0 and native INELIGIBLE, then WAIT as the original engine entered
+mission failure and dropped remotes. That terminal lifecycle prevents the
+proposed live-gate observation; its full evidence is retained in
+`brecourt-cb7071-cod1-dead-boundary-FAIL-1795300128214990182` and
+`brecourt-cb7071-cod1-native-zero-health-MISSIONFAIL-FAIL-1795300473460583871`
+under the same history directory. No mission-failure guard was disabled.
+
+Earlier filename/scene failures are also retained. Actual engine `path` output
+showed a new QA PK3 shadowed by the older generated overlay; a subsequent real
+`zz_` filename was not mounted because CoD1 reserves that prefix for its
+`sp_` alias handling. The current fixture updates only the known owned generated
+`zzzzz_codcoop_triggers.pk3`. Native comparator evidence and engine-aware
+inventory ordering are separate from historical source-only inventories; no
+general package renaming or authored-package reorder was applied.
+
+The generic QA harness accepts targeted scenarios only through the explicit
+Python callback API. It first proves real connection and advancing clocks,
+requires bounded explicit scope/checks/evidence, and retains screenshot/log
+checks, native QUIT and exit-code checks. Targeted scenarios cannot silently
+skip requested checkpoint reloads. The ordinary CLI smoke path is unchanged.

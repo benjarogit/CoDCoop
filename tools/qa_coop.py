@@ -131,7 +131,24 @@ def archive_previous(output):
             shutil.copy2(path, target)
 
 
-def main(argv=None):
+def validate_scenario_result(value):
+    """Bound a trusted Python-only scenario report; never grant cleanup success."""
+    if not isinstance(value, dict) or set(value) != {'scope', 'checks', 'evidence'}:
+        raise ValueError('Native scenario must return exactly scope/checks/evidence')
+    scope=value['scope'];checks=value['checks'];evidence=value['evidence']
+    if not isinstance(scope,str) or not scope.strip() or len(scope)>160 or '\n' in scope:
+        raise ValueError('Native scenario needs bounded explicit scope')
+    if not isinstance(checks,list) or not 1<=len(checks)<=32 or any(not isinstance(v,str) or not v.strip() or len(v)>1000 for v in checks):
+        raise ValueError('Native scenario needs bounded nonempty checks')
+    if not isinstance(evidence,dict): raise ValueError('Native scenario evidence must be a JSON object')
+    try: encoded=json.dumps(evidence,allow_nan=False).encode()
+    except (TypeError,ValueError) as error: raise ValueError('Native scenario evidence must be finite JSON') from error
+    if len(encoded)>262144: raise ValueError('Native scenario evidence is too large')
+    return value
+
+
+def main(argv=None, *, scenario=None):
+    if scenario is not None and not callable(scenario): raise ValueError('scenario is a trusted Python callable only')
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--source', required=True, type=Path)
     parser.add_argument('--run', required=True, type=Path, help='new or reusable isolated output directory')
@@ -154,6 +171,8 @@ def main(argv=None):
     parser.add_argument('--chaos-profile', choices=('lan', 'good_wifi', 'bad_wifi', 'mobile_tether', 'transatlantic', 'hell'), default='bad_wifi')
     parser.add_argument('--chaos-seed', type=int, default=260621)
     args = parser.parse_args(argv)
+    if scenario is not None and args.checkpoint_reloads:
+        parser.error('targeted Python scenarios cannot request unrelated checkpoint reloads')
     runner_hash = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
     chaos_script = None
     if args.chaos_checkout:
@@ -327,50 +346,57 @@ def main(argv=None):
         assess_liveness(before, connected()[0], args.players)
         results['checks'].append('host and every remote user-command clock advance')
         (output / 'before.json').write_text(json.dumps(states, indent=2))
-        for n, folder in enumerate(folders[1:], 1):
-            slot = states[n]['slot']
-            if slot < 1 or slot >= args.players: raise RuntimeError('invalid joiner slot')
-            distance = move_remote(folders[0], folder, slot, processes, args.timeout)
-            results['checks'].append('remote %d moved %.1f units via player input' % (slot, distance))
-        for iteration in range(args.checkpoint_reloads):
-            # Use the actual native save/load commands, including remote player
-            # records. Loading a fresh map is not a checkpoint roundtrip.
-            save_root = 'Main' if args.variant == 'cod1' else (fs_game or 'uo')
-            save = folders[0] / save_root / 'save/coop_qa_checkpoint.svg'
-            save.unlink(missing_ok=True)
-            command(folders[0], 'savegame coop_qa_checkpoint')
-            wait_for(lambda: save.exists() and save.stat().st_size > 1024, processes,
-                     args.timeout, 'native host checkpoint written')
-            saved_time = read_state(folders[0])['server_time']
-            wait_for(lambda: read_state(folders[0])['server_time'] > saved_time + 5000,
-                     processes, args.timeout, 'world advances beyond saved checkpoint')
-            old_time = read_state(folders[0])['server_time']
-            command(folders[0], 'loadgame coop_qa_checkpoint')
-            wait_for(lambda: read_state(folders[0])['server_time'] < old_time - 1000,
-                     processes, args.timeout, 'native checkpoint restores earlier world time')
-            def checkpoint_connected():
-                for folder in folders:
-                    errors = process_log_errors(folder)
-                    if errors: raise RuntimeError('checkpoint engine error: ' + errors[0])
-                return connected()
-            states = wait_for(checkpoint_connected, processes, args.timeout, 'all players rejoin restored checkpoint')
-            baseline_reload = states[0]
-            time.sleep(2)
-            recovered = checkpoint_connected()
-            if not recovered:
-                raise RuntimeError('remote disconnected during checkpoint recovery')
-            assess_liveness(baseline_reload, recovered[0], args.players)
-            if not all(s['snapshot_num'] > 0 and s['snapshot_time'] > 0 for s in recovered[1:]):
-                raise RuntimeError('checkpoint joiner has no actual rendered snapshots')
-            results['checks'].append('native checkpoint reload %d restored world and all remote command clocks' % (iteration + 1))
-            for peer_number, folder in enumerate(folders[1:]):
-                slot = read_state(folder)['slot']
-                # Separate the actual players after native respawn as well as
-                # checking input: overlapping bodies would obstruct screenshots.
-                action = ('+forward', '+back', '+moveleft')[peer_number]
-                distance = move_remote(folders[0], folder, slot, processes, args.timeout, action)
-                results['checks'].append('checkpoint %d remote %d moved %.1f units via %s' %
-                                        (iteration + 1, slot, distance, action))
+        if scenario is not None:
+            result=validate_scenario_result(scenario(folders,processes,states))
+            results['scope']='targeted-native-scenario'
+            results['coverage']=result['scope']
+            results['scenario_evidence']=result['evidence']
+            results['checks'].extend(result['checks'])
+        else:
+            for n, folder in enumerate(folders[1:], 1):
+                slot = states[n]['slot']
+                if slot < 1 or slot >= args.players: raise RuntimeError('invalid joiner slot')
+                distance = move_remote(folders[0], folder, slot, processes, args.timeout)
+                results['checks'].append('remote %d moved %.1f units via player input' % (slot, distance))
+            for iteration in range(args.checkpoint_reloads):
+                # Use the actual native save/load commands, including remote player
+                # records. Loading a fresh map is not a checkpoint roundtrip.
+                save_root = 'Main' if args.variant == 'cod1' else (fs_game or 'uo')
+                save = folders[0] / save_root / 'save/coop_qa_checkpoint.svg'
+                save.unlink(missing_ok=True)
+                command(folders[0], 'savegame coop_qa_checkpoint')
+                wait_for(lambda: save.exists() and save.stat().st_size > 1024, processes,
+                         args.timeout, 'native host checkpoint written')
+                saved_time = read_state(folders[0])['server_time']
+                wait_for(lambda: read_state(folders[0])['server_time'] > saved_time + 5000,
+                         processes, args.timeout, 'world advances beyond saved checkpoint')
+                old_time = read_state(folders[0])['server_time']
+                command(folders[0], 'loadgame coop_qa_checkpoint')
+                wait_for(lambda: read_state(folders[0])['server_time'] < old_time - 1000,
+                         processes, args.timeout, 'native checkpoint restores earlier world time')
+                def checkpoint_connected():
+                    for folder in folders:
+                        errors = process_log_errors(folder)
+                        if errors: raise RuntimeError('checkpoint engine error: ' + errors[0])
+                    return connected()
+                states = wait_for(checkpoint_connected, processes, args.timeout, 'all players rejoin restored checkpoint')
+                baseline_reload = states[0]
+                time.sleep(2)
+                recovered = checkpoint_connected()
+                if not recovered:
+                    raise RuntimeError('remote disconnected during checkpoint recovery')
+                assess_liveness(baseline_reload, recovered[0], args.players)
+                if not all(s['snapshot_num'] > 0 and s['snapshot_time'] > 0 for s in recovered[1:]):
+                    raise RuntimeError('checkpoint joiner has no actual rendered snapshots')
+                results['checks'].append('native checkpoint reload %d restored world and all remote command clocks' % (iteration + 1))
+                for peer_number, folder in enumerate(folders[1:]):
+                    slot = read_state(folder)['slot']
+                    # Separate the actual players after native respawn as well as
+                    # checking input: overlapping bodies would obstruct screenshots.
+                    action = ('+forward', '+back', '+moveleft')[peer_number]
+                    distance = move_remote(folders[0], folder, slot, processes, args.timeout, action)
+                    results['checks'].append('checkpoint %d remote %d moved %.1f units via %s' %
+                                            (iteration + 1, slot, distance, action))
         # Unallocated endpoints must not be able to inject engine snapshots.
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
             sock.sendto(b'\x01\x00\x00\x00' + b'fake engine packet', ('127.0.0.1', args.port))

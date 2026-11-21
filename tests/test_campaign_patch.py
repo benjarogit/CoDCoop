@@ -584,6 +584,8 @@ class CampaignPatchTests(unittest.TestCase):
         camera_scene() { level.player setorigin(scene.origin); }
         Moody_GetInjuredMan() {
           if (level.flags["moodydied"] == false) {
+            lastnode = scene;
+            level.moody waittill("goal");
             while (distance(level.player.origin, level.moodyloc) > 100) wait 1;
             thread got_explosives();
           } else { original_fallback(); }

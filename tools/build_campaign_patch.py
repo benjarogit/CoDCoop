@@ -379,7 +379,7 @@ def transform_trigger(path, data):
         start, end = function_span(text, 'Moody_GetInjuredMan')
         body = replace_active(text[start:end],
             r'\bwhile\s*\(\s*distance\s*\(\s*level\.player\.origin\s*,\s*level\.moodyloc\s*\)\s*>\s*100\s*\)\s*wait\s+1\s*;',
-            r'coop_recipient = maps\_coop_brecourt_handoff::wait_for_recipient(level.moodyloc, 100);' + '\n'
+            'level notify("coop_brecourt_handoff_gate_ready");\n        ' + r'coop_recipient = maps\_coop_brecourt_handoff::wait_for_recipient(level.moodyloc, 100);' + '\n'
             + r'        level notify("coop_brecourt_handoff_recipient", coop_recipient);', expected=1)
         # Keep a single production normal-handoff routine so an isolated QA
         # scene exercises the exact original branch, not a copied objective.
@@ -393,7 +393,13 @@ def transform_trigger(path, data):
         handoff = body[opening + 1:branch_end]
         body = body[:opening + 1] + '\n        Coop_NormalHandoff();\n    ' + body[branch_end:]
         text = text[:start] + body + text[end:]
-        text += '\nCoop_NormalHandoff()\n{' + handoff + '}\n'
+        goal = list(re.finditer(r'level\.moody\s+waittill\s*\(\s*"goal"\s*\)\s*;',uncomment(handoff)))
+        if len(goal)!=1: raise ValueError('Unknown original handoff goal boundary')
+        boundary=goal[0].end()
+        head=handoff[:boundary] + '\n        Coop_NormalHandoffAfterGoal(lastnode);\n'
+        tail=handoff[boundary:]
+        text += '\nCoop_NormalHandoff()\n{' + head + '}\n'
+        text += '\nCoop_NormalHandoffAfterGoal(lastnode)\n{' + tail + '}\n'
     return text.encode('latin-1')
 
 
@@ -407,7 +413,7 @@ def build_trigger_patch(game, output, profile, qa=False):
         groups.append(PROFILES[profile][0])
     sources = {}
     for group in groups:
-        for package in layer_files(Path(game), group):
+        for package in layer_files(Path(game), group, engine='cod1' if profile == 'cod1' else 'uo'):
             try:
                 with zipfile.ZipFile(package) as z:
                     for name in z.namelist():
@@ -433,7 +439,11 @@ def build_trigger_patch(game, output, profile, qa=False):
             body=text[start:end]
             cut=list(re.finditer(r'\bthread\s+maps\\_utility::set_ambient\s*\(',uncomment(body)))
             if len(cut)!=1:raise ValueError('Unknown Brecourt isolated setup prefix')
-            body=body[:cut[0].start()] + '\n    friends();\n    maps\\_coop_brecourt_handoff_qa::main();\n'
+            body=body[:cut[0].start()] + '\n    friends();\n    thread maps\\_coop_brecourt_handoff_qa::main();\n'
+            text=text[:start]+body+text[end:]
+            start,end=function_span(text,'got_explosives')
+            body=replace_active(text[start:end],r'\bobjective_state\s*\(\s*4\s*,\s*"done"\s*\)\s*;',
+                'objective_state(4, "done");\n    level notify("coop_brecourt_qa_objective4_done");',expected=1)
             entries[index]=(name,(text[:start]+body+text[end:]).encode('latin-1'))
         entries.append(('maps/_coop_brecourt_handoff_qa.gsc',(ROOT/'campaign_patches/brecourt_handoff_qa.gsc').read_bytes()))
     entries.append(('maps/_coop_players.gsc', (ROOT / 'campaign_patches/coop_players.gsc').read_bytes()))
