@@ -605,11 +605,368 @@ static bool Download(const std::wstring& url, const std::wstring& path, const st
 
 // ---------------------------------------------------------------- unzip
 
-// Windows 10/11 ships tar.exe (bsdtar), which also opens .zip
+// Windows 10/11 ships tar.exe (bsdtar), which also opens .zip, and PowerShell
+// or the shell can unpack it too. None of that is guaranteed (Windows 7, locked
+// down machines, Wine), so the installer brings its own DEFLATE decoder and
+// tries that first: no external program, no console window, constant memory
+// (the biggest entry in the package is ~750 MB compressed and uncompressed).
+
+static void MakeDirs(const std::wstring& path)
+{
+    std::wstring cur;
+    for (size_t i = 0; i <= path.size(); ++i) {
+        if (i == path.size() || (path[i] == L'\\' && i > 2)) {
+            if (!cur.empty()) CreateDirectoryW(cur.c_str(), nullptr);
+            if (i == path.size()) break;
+        }
+        if (i < path.size()) cur += path[i];
+    }
+}
+
+struct InflateIn
+{
+    FILE* f;
+    unsigned char buf[1 << 16];
+    size_t pos = 0, len = 0;
+    bool eof = false;
+    int Next()
+    {
+        if (pos == len) {
+            if (eof) return -1;
+            len = fread(buf, 1, sizeof buf, f);
+            pos = 0;
+            if (!len) { eof = true; return -1; }
+        }
+        return buf[pos++];
+    }
+};
+
+struct BitIn
+{
+    InflateIn* s;
+    unsigned buf = 0;
+    int cnt = 0;
+    int Bits(int n)
+    {
+        while (cnt < n) {
+            int c = s->Next();
+            if (c < 0) return -1;
+            buf |= (unsigned)c << cnt;
+            cnt += 8;
+        }
+        int v = (int)(buf & ((1u << n) - 1));
+        buf >>= n;
+        cnt -= n;
+        return v;
+    }
+    void Align()
+    {
+        int drop = cnt % 8;
+        buf >>= drop;
+        cnt -= drop;
+    }
+};
+
+struct Huffman
+{
+    short count[16];
+    short symbol[288];
+};
+
+static int HuffBuild(Huffman& h, const unsigned char* len, int n)
+{
+    for (int i = 0; i < 16; ++i) h.count[i] = 0;
+    for (int i = 0; i < n; ++i) h.count[len[i]]++;
+    int left = 1;
+    for (int l = 1; l <= 15; ++l) {
+        left <<= 1;
+        left -= h.count[l];
+        if (left < 0) return left;  // over-subscribed
+    }
+    short offs[16];
+    offs[1] = 0;
+    for (int l = 1; l < 15; ++l) offs[l + 1] = (short)(offs[l] + h.count[l]);
+    for (int i = 0; i < n; ++i)
+        if (len[i]) h.symbol[offs[len[i]]++] = (short)i;
+    return left;
+}
+
+static int HuffDecode(BitIn& in, const Huffman& h)
+{
+    int code = 0, first = 0, index = 0;
+    for (int l = 1; l <= 15; ++l) {
+        int b = in.Bits(1);
+        if (b < 0) return -1;
+        code |= b;
+        int count = h.count[l];
+        if (code - first < count) return h.symbol[index + (code - first)];
+        index += count;
+        first = (first + count) << 1;
+        code <<= 1;
+    }
+    return -1;
+}
+
+struct InflateOut
+{
+    FILE* f;
+    unsigned char win[32768];
+    unsigned wpos = 0;
+    unsigned char out[1 << 16];
+    size_t olen = 0;
+    unsigned long long total = 0;
+    bool ok = true;
+
+    void Flush()
+    {
+        if (olen && fwrite(out, 1, olen, f) != olen) ok = false;
+        olen = 0;
+    }
+    void Byte(unsigned char c)
+    {
+        win[wpos] = c;
+        wpos = (wpos + 1) & 32767;
+        out[olen++] = c;
+        ++total;
+        if (olen == sizeof out) Flush();
+    }
+    void Copy(unsigned dist, unsigned len)
+    {
+        unsigned from = (wpos - dist) & 32767;
+        for (unsigned i = 0; i < len; ++i) Byte(win[(from + i) & 32767]);
+    }
+};
+
+static const short kLenBase[29] = {3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31,
+                                   35, 43, 51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 258};
+static const short kLenExtra[29] = {0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2,
+                                    3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0};
+static const short kDistBase[30] = {1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129,
+                                    193, 257, 385, 513, 769, 1025, 1537, 2049, 3073, 4097,
+                                    6145, 8193, 12289, 16385, 24577};
+static const short kDistExtra[30] = {0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6,
+                                     7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13};
+static const short kClOrder[19] = {16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15};
+
+// raw DEFLATE (RFC 1951), as stored in a .zip entry
+static bool InflateRaw(FILE* in, FILE* out, unsigned long long expect)
+{
+    InflateIn src{in};
+    BitIn bits{&src};
+    InflateOut dst{out};
+    int last;
+    do {
+        last = bits.Bits(1);
+        if (last < 0) return false;
+        int type = bits.Bits(2);
+        if (type < 0 || type == 3) return false;
+        if (type == 0) {
+            bits.Align();
+            int len = bits.Bits(16), nlen = bits.Bits(16);
+            if (len < 0 || nlen < 0 || (len ^ 0xffff) != nlen) return false;
+            for (int i = 0; i < len; ++i) {
+                int c = bits.Bits(8);
+                if (c < 0) return false;
+                dst.Byte((unsigned char)c);
+            }
+            continue;
+        }
+        Huffman lit, dist;
+        if (type == 1) {
+            unsigned char l[288];
+            int i = 0;
+            for (; i < 144; ++i) l[i] = 8;
+            for (; i < 256; ++i) l[i] = 9;
+            for (; i < 280; ++i) l[i] = 7;
+            for (; i < 288; ++i) l[i] = 8;
+            HuffBuild(lit, l, 288);
+            for (i = 0; i < 30; ++i) l[i] = 5;
+            HuffBuild(dist, l, 30);
+        } else {
+            int hlit = bits.Bits(5), hdist = bits.Bits(5), hclen = bits.Bits(4);
+            if (hlit < 0 || hdist < 0 || hclen < 0) return false;
+            hlit += 257;
+            hdist += 1;
+            hclen += 4;
+            unsigned char cl[19] = {0};
+            for (int i = 0; i < hclen; ++i) {
+                int v = bits.Bits(3);
+                if (v < 0) return false;
+                cl[kClOrder[i]] = (unsigned char)v;
+            }
+            Huffman clh;
+            if (HuffBuild(clh, cl, 19) < 0) return false;
+            unsigned char lens[320] = {0};
+            int n = 0, all = hlit + hdist;
+            while (n < all) {
+                int sym = HuffDecode(bits, clh);
+                if (sym < 0) return false;
+                if (sym < 16) {
+                    lens[n++] = (unsigned char)sym;
+                    continue;
+                }
+                int rep, value = 0;
+                if (sym == 16) {
+                    if (!n) return false;
+                    value = lens[n - 1];
+                    rep = bits.Bits(2);
+                    if (rep < 0) return false;
+                    rep += 3;
+                } else if (sym == 17) {
+                    rep = bits.Bits(3);
+                    if (rep < 0) return false;
+                    rep += 3;
+                } else {
+                    rep = bits.Bits(7);
+                    if (rep < 0) return false;
+                    rep += 11;
+                }
+                while (rep-- && n < all) lens[n++] = (unsigned char)value;
+            }
+            if (HuffBuild(lit, lens, hlit) < 0) return false;
+            if (HuffBuild(dist, lens + hlit, hdist) < 0) return false;
+        }
+        for (;;) {
+            int sym = HuffDecode(bits, lit);
+            if (sym < 0) return false;
+            if (sym < 256) {
+                dst.Byte((unsigned char)sym);
+                continue;
+            }
+            if (sym == 256) break;
+            sym -= 257;
+            if (sym >= 29) return false;
+            int len = kLenBase[sym];
+            if (kLenExtra[sym]) {
+                int e = bits.Bits(kLenExtra[sym]);
+                if (e < 0) return false;
+                len += e;
+            }
+            int ds = HuffDecode(bits, dist);
+            if (ds < 0 || ds >= 30) return false;
+            unsigned d = (unsigned)kDistBase[ds];
+            if (kDistExtra[ds]) {
+                int e = bits.Bits(kDistExtra[ds]);
+                if (e < 0) return false;
+                d += (unsigned)e;
+            }
+            if (d > dst.total) return false;
+            dst.Copy(d, (unsigned)len);
+        }
+    } while (!last);
+    dst.Flush();
+    return dst.ok && (!expect || dst.total == expect);
+}
+
+struct ZipEntry
+{
+    std::string name;
+    unsigned method = 0;
+    unsigned long long csize = 0, usize = 0, off = 0;
+};
+
+static unsigned Rd16(const unsigned char* p) { return p[0] | p[1] << 8; }
+static unsigned long long Rd32(const unsigned char* p)
+{
+    return (unsigned long long)p[0] | p[1] << 8 | p[2] << 16 | (unsigned long long)p[3] << 24;
+}
+
+static bool ReadZipIndex(FILE* f, std::vector<ZipEntry>& list)
+{
+    if (_fseeki64(f, 0, SEEK_END)) return false;
+    long long size = _ftelli64(f);
+    if (size < 22) return false;
+    long long tail = size < 0x10016 ? size : 0x10016;
+    std::vector<unsigned char> buf((size_t)tail);
+    if (_fseeki64(f, size - tail, SEEK_SET) || fread(buf.data(), 1, buf.size(), f) != buf.size()) return false;
+    long long eocd = -1;
+    for (long long i = (long long)buf.size() - 22; i >= 0; --i)
+        if (!memcmp(&buf[i], "PK\x05\x06", 4)) { eocd = i; break; }
+    if (eocd < 0) return false;
+    unsigned count = Rd16(&buf[eocd + 10]);
+    unsigned long long cdSize = Rd32(&buf[eocd + 12]);
+    unsigned long long cdOff = Rd32(&buf[eocd + 16]);
+    if (!count || cdSize > (unsigned long long)size) return false;
+    std::vector<unsigned char> cd((size_t)cdSize);
+    if (_fseeki64(f, (long long)cdOff, SEEK_SET) || fread(cd.data(), 1, cd.size(), f) != cd.size()) return false;
+    size_t p = 0;
+    for (unsigned i = 0; i < count; ++i) {
+        if (p + 46 > cd.size() || memcmp(&cd[p], "PK\x01\x02", 4)) return false;
+        ZipEntry e;
+        e.method = Rd16(&cd[p + 10]);
+        e.csize = Rd32(&cd[p + 20]);
+        e.usize = Rd32(&cd[p + 24]);
+        unsigned nl = Rd16(&cd[p + 28]), xl = Rd16(&cd[p + 30]), cl = Rd16(&cd[p + 32]);
+        e.off = Rd32(&cd[p + 42]);
+        if (p + 46 + nl + xl + cl > cd.size()) return false;
+        e.name.assign((const char*)&cd[p + 46], nl);
+        p += 46 + nl + xl + cl;
+        if (e.csize == 0xFFFFFFFFull || e.usize == 0xFFFFFFFFull || e.off == 0xFFFFFFFFull) continue;  // zip64
+        list.push_back(e);
+    }
+    return true;
+}
+
+static bool UnzipBuiltin(const std::wstring& zip, const std::wstring& dir, const std::wstring& label)
+{
+    FILE* f = _wfopen(zip.c_str(), L"rb");
+    if (!f) return false;
+    std::vector<ZipEntry> list;
+    bool ok = ReadZipIndex(f, list);
+    unsigned long long totalBytes = 0;
+    for (const ZipEntry& e : list) totalBytes += e.usize;
+    unsigned long long done = 0;
+    int lastPct = -2;
+    for (size_t i = 0; ok && i < list.size(); ++i) {
+        const ZipEntry& e = list[i];
+        std::string name = e.name;
+        for (char& c : name)
+            if (c == '\\') c = '/';
+        if (name.empty() || name[0] == '/' || name.find("..") != std::string::npos) { ok = false; break; }
+        std::wstring path = dir + L"\\" + Widen(name, CP_UTF8);
+        for (wchar_t& c : path)
+            if (c == L'/') c = L'\\';
+        if (name.back() == '/') {
+            MakeDirs(path);
+            continue;
+        }
+        size_t slash = path.find_last_of(L'\\');
+        if (slash != std::wstring::npos) MakeDirs(path.substr(0, slash));
+        unsigned char lh[30];
+        if (_fseeki64(f, (long long)e.off, SEEK_SET) || fread(lh, 1, 30, f) != 30 ||
+            memcmp(lh, "PK\x03\x04", 4)) { ok = false; break; }
+        unsigned long long data = e.off + 30 + Rd16(&lh[26]) + Rd16(&lh[28]);
+        FILE* out = _wfopen(path.c_str(), L"wb");
+        if (!out || _fseeki64(f, (long long)data, SEEK_SET)) { ok = false; break; }
+        if (e.method == 0) {
+            unsigned char buf[1 << 16];
+            unsigned long long left = e.csize;
+            while (left && ok) {
+                size_t n = (size_t)(left < sizeof buf ? left : sizeof buf);
+                if (fread(buf, 1, n, f) != n || fwrite(buf, 1, n, out) != n) ok = false;
+                left -= n;
+            }
+        } else if (e.method == 8) {
+            ok = InflateRaw(f, out, e.usize);
+        } else {
+            ok = false;
+        }
+        fclose(out);
+        done += e.usize;
+        if (totalBytes) {
+            int pct = (int)(done * 100 / totalBytes);
+            if (pct != lastPct) { lastPct = pct; Say(label, pct); }
+        }
+    }
+    fclose(f);
+    return ok;
+}
+
 static bool ExtractZip(const std::wstring& zip, const std::wstring& dir, const std::wstring& label)
 {
-    Say(label, -1);
+    Say(label, 0);
     CreateDirectoryW(dir.c_str(), nullptr);
+    if (UnzipBuiltin(zip, dir, label)) return true;
     if (RunAndWait(L"tar.exe -xf \"" + zip + L"\" -C \"" + dir + L"\"")) return true;
     if (RunAndWait(L"powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"Expand-Archive -LiteralPath '" +
                    zip + L"' -DestinationPath '" + dir + L"' -Force\""))
