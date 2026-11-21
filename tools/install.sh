@@ -13,7 +13,7 @@ set -eu
 
 REPO=benjarogit/CoDCoop
 TAG=${COD_COOP_TAG:-v0.5.3}
-URL="https://github.com/$REPO/releases/download/$TAG/Call-of-Duty-UO-Coop-Ready.zip"
+URL=${COD_COOP_URL:-"https://github.com/$REPO/releases/download/$TAG/Call-of-Duty-UO-Coop-Ready.zip"}
 
 # run from the extracted package: everything is already there, nothing to download
 HERE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
@@ -48,4 +48,4 @@ if [ ! -f "$DIR/install-linux.py" ]; then
     exit 1
 fi
 
-exec python3 "$DIR/install-linux.py" "$@"
+python3 "$DIR/install-linux.py" "$@"

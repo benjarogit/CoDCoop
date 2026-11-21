@@ -10,7 +10,7 @@ Play the **Call of Duty 1 (2003)** campaign, the **United Offensive** expansion 
 curl -fsSL https://raw.githubusercontent.com/benjarogit/CoDCoop/master/tools/install.sh | sh
 ```
 
-**[⬇ Offline: `Call of Duty - UO Coop Ready.zip` (~1 GB)](https://github.com/benjarogit/CoDCoop/releases/download/v0.5.3/Call-of-Duty-UO-Coop-Ready.zip)** — for installing without internet later: extract, run `Install-CoD-Coop.exe` (Windows) or `install-linux.sh` (Linux). Mirror: [MEGA](https://mega.nz/file/AV4TjbBD#eOp-9s1CcZ5MCDSLvyDyUJ5TJRkh5y5C6VAzme2EpDM).
+**[⬇ Offline: `Call of Duty - UO Coop Ready.zip` (~1 GB)](https://github.com/benjarogit/CoDCoop/releases/download/v0.5.3/Call-of-Duty-UO-Coop-Ready.zip)** — for installing without internet later: extract, run `Install-CoD-Coop.exe` (Windows) or `install-linux.sh` (Linux). Mirror: [MEGA](https://mega.nz/file/oMAjRTQA#r60DTteMs7-x6kqZuEMjtmLlRQVrJIBvv2uKk4pkXmQ).
 
 > **This is a fork** of [TheTiranix/CoDCoop](https://github.com/TheTiranix/CoDCoop), maintained here.
 > It adds first-class Linux support — cross-build, native installer, the Proton/`ddraw` fixes and the

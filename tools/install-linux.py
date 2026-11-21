@@ -215,6 +215,8 @@ def detect_games():
         found.append(os.path.join(apps, "common", "Call of Duty"))
     found += ankergames_dirs()
     found.append(os.getcwd())
+    # the ready package itself has game/CoDSP.exe - that is not an installation
+    package = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "game"))
     out = []
     for d in found:
         d = os.path.abspath(os.path.expanduser(d))
@@ -222,8 +224,13 @@ def detect_games():
             continue
         # the launcher root may be one level above the game folder (…/Call of Duty (2003)-3278/Call of Duty)
         for cand in [d] + [os.path.join(d, n) for n in sorted(os.listdir(d))]:
+            cand = os.path.abspath(cand)
+            if cand == package or cand.startswith(package + os.sep):
+                continue
             if os.path.isdir(cand) and find(cand, "CoDSP.exe") and cand not in out:
                 out.append(cand)
+    # a real installation has the game data; put those first (the package folder has only the exe)
+    out.sort(key=lambda p: 0 if os.path.isdir(os.path.join(p, "Main")) else 1)
     return out
 
 
@@ -629,7 +636,12 @@ def main():
             except (EOFError, ValueError, IndexError):
                 die("no valid choice - pass --game")
         else:
-            die("several installations found, pass --game:\n       " + "\n       ".join(found))
+            # started with "curl ... | sh": no keyboard to ask, take the first (a real
+            # installation, because those are sorted first) and say which one it is
+            game = found[0]
+            say("game: %s (detected)" % game)
+            for d in found[1:]:
+                say("      also found: %s (use --game to install there instead)" % d)
 
     here = os.path.dirname(os.path.abspath(__file__))
     tmp = None
