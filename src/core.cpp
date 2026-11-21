@@ -887,15 +887,21 @@ void JoinerApplyAnims(Reader r)
                 *(uint16_t*)p = 0;
                 *(uint16_t*)(p + 6) = 0;
             }
+            // El host manda el bloque cliente (el que se dibuja). Aca se guarda como estado
+            // confirmado del lado servidor, para que JoinerAdvanceAnims lo pueda avanzar entre
+            // snapshots con BodyAnimUpdate; XAnimCloneServerToClient lo copia al cliente.
             uint8_t* info = g::xanimInfo + *slot * 0x44;
-            memcpy(info + 0x1c, st, 4);
-            memcpy(info + 0x24, st + 4, 2);
-            memcpy(info + 0x28, st + 6, 16);
+            memcpy(info + 0x3c, st, 4);       // tiempo confirmado
+            memcpy(info + 0x42, st + 4, 2);   // ciclo confirmado
+            memcpy(info + 0x44, st + 6, 16);  // goalTime, goalWeight, weight, rate
+            memcpy(info + 0x38, st, 4);       // tiempo nuevo = confirmado
+            memcpy(info + 0x40, st + 4, 2);   // ciclo nuevo = confirmado
         }
         for (int a = 0; a < size; ++a) {
             uint16_t* slot = (uint16_t*)(tree + g::TREE_INFO + a * 2);
             if (*slot && !seen[a]) ReleaseInfo(tree, slot);
         }
+        if (tree) g::XAnimCloneServerToClient(tree);  // que este frame ya muestre lo nuevo
     }
 }
 
@@ -1221,6 +1227,51 @@ void HostAnimateBodies(float dt)
         g::XAnimCloneServerToClient(tree);  // 0x44d8e0 lo hace por snapshot pero desde la entidad 4
     }
     g::inGameCall = prevSide;
+}
+
+// En el que se une el servidor local no corre, asi que nadie avanza la animacion entre snapshots:
+// el estado que manda el host se veria congelado hasta el siguiente paquete (20 Hz) y los cuerpos
+// parecerian animados a muy pocos FPS. Aca se hace lo mismo que el host con los cuerpos de los
+// jugadores: avanzar el lado servidor de cada arbol propio con BodyAnimUpdate, confirmar el tiempo
+// y copiarlo al cliente. El proximo snapshot solo corrige la fase.
+void JoinerAdvanceAnims(float dt)
+{
+    if (dt <= 0.0f) return;
+    static int lastLog, lastTrees, frames;
+    static float acc;
+    int trees = 0;
+    int prevSide = g::inGameCall;
+    g::inGameCall = 1;  // BodyAnimUpdate trabaja sobre el bloque servidor (+0x38..)
+    for (int e = 0; e < g::MAX_GENTITIES; ++e) {
+        uint8_t* tree = S->ownTree[e];
+        uint8_t* d = g::ServerDObj(e);
+        if (!tree || !d || *(uint8_t**)d != tree) continue;
+        ++trees;
+        BodyAnimUpdate(d, dt);
+        int size = *(int*)(*(uint8_t**)tree + 4);
+        for (int a = 0; a < size; ++a)
+            if (uint16_t idx = *(uint16_t*)(tree + g::TREE_INFO + a * 2)) {
+                uint8_t* info = g::xanimInfo + idx * 0x44;
+                *(float*)(info + 0x3c) = *(float*)(info + 0x38);
+                *(uint16_t*)(info + 0x42) = *(uint16_t*)(info + 0x40);
+            }
+        g::XAnimCloneServerToClient(tree);
+    }
+    g::inGameCall = prevSide;
+    if (!trees) return;
+    if (!lastTrees) {
+        lastLog = GetTickCount();
+        Log("joiner: %d arboles de animacion propios, se avanzan por frame", trees);
+    }
+    lastTrees = trees;
+    acc += dt;
+    ++frames;
+    if (GetTickCount() - lastLog > 10000) {  // prueba: tiene que dar ~10 s
+        lastLog = GetTickCount();
+        Log("joiner: animaciones propias +%.1f s en 10 s, %d frames/s (%d arboles)", acc, frames / 10, trees);
+        acc = 0;
+        frames = 0;
+    }
 }
 
 // ---------- daño entre jugadores (opcion: set coop_friendlyfire 1 en el host) ----------
@@ -2783,11 +2834,17 @@ EXPORT int __cdecl Coop_FrozenFrame(int msec)
     int& t = S->frozenTime;
     int latest = g::cl_snapServerTime;
     int target = latest - 50;
+    int prev = g::sv_time;
     t += msec;
     if (t < target - 300) t = target;  // al entrar o tras un corte: salto
     else if (t > latest) t = latest;   // nunca adelante del ultimo snapshot
     else if (t < target - 10) t += 1;  // se acerca de a poco
     g::sv_time = t;
+    // El reloj del servidor del host manda: si esta en pausa (o el host no manda nada), t no
+    // avanza y las animaciones se quedan quietas. Si corre, avanzan a la tasa del cliente.
+    float dt = (t - prev) / 1000.0f;
+    if (dt < 0.0f || dt > 0.2f) dt = 0.0f;
+    JoinerAdvanceAnims(dt);
     g::Com_SyncClientDObjs();           // lo hace un trap del juego, que aca no corre
     return 1;
 }
