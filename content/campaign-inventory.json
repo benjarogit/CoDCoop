@@ -48,13 +48,13 @@
       "sha256": "36a9e7f1c95b82ffb99743e0c5c4ce95d83c9a430aac59f84ef3cbfab6145068",
       "warning": "invalid_archive"
     },
-    "Main/zzz_patch.pk3": {
-      "size": 544551,
-      "sha256": "4a4f76f0a58176e8e84739740f9487556a29170f6262b4f459294414b0548c04"
-    },
     "Main/zzzzzzz_kar98k_firing_anim_fix.pk3": {
       "size": 28177,
       "sha256": "a0ff833f949b2cf8d7cc76570a5e85e73d1a02fea787a6f106bedc83dac8eff8"
+    },
+    "Main/zzz_patch.pk3": {
+      "size": 544551,
+      "sha256": "4a4f76f0a58176e8e84739740f9487556a29170f6262b4f459294414b0548c04"
     },
     "uo/pakuo00.pk3": {
       "size": 161403007,
