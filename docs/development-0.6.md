@@ -315,6 +315,19 @@ the supported prepared UO `0a0c52e5…` has byte-identical compared functions.
 This is PE disassembly and real engine search-path evidence, not a new Ghidra
 decompilation or a successful mission-interaction proof.
 
+Reproducible native builds / Reproduzierbare native Builds: preserve both the
+compiler version and the exact output argument. MinGW chooses a DLL's default
+ImageBase from that argument; compiling identical sources to a different output
+path can legitimately produce another SHA256. Two normal `./build.sh` runs from
+frozen source checkpoint `98de830` produced byte-identical Core
+`6dba814dd378a7c2f69ec9238512ad648b14d5a04df2aa3ed1a268bdf09b828d`,
+loader `85fc865c…` and checker `0cd064f6…`. The separately named experimental
+Core `602cb6af…` has identical source but its own native evidence and immutable
+binary; do not substitute one hash for another in a tested payload.
+Dieselben Quelldateien unter einem anderen Ausgabepfad können wegen der
+automatisch gewählten ImageBase andere Prüfsummen ergeben. Testnachweise und
+Paketierung bleiben deshalb an die tatsächlich ausgeführte Binärdatei gebunden.
+
 ```sh
 python3 -m unittest discover -s tests -p test_campaign_inventory.py -v
 i686-w64-mingw32-objdump -d --start-address=0x424420 \

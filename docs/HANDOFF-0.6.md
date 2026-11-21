@@ -47,7 +47,12 @@ This addendum supersedes pending statements below. Nothing has been published.
   explicitly unresolved. Evidence: `run/body-overlap-private/STATUS.md`.
   HEAD combines this policy with input/ghost fixes and stronger PE image bounds;
   compiled Core `602cb6af5d25fc7cf8a010e96f56e2a05095dcd30a991499b80ae08d07fa9228`
-  is undergoing fresh native regression in `run/combined-core-prototype/`.
+  passed fresh targeted native UO regression: both unchanged positions clear,
+  downed body visible with normal Use revival, third-person retention and
+  162.5units actual movement. Peer keyboard turns107.7degrees with nonzero
+  local input time. UO mouse injection remains untested: both owned-window
+  methods refused surface binding before injection; no mouse failure is inferred.
+  Evidence: `run/combined-body-validation/STATUS.md`.
 - **Private resource bootstrap:** CoD1 and UO now both pass lost-fragment
   retransmission before the peer's first GAME_INIT. UF also passes default and
   peer-first world-refresh cases with complete current weapon mappings.
