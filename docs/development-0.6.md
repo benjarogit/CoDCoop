@@ -287,3 +287,38 @@ The full sanitizer list is in `.github/workflows/development.yml`. Targeted
 Brecourt scene tests do not count as a complete Brecourt playthrough. / Die
 vollständige Sanitizer-Liste steht im CI-Workflow. Ein isolierter Brecourt-
 Mechaniktest zählt nicht als durchgespielte Mission.
+
+### Native package priority / Native Paketreihenfolge
+
+Do not infer script priority from Python lowercase filename sorting or the
+number of leading `z` characters. Native PathCmp folds ASCII letters to
+**uppercase**, then compares punctuation. Verified native addresses are
+CoD1 1.5 `0x424420` and UO1.51 `0x425840`; their91-byte bodies are identical.
+The CoD1 archive comparator `0x4247a0` calls this function; UO uses `0x425bd0`.
+Native package insertion reverses ascending order for lookup. CoD1 additionally
+sorts lowercase `sp_` as `zz_`, restores it before opening and skips `mp_` packs.
+A physical `zz_*.pk3` is therefore a reserved alias, not a safe override name.
+UO does not have that `sp_`/`zz_` alias behavior. Localized packages have separate
+language ordering and remain excluded from the campaign source inventory.
+
+Die Skriptpriorität ergibt sich nicht aus der Anzahl vorangestellter `z`.
+Die Engine vergleicht ASCII-Großbuchstaben und Satzzeichen. CoD1 behandelt
+`zz_` außerdem als reservierten Alias für `sp_`; UO tut dies nicht. Darum
+verwendet das Inventar je nach Profil die passende Engine-Reihenfolge.
+Produktionspakete wurden aufgrund dieses Befunds nicht pauschal umbenannt.
+
+Evidence: `run/campaign-investigation/native-package-order/` and native search
+path in `run/qa-cod1-four/history/brecourt-cb7071-old-overlay-precedence-TIMEOUT-1795298622366242296/host/Main/console.log`.
+CoD1 SHA256: `c755c7da411c87039ade462a2299402c3c4ca5c4fc4f1ae5cea6e25b05c69f47`.
+UO raw QA SHA256: `c17e57c060f08ef65d7cddea738cced61ab7ccb6d98df95fe185b1ab8aa7e325`;
+the supported prepared UO `0a0c52e5…` has byte-identical compared functions.
+This is PE disassembly and real engine search-path evidence, not a new Ghidra
+decompilation or a successful mission-interaction proof.
+
+```sh
+python3 -m unittest discover -s tests -p test_campaign_inventory.py -v
+i686-w64-mingw32-objdump -d --start-address=0x424420 \
+  --stop-address=0x42447b /path/to/CoDSP.exe
+i686-w64-mingw32-objdump -d --start-address=0x425840 \
+  --stop-address=0x42589b /path/to/CoDUOSP.exe
+```

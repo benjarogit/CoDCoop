@@ -51,11 +51,27 @@ def find_folder(game, name):
     return matches[0]
 
 
-def layer_files(game, folder):
+def native_package_key(name, engine='uo'):
+    """Ascending nonlocalized PK3 order, before native head insertion.
+
+    CoD1 1.5 PathCmp424420 / UO1.51 PathCmp425840 use ASCII uppercase,
+    not lowercase. CoD1 additionally sorts an authored sp_ prefix as zz_
+    before restoring it for opening; UO does not perform that substitution.
+    Localized packs have a separate native language ordering and are excluded.
+    """
+    if engine not in ('cod1','uo'): raise ValueError('Unknown package engine')
+    if engine=='cod1' and name.startswith('sp_'): name='zz_'+name[3:]
+    return name.translate(str.maketrans('abcdefghijklmnopqrstuvwxyz\\:',
+                                      'ABCDEFGHIJKLMNOPQRSTUVWXYZ//'))
+
+
+def layer_files(game, folder, engine='uo'):
     root = find_folder(game, folder)
     # Only shipping assets, not generated Coop overlays, define the inventory.
-    return [p for p in sorted(root.glob('*.pk3'), key=lambda p: p.name.lower())
+    return [p for p in sorted(root.glob('*.pk3'), key=lambda p: native_package_key(p.name,engine))
             if not p.name.lower().startswith('localized_')
+            # CoD1 treats zz_ as its reserved sp_ alias, not this disk name.
+            and not (engine=='cod1' and p.name.startswith(('zz_','mp_')))
             and not re.match(r'^(?:pakz+|z+)_(?:cod)?coop', p.name, re.I)]
 
 
@@ -131,7 +147,8 @@ def inventory(game):
     for profile, groups in profile_layers.items():
         providers = {}
         for group in groups:
-            for package in layers[group]:
+            folder={'cod1':'Main','uo':'uo','sp_improved':'sp_improved','united_fronts':'UnitedFronts'}[group]
+            for package in layer_files(game,folder,'cod1' if profile=='cod1' else 'uo'):
                 rel = package.relative_to(game).as_posix()
                 providers.update({name: (rel, original) for name, original in members.get(rel, {}).items()})
         scripts = []
