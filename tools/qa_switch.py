@@ -309,6 +309,24 @@ def query_hunkmegs(folder, joining, supervisors, timeout):
     return query_engine_number(folder, joining, supervisors, timeout,'com_hunkmegs','qa-switch-hunkmegs.txt',hunk_value)
 
 
+def capture_game_frames(folders,supervisors,timeout):
+    def shots(folder):
+        return {p for p in folder.rglob('screenshots/*') if p.is_file() and p.suffix.lower() in ('.tga','.jpg','.jpeg','.png')}
+    previous=[shots(folder) for folder in folders]
+    requested=time.time_ns();stable=[None]
+    for n,folder in enumerate(folders):command(folder,'screenshot',joiner=n!=0)
+    def complete():
+        paths=[]
+        for folder,old in zip(folders,previous):
+            fresh=[p for p in shots(folder)-old if p.stat().st_size>18 and p.stat().st_mtime_ns>=requested-1_000_000_000]
+            if not fresh:return None
+            paths.append(max(fresh,key=lambda p:p.stat().st_mtime_ns))
+        signature=[(str(p),p.stat().st_size,p.stat().st_mtime_ns) for p in paths]
+        if stable[0]!=signature:stable[0]=signature;return None
+        return [{'path':str(p),'bytes':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest()} for p in paths]
+    return wait_for(complete,supervisors,timeout,'fresh completed native host and joiner screenshots')
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--source', required=True, type=Path)
@@ -585,6 +603,8 @@ def main(argv=None):
         if args.supervisor_mode == 'bundled':
             results['runner_environment_after'] = runner_environments(supervisors, folders, output/'prefix')
             results['checks'].append('actual external Wine process environments isolate bundled GUI libraries and preserve owned prefix')
+        results['native_screenshots']=capture_game_frames(folders,supervisors,20)
+        results['checks'].append('both actual target engines write fresh native screenshots; older reused images are excluded')
         for folder in folders:
             if process_log_errors(folder): raise RuntimeError(str(process_log_errors(folder)))
         for supervisor in supervisors: supervisor.stop()
