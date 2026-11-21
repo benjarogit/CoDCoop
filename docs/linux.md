@@ -69,7 +69,7 @@ The same package is mirrored on MEGA, together with the two optional archives:
 
 | File | Size | Contents |
 |---|---|---|
-| [`Call of Duty - UO Coop Ready.zip`](https://mega.nz/file/5IoQ3KqZ#nxJ6N36qz-heaygUXZ6KcCzal96XQ2O-dpP4v6sOifE) | 1.09 GB | CoD 1.5, UO 1.51, the mod, both installers |
+| [`Call of Duty - UO Coop Ready.zip`](https://mega.nz/file/RMw1QS6B#Elowfq-rcNcMqxUUGDwIXeFbijHOzP5TpoSdNxl36mA) | 1.04 GB | CoD 1.5, UO 1.51, the mod, both installers |
 | [`CoD-UO-German-Language.zip`](https://mega.nz/file/5cpi1LzL#F2kXKeDcP8Rz45oYRgPfcUUTvCdONDtEmDrnJLuAkmg) | 657 MB | German text and voices (CoD + UO) |
 | [`CoD-SP-Extras.zip`](https://mega.nz/file/FVYT3Coa#x0StdxHWj2a0lP5uHIZcuASlQWo2_J6SBQw8mg7dH5c) | 922 MB | SP Improved, United Fronts, UO map pack, Kar98k fix |
 

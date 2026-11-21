@@ -12,7 +12,7 @@ curl -fsSL https://raw.githubusercontent.com/benjarogit/CoDCoop/master/tools/ins
 
 **[⬇ Offline: `Call of Duty - UO Coop Ready.zip` (~1 GB)](https://github.com/benjarogit/CoDCoop/releases/download/v0.5.4/Call-of-Duty-UO-Coop-Ready.zip)** — for installing without internet later: extract, run `Install-CoD-Coop.exe` (Windows) or `install-linux.sh` (Linux). The German language pack (`CoD-UO-German-Language.zip`, ~630 MB) and the optional singleplayer extras (`CoD-SP-Extras.zip`, ~880 MB) are separate downloads; the installers pick them up automatically when they are next to the exe or download them on demand.
 
-**MEGA mirror:** [ready package](https://mega.nz/file/5IoQ3KqZ#nxJ6N36qz-heaygUXZ6KcCzal96XQ2O-dpP4v6sOifE) ·
+**MEGA mirror:** [ready package](https://mega.nz/file/RMw1QS6B#Elowfq-rcNcMqxUUGDwIXeFbijHOzP5TpoSdNxl36mA) ·
 [German pack](https://mega.nz/file/5cpi1LzL#F2kXKeDcP8Rz45oYRgPfcUUTvCdONDtEmDrnJLuAkmg) ·
 [SP extras](https://mega.nz/file/FVYT3Coa#x0StdxHWj2a0lP5uHIZcuASlQWo2_J6SBQw8mg7dH5c)
 
