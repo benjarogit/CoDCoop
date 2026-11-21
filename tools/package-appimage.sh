@@ -66,7 +66,25 @@ module.collect_notices(root,bundle,root/'build/appimage-work/CoDCoop-Setup/Analy
 (bundle/'licenses/CoDCoop-MIT.txt').write_bytes((root/'LICENSE').read_bytes())
 shutil.copytree(root/'third_party/appimage',bundle/'licenses/appimage-runtime',dirs_exist_ok=True)
 PYNOTICE
+# Optional self-contained installer payload. Missing original base packages are
+# retained as installer requirements; this never seals an incomplete game.
+if [ -n "${COOP_SUITE_SOURCE:-}" ]; then
+    "$PYTHON" tools/package_appimage_suite.py --source "$COOP_SUITE_SOURCE" \
+        --destination "$APPDIR/usr/bin/CoDCoop-Setup/suite" \
+        --report "$APPDIR/bundled-suite.json"
+fi
 APPIMAGE_RUNTIME=${COOP_APPIMAGE_RUNTIME:-$ROOT/run/portable-builder/runtime-x86_64}
 printf '%s  %s\n' '77f59c85aa4b171adf01d1870d86a53fcdeee7e27b31d119beb420dc4f140b66' "$APPIMAGE_RUNTIME" | sha256sum -c -
-ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 appimagetool --runtime-file "$APPIMAGE_RUNTIME" "$APPDIR" build/Install-CoD-Coop-Linux-x86_64.AppImage
-sha256sum build/Install-CoD-Coop-Linux-x86_64.AppImage
+APPIMAGE_OUTPUT=${COOP_APPIMAGE_OUTPUT:-build/Install-CoD-Coop-Linux-x86_64.AppImage}
+if [ -e "$APPIMAGE_OUTPUT" ]; then
+    echo "Output already exists; choose a fresh COOP_APPIMAGE_OUTPUT or archive it first." >&2
+    exit 1
+fi
+APPIMAGE_PROCESSORS=${COOP_APPIMAGE_PROCESSORS:-4}
+case "$APPIMAGE_PROCESSORS" in ''|*[!0-9]*) echo "Invalid COOP_APPIMAGE_PROCESSORS" >&2; exit 1;; esac
+if [ "$APPIMAGE_PROCESSORS" -lt 1 ] || [ "$APPIMAGE_PROCESSORS" -gt 64 ]; then
+    echo "COOP_APPIMAGE_PROCESSORS must be between 1 and 64." >&2; exit 1
+fi
+ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 appimagetool --runtime-file "$APPIMAGE_RUNTIME" \
+    --mksquashfs-opt=-processors --mksquashfs-opt="$APPIMAGE_PROCESSORS" "$APPDIR" "$APPIMAGE_OUTPUT"
+sha256sum "$APPIMAGE_OUTPUT"
