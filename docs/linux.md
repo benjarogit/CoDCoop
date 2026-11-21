@@ -8,7 +8,7 @@ Proton. This guide is the setup that was tested end to end:
 | Launcher | AnkerGames (also applies to similar launchers that start the game through `umu-run`/Proton) |
 | Proton | 11.0 |
 | GPU / driver | NVIDIA (proprietary) and Mesa (llvmpipe) |
-| Game | Call of Duty 1.5 + United Offensive 1.51, mod 0.5.2 (this fork) |
+| Game | Call of Duty 1.5 + United Offensive 1.51, mod 0.5.4 (this fork) |
 
 Three things matter on Linux: the launcher has to keep the modified files, the
 driver must not report more OpenGL extensions than the 2003 engine can hold, and
@@ -29,6 +29,24 @@ folder), installs **Call of Duty 1.5** if `CoDSP.exe` is another version (the ol
 one stays as `CoDSP.exe.bak`) and copies **United Offensive 1.51** plus the mod
 into it. Existing files are kept as `<name>.bak`.
 
+On the way it asks the same questions as the Windows setup:
+
+| Question | Default |
+|---|---|
+| game folder (when several are found) | the first real install |
+| game language — German or English | system language |
+| player name | system user name |
+| resolution and fullscreen/windowed | desktop resolution, fullscreen |
+| FOV | 96 for 16:9 (Hor+), 90 otherwise |
+| quality — low/medium/high | high |
+| extras — SP Improved, United Fronts, UO map pack, Kar98k fix | no |
+
+It then writes the settings into `Main/config.cfg` and `uo/config.cfg`, applies
+the PCGamingWiki fixes (`com_maxfps 125`, `com_hunkmegs 256`, multicore renderer,
+skipped intro) and, if German was chosen, installs the German language pack
+(`CoD-UO-German-Language.zip`, ~630 MB, downloaded once; English paks go to
+`localized_backup/`).
+
 Useful variants:
 
 ```sh
@@ -37,6 +55,10 @@ curl -fsSL .../tools/install.sh | sh -s -- --check
 
 # choose the folder yourself / show what would happen
 curl -fsSL .../tools/install.sh | sh -s -- --game "/path/to/Call of Duty" --dry-run
+
+# unattended, everything given on the command line
+curl -fsSL .../tools/install.sh | sh -s -- --yes --language de --name Soldat \
+    --resolution 1920x1080 --fov 96 --quality hoch
 ```
 
 Already downloaded the ZIP? Extract it and run `./install-linux.sh` or

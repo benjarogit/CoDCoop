@@ -344,6 +344,18 @@ BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID)
             g_log = _fsopen(p, "w", _SH_DENYWR);
         }
         Log("codcoop cargado en %s, exe base %p", GetCommandLineA(), GetModuleHandleA(nullptr));
+        // Singleplayer-Mods (SP Improved, United Fronts) bringen ihre eigene
+        // Spiellogik mit; die Co-op-Hooks werden dort nicht gebraucht und
+        // wuerden das Spiel beim Laden der Karte abstuerzen lassen.
+        const char* cmdline = GetCommandLineA();
+        if (strstr(cmdline, "sp_improved") || strstr(cmdline, "UnitedFronts")) {
+            snprintf(p, sizeof p, "%scoduo_yap.dll", g_dir);
+            if (GetFileAttributesA(p) != INVALID_FILE_ATTRIBUTES)
+                Log("Singleplayer-Mod: YAP %s", LoadLibraryA(p) ? "geladen" : "nicht geladen");
+            else
+                Log("Singleplayer-Mod erkannt - Coop-Hooks werden nicht geladen");
+            return TRUE;
+        }
         char exe[MAX_PATH];
         GetModuleFileNameA(nullptr, exe, MAX_PATH);
         if (!_stricmp(strrchr(exe, '\\') + 1, "CoD2SP_s.exe")) {  // CoD2: modulo aparte (src/cod2.cpp), en prueba

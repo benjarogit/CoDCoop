@@ -11,8 +11,15 @@
 # existing files are kept as .bak. Nothing else has to be downloaded or unpacked.
 set -eu
 
+# "curl ... | sh" hands the script a pipe as stdin, so every question would be
+# answered by the end of the download. Switch back to the terminal when there
+# is one; with --yes the installer stays non-interactive anyway.
+if [ ! -t 0 ] && [ -r /dev/tty ]; then
+    exec </dev/tty
+fi
+
 REPO=benjarogit/CoDCoop
-TAG=${COD_COOP_TAG:-v0.5.3}
+TAG=${COD_COOP_TAG:-v0.5.4}
 URL=${COD_COOP_URL:-"https://github.com/$REPO/releases/download/$TAG/Call-of-Duty-UO-Coop-Ready.zip"}
 
 # run from the extracted package: everything is already there, nothing to download

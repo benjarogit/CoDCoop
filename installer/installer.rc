@@ -1,10 +1,95 @@
-// Archivos que lleva el instalador (los ids van con FILES de installer.cpp). Rutas desde la raiz del proyecto.
+// Resources of the Windows installer.
+//  1..9  RCDATA: files the installer carries inside the .exe
+//  1     RT_MANIFEST: administrator rights + DPI awareness
+//  200   the setup dialog
+//
+// Paths are relative to the project root (build.sh runs windres from there).
 1 RCDATA "build/ddraw.dll"
 2 RCDATA "build/codcoop_core.dll"
 3 RCDATA "game/Main/pakz_coop.pk3"
 4 RCDATA "installer/README.txt"
 5 RCDATA "build/steam_api.dll"
-6 RCDATA "game/uo/pakz_coop.pk3"  // solo si hay United Offensive (installer.cpp)
-7 RCDATA "build/cod2coop.dll"  // Call of Duty 2 (installer.cpp)
-8 RCDATA "game2/main/zz_coop2.iwd"  // Call of Duty 2: boton Co-op del menu
-9 RCDATA "game/CoDSP.exe"  // Call of Duty 1.5 (el mod necesita ese exe)
+6 RCDATA "game/uo/pakz_coop.pk3"   // only if United Offensive is there
+7 RCDATA "build/cod2coop.dll"      // Call of Duty 2
+8 RCDATA "game2/main/zz_coop2.iwd" // Call of Duty 2: Co-op button in the menu
+9 RCDATA "game/CoDSP.exe"          // Call of Duty 1.5 (the mod needs that exe)
+
+1 24 "installer/installer.manifest"
+
+#include <windows.h>
+#include <commctrl.h>
+
+#define IDD_INSTALL 200
+
+#define IDC_HEAD      100
+#define IDC_ST_TARGET 101
+#define IDC_LIST      102
+#define IDC_BROWSE    103
+#define IDC_INFO      104
+#define IDC_ST_LANG   105
+#define IDC_DE        106
+#define IDC_EN        107
+#define IDC_LANGNOTE  108
+#define IDC_ST_SET    109
+#define IDC_ST_NAME   110
+#define IDC_NAME      111
+#define IDC_ST_RES    112
+#define IDC_RES       113
+#define IDC_FULL      114
+#define IDC_ST_FOV    115
+#define IDC_FOV       116
+#define IDC_FOVNOTE   117
+#define IDC_ST_Q      118
+#define IDC_Q         119
+#define IDC_FIXNOTE   120
+#define IDC_ST_EXTRAS 121
+#define IDC_SP        122
+#define IDC_UF        123
+#define IDC_MAP       124
+#define IDC_EXNOTE    125
+#define IDC_PROGRESS  126
+#define IDC_STATUS    127
+#define IDC_INSTALL   128
+#define IDC_QUIT      129
+
+IDD_INSTALL DIALOGEX 0, 0, 340, 312
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX
+EXSTYLE WS_EX_APPWINDOW
+CAPTION "Call of Duty Coop - Setup"
+FONT 9, "MS Shell Dlg", 0, 0, 0x1
+BEGIN
+    LTEXT           "", IDC_HEAD, 10, 7, 320, 10
+    GROUPBOX        "", IDC_ST_TARGET, 8, 20, 324, 64
+    LISTBOX         IDC_LIST, 15, 31, 242, 38, LBS_NOINTEGRALHEIGHT | LBS_NOTIFY | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "", IDC_BROWSE, 263, 31, 62, 14
+    LTEXT           "", IDC_INFO, 15, 73, 310, 9
+
+    GROUPBOX        "", IDC_ST_LANG, 8, 88, 324, 44
+    AUTORADIOBUTTON "", IDC_DE, 15, 99, 160, 10, WS_GROUP | WS_TABSTOP
+    AUTORADIOBUTTON "", IDC_EN, 180, 99, 80, 10, WS_TABSTOP
+    LTEXT           "", IDC_LANGNOTE, 15, 112, 310, 17
+
+    GROUPBOX        "", IDC_ST_SET, 8, 136, 324, 78
+    LTEXT           "", IDC_ST_NAME, 15, 148, 26, 9
+    EDITTEXT        IDC_NAME, 43, 146, 88, 13, ES_AUTOHSCROLL | WS_TABSTOP
+    LTEXT           "", IDC_ST_RES, 140, 148, 44, 9
+    COMBOBOX        IDC_RES, 186, 146, 74, 100, CBS_DROPDOWN | WS_VSCROLL | WS_TABSTOP
+    AUTOCHECKBOX    "", IDC_FULL, 266, 148, 60, 10, WS_TABSTOP
+    LTEXT           "", IDC_ST_FOV, 15, 165, 22, 9
+    EDITTEXT        IDC_FOV, 39, 163, 28, 13, ES_NUMBER | WS_TABSTOP
+    LTEXT           "", IDC_FOVNOTE, 72, 165, 60, 9
+    LTEXT           "", IDC_ST_Q, 140, 165, 38, 9
+    COMBOBOX        IDC_Q, 180, 163, 62, 60, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "", IDC_FIXNOTE, 15, 180, 310, 30
+
+    GROUPBOX        "", IDC_ST_EXTRAS, 8, 218, 324, 44
+    AUTOCHECKBOX    "", IDC_SP, 15, 229, 105, 10, WS_TABSTOP
+    AUTOCHECKBOX    "", IDC_UF, 125, 229, 70, 10, WS_TABSTOP
+    AUTOCHECKBOX    "", IDC_MAP, 200, 229, 70, 10, WS_TABSTOP
+    LTEXT           "", IDC_EXNOTE, 15, 242, 310, 17
+
+    CONTROL         "", IDC_PROGRESS, "msctls_progress32", WS_BORDER | PBS_MARQUEE, 8, 266, 324, 9
+    LTEXT           "", IDC_STATUS, 8, 278, 324, 9
+    DEFPUSHBUTTON   "", IDC_INSTALL, 8, 291, 70, 16
+    PUSHBUTTON      "", IDC_QUIT, 280, 291, 52, 16
+END

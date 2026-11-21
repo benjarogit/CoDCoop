@@ -2,7 +2,7 @@
 
 Play the **Call of Duty 1 (2003)** campaign, the **United Offensive** expansion and the **Call of Duty 2** campaign in co-op with friends: up to 4 players, through Steam, over the internet by IP, or on a local network.
 
-**[⬇ Windows: `Install-CoD-Coop.exe`](https://github.com/benjarogit/CoDCoop/releases/latest)** — double-click. It finds the game, installs Call of Duty 1.5 and United Offensive 1.51 with the mod, and downloads the ~1 GB package itself. No disc image, no patch wizard.
+**[⬇ Windows: `Install-CoD-Coop.exe`](https://github.com/benjarogit/CoDCoop/releases/latest)** — double-click. A real setup window: it finds the game, asks for language, name, resolution, FOV and quality, and installs Call of Duty 1.5 + United Offensive 1.51 with the mod. It downloads the ~1 GB package itself. No disc image, no patch wizard, no console window.
 
 **Linux:** one command, nothing to unpack:
 
@@ -10,7 +10,7 @@ Play the **Call of Duty 1 (2003)** campaign, the **United Offensive** expansion 
 curl -fsSL https://raw.githubusercontent.com/benjarogit/CoDCoop/master/tools/install.sh | sh
 ```
 
-**[⬇ Offline: `Call of Duty - UO Coop Ready.zip` (~1 GB)](https://github.com/benjarogit/CoDCoop/releases/download/v0.5.3/Call-of-Duty-UO-Coop-Ready.zip)** — for installing without internet later: extract, run `Install-CoD-Coop.exe` (Windows) or `install-linux.sh` (Linux). Mirror: [MEGA](https://mega.nz/file/oMAjRTQA#r60DTteMs7-x6kqZuEMjtmLlRQVrJIBvv2uKk4pkXmQ).
+**[⬇ Offline: `Call of Duty - UO Coop Ready.zip` (~1 GB)](https://github.com/benjarogit/CoDCoop/releases/download/v0.5.4/Call-of-Duty-UO-Coop-Ready.zip)** — for installing without internet later: extract, run `Install-CoD-Coop.exe` (Windows) or `install-linux.sh` (Linux). The German language pack (`CoD-UO-German-Language.zip`, ~630 MB) and the optional singleplayer extras (`CoD-SP-Extras.zip`, ~880 MB) are separate downloads; the installers pick them up automatically when they are next to the exe or download them on demand.
 
 > **This is a fork** of [TheTiranix/CoDCoop](https://github.com/TheTiranix/CoDCoop), maintained here.
 > It adds first-class Linux support — cross-build, native installer, the Proton/`ddraw` fixes and the
@@ -51,13 +51,29 @@ curl -fsSL https://raw.githubusercontent.com/benjarogit/CoDCoop/master/tools/ins
 3. If Windows shows "Windows protected your PC", click **More info** →
    **Run anyway** (the installer is not signed).
 
-The installer does the rest:
+The setup asks for
+
+* the game folder (all detected installs are listed: Steam — every library —,
+  AnkerGames, registry, portable; pick one or browse to it),
+* the game language: **German** (downloads the German language pack once) or English,
+* your player name, resolution and fullscreen/windowed,
+* **FOV** and **quality** (low/medium/high),
+* optional **extras**: SP Improved, United Fronts, the UO map pack and the
+  Kar98k FOV fix.
+
+Then it does the rest:
 
 * installs **Call of Duty 1.5** if `CoDSP.exe` is another version (the old one
   stays as `CoDSP.exe.bak`),
 * downloads the ready package (~1 GB) once and unpacks it,
 * copies **United Offensive 1.51** and the mod into the game folder, keeping
-  existing files as `.bak`.
+  existing files as `.bak`,
+* applies the sensible PCGamingWiki fixes: Hor+ FOV, `com_maxfps 125` (footsteps
+  stay audible), `com_hunkmegs 256` (no UO quick-save crash), multicore renderer,
+  skipped intro, and no `WIN_*` start dialogs after an unclean exit,
+* installs the German language pack if chosen (English paks are kept in
+  `localized_backup/`),
+* writes the settings into `Main/config.cfg` and `uo/config.cfg`.
 
 **Linux**
 
@@ -65,9 +81,18 @@ The installer does the rest:
 curl -fsSL https://raw.githubusercontent.com/benjarogit/CoDCoop/master/tools/install.sh | sh
 ```
 
-That downloads the package, extracts it and runs the installer, which finds the
-game folder by itself (Steam libraries, AnkerGames, current folder). Add
-`--check` to verify an installation afterwards:
+That downloads the package, extracts it and runs the same setup as a terminal
+wizard: it finds the game folder by itself (Steam libraries, AnkerGames, current
+folder), then asks the same questions (language, name, resolution, FOV, quality,
+extras) and writes the same files. Everything can also be passed as flags for an
+unattended run:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/benjarogit/CoDCoop/master/tools/install.sh | sh -s -- \
+  --yes --language de --name Soldat --resolution 1920x1080 --fov 96 --quality hoch
+```
+
+Add `--check` to verify an installation afterwards:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/benjarogit/CoDCoop/master/tools/install.sh | sh -s -- --check
@@ -79,6 +104,16 @@ curl -fsSL https://raw.githubusercontent.com/benjarogit/CoDCoop/master/tools/ins
 with CoD 1.5, United Offensive 1.51, the mod and both installers. Extract it and
 run `Install-CoD-Coop.exe` (Windows) or `install-linux.sh` (Linux) from that
 folder — no download, no disc image, no patch wizard.
+
+For a fully offline setup put these next to the installer first:
+
+| File | Size | What it is |
+|---|---|---|
+| `CoD-UO-German-Language.zip` | ~630 MB | German text and voices for CoD and UO |
+| `CoD-SP-Extras.zip` | ~880 MB | SP Improved, United Fronts, UO map pack, Kar98k fix |
+
+The installers look for `german/` and `extras/` folders (or the ZIPs themselves)
+next to the exe and use them instead of downloading.
 
 ## Linux (Proton / Wine)
 

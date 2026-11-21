@@ -181,6 +181,41 @@ bool OpenSocket(int port)
     return true;
 }
 
+// IP local (la que ven los demas en la red): se pregunta al sistema cual seria la salida
+// (connect UDP no manda nada) y si falla se resuelve el nombre del equipo.
+const char* LocalIp()
+{
+    static char ip[64] = "";
+    if (ip[0]) return ip;
+    SOCKET s = socket(AF_INET, SOCK_DGRAM, 0);
+    if (s != INVALID_SOCKET) {
+        sockaddr_in dst{};
+        dst.sin_family = AF_INET;
+        dst.sin_port = htons(53);
+        inet_pton(AF_INET, "8.8.8.8", &dst.sin_addr);
+        if (connect(s, (sockaddr*)&dst, sizeof dst) == 0) {
+            sockaddr_in self{};
+            int len = sizeof self;
+            if (getsockname(s, (sockaddr*)&self, &len) == 0)
+                inet_ntop(AF_INET, &self.sin_addr, ip, sizeof ip);
+        }
+        closesocket(s);
+    }
+    if (!ip[0]) {
+        char host[256];
+        if (gethostname(host, sizeof host) == 0) {
+            addrinfo hints{}, *res = nullptr;
+            hints.ai_family = AF_INET;
+            if (getaddrinfo(host, nullptr, &hints, &res) == 0 && res) {
+                inet_ntop(AF_INET, &((sockaddr_in*)res->ai_addr)->sin_addr, ip, sizeof ip);
+                freeaddrinfo(res);
+            }
+        }
+    }
+    if (!ip[0]) snprintf(ip, sizeof ip, "your IP");
+    return ip;
+}
+
 netadr_t ToNet(const sockaddr_in& a)
 {
     netadr_t n{};
@@ -2205,9 +2240,15 @@ void Cmd_CoopHost()
         return;
     }
     S->role = HOST;
-    g::Com_Printf("^2COOP: hosting on port %d. Others: coopjoin <your ip>\n", port);
-    CoopStatus("Hosting (UDP port %d). Now choose New Game or Load Game; others join with your IP%s.", port,
-               steam::up ? " or through Steam" : "");
+    const char* ip = LocalIp();
+    char note[128];
+    snprintf(note, sizeof note, "CO-OP: hosting %s:%d", ip, port);
+    g::Cvar_Set("ui_coop_host", note);       // aviso corto del menu principal
+    snprintf(note, sizeof note, "HOSTING on %s:%d - press Back, then New Game.", ip, port);
+    g::Cvar_Set("ui_coop_host_info", note);  // ventana Cooperativo
+    g::Com_Printf("^2COOP: hosting on %s:%d. Others: coopjoin %s\n", ip, port, ip);
+    CoopStatus("Hosting on %s:%d. Back, then New Game. Friends join with coopjoin %s%s.", ip, port, ip,
+               steam::up ? " or a Steam invite" : "");
 }
 
 // coopjoin <ip>[:puerto]; sin argumento usa la IP escrita en el menu Cooperativo (cvar coop_ip)
@@ -2280,6 +2321,8 @@ void Cmd_CoopLeave()
         S->role = NONE;
         g_noPause = false;
         SkipUiPauseCheck(false);  // el menu vuelve a pausar como en el SP
+        g::Cvar_Set("ui_coop_host", "");
+        g::Cvar_Set("ui_coop_host_info", "");
         CoopStatus("You stopped hosting: the game goes on just for you.");
     } else {
         CoopStatus("You are not in a co-op game.");

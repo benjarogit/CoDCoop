@@ -33,7 +33,7 @@
 			type ITEM_TYPE_TEXT
 			style 1
 			textstyle 3
-			text "CO-OP: hosting - UDP 28960 open"
+			cvar "ui_coop_host"
 			cvarTest "ui_coop_hosting"
 			showCVar { "1" }
 			textscale .2

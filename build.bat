@@ -25,5 +25,5 @@ if not exist build\steam_api.dll copy /y "C:\Program Files (x86)\Steam\steamapps
 fc /b build\steam_api.dll game\steam_api.dll >nul 2>nul || copy /y build\steam_api.dll game\ >nul 2>nul || echo AVISO: no se pudo copiar steam_api.dll a game\
 if exist game2\CoD2SP_s.exe fc /b build\steam_api.dll game2\steam_api.dll >nul 2>nul || copy /y build\steam_api.dll game2\ >nul 2>nul
 rem instalador: un solo .exe con los archivos del mod, steam_api.dll y el README.txt adentro (installer\installer.rc)
-windres -i installer\installer.rc -o build\installer_res.o && g++ -std=c++17 -O2 -s -static -mwindows -municode -o "build\Install CoD Coop.exe" installer\installer.cpp build\installer_res.o -lole32 -lshell32 -lurlmon || echo AVISO: no se pudo armar el instalador
+windres -i installer\installer.rc -o build\installer_res.o && g++ -std=c++17 -O2 -s -static -mwindows -municode -o "build\Install-CoD-Coop.exe" installer\installer.cpp build\installer_res.o -lole32 -lshell32 -lurlmon -lcomctl32 -loleaut32 -luuid || echo AVISO: no se pudo armar el instalador
 echo BUILD OK

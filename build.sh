@@ -74,7 +74,7 @@ fi
 
 if [ "$INSTALLER" = 1 ]; then
     missing=""
-    for f in build/steam_api.dll game/Main/pakz_coop.pk3 game/uo/pakz_coop.pk3 game2/main/zz_coop2.iwd; do
+    for f in build/steam_api.dll game/Main/pakz_coop.pk3 game/uo/pakz_coop.pk3 game2/main/zz_coop2.iwd installer/installer.manifest; do
         [ -f "$f" ] || missing="$missing $f"
     done
     if [ -n "$missing" ]; then
@@ -83,10 +83,11 @@ if [ "$INSTALLER" = 1 ]; then
     elif ! command -v "$WINDRES" >/dev/null 2>&1; then
         echo "WARNING: $WINDRES not found, not building the installer" >&2
     else
-        echo "== Install CoD Coop.exe"
+        echo "== Install-CoD-Coop.exe"
         "$WINDRES" -i installer/installer.rc -o build/installer_res.o
-        "$CXX" -std=c++17 -O2 -s -static -mwindows -municode -o "build/Install CoD Coop.exe" \
-            installer/installer.cpp build/installer_res.o -lole32 -lshell32 -lurlmon
-        echo "BUILD OK: build/Install CoD Coop.exe"
+        "$CXX" -std=c++17 -O2 -s -static -mwindows -municode -o "build/Install-CoD-Coop.exe" \
+            installer/installer.cpp build/installer_res.o \
+            -lole32 -lshell32 -lurlmon -lcomctl32 -loleaut32 -luuid
+        echo "BUILD OK: build/Install-CoD-Coop.exe"
     fi
 fi

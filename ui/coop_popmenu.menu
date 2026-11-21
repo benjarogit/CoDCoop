@@ -187,16 +187,16 @@
 			mouseExit { setitemcolor leave backcolor UI_BUTTON_BACK_COLOR }
 		}
 
-		// aviso: el puerto ya esta abierto y lo siguiente es "Back" + "New Game"
-		// (ui_coop_hosting lo pone el boton de arriba; sin esto el jugador no ve nada tras "Host game")
+		// aviso: el puerto ya esta abierto y lo siguiente es "Back" + "New Game"; muestra la IP
+		// que hay que dar a los amigos (ui_coop_host la pone coophost, ver src/core.cpp)
 		itemDef
 		{
 			name hostingnote
-			rect 20 186 255 14
+			rect 20 184 255 12
 			type ITEM_TYPE_TEXT
 			style 1
 			textstyle 3
-			text "HOSTING - UDP 28960 open. Press Back, then New Game."
+			cvar "ui_coop_host"
 			cvarTest "ui_coop_hosting"
 			showCVar { "1" }
 			textscale .16
@@ -213,14 +213,14 @@
 		itemDef
 		{
 			name steaminfo
-			rect 20 192 255 16
+			rect 20 196 255 12
 			type ITEM_TYPE_TEXT
 			style 1
 			cvar "ui_coop_steam"
 			textalign ITEM_ALIGN_CENTER
 			textalignx 127
 			textaligny 12
-			textscale .22
+			textscale .18
 			forecolor 1 1 1 .8
 			visible 1
 			decoration
