@@ -51,6 +51,17 @@ class SwitchGateTests(unittest.TestCase):
     def test_missing_query_fails(self):
         with self.assertRaises(ValueError): qa.difficulty_value('g_gameskill was passed on command line')
 
+class NativeShutdownTests(unittest.TestCase):
+    def test_all_real_process_lifetimes_require_zero_nonforced_exit(self):
+        records=[{'phase':'game_stopped','pid':pid,'code':0,'forced':False} for pid in (10,20,30)]
+        self.assertEqual(qa.verify_game_stops([10,20,30],records),records)
+        for changed in (records[:-1],records+[dict(records[0])],
+                        [dict(r,code=7) if r['pid']==20 else r for r in records],
+                        [dict(r,forced=True) if r['pid']==20 else r for r in records]):
+            with self.subTest(records=changed),self.assertRaises(ValueError):qa.verify_game_stops([10,20,30],changed)
+        with self.assertRaises(ValueError):qa.verify_game_stops([],[])
+
+
 class RunnerEnvironmentTests(unittest.TestCase):
     def test_realistic_clean_runner_retains_owned_prefix(self):
         value=qa.assess_runner_environment({'WINEPREFIX':'/owned/prefix','CODCOOP_QA_PROFILE':'1','PATH':'/usr/bin'},Path('/owned/prefix'),Path('/game/coop/launcher'))

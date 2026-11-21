@@ -151,6 +151,20 @@ def verify_transition(before, after, old_pids, new_pids, variant, map_name, diff
         raise ValueError('test must start in a different campaign')
 
 
+def verify_game_stops(pids,events):
+    if not pids: raise ValueError('no actual game process was observed')
+    stops=[]
+    for pid in pids:
+        matching=[e for e in events if e.get('phase')=='game_stopped' and e.get('pid')==pid]
+        if len(matching)!=1:
+            raise ValueError('missing or ambiguous native exit status for game process '+str(pid))
+        stop=matching[0]
+        if type(stop.get('code')) is not int or stop['code']!=0 or stop.get('forced') is not False:
+            raise ValueError('native game did not stop cleanly: '+str(stop))
+        stops.append(stop)
+    return stops
+
+
 class Supervisor:
     def __init__(self, folder, command_line, env, log_path):
         self.folder = folder
@@ -576,6 +590,7 @@ def main(argv=None):
         for supervisor in supervisors: supervisor.stop()
         if any(s.process.returncode != 0 for s in supervisors):
             raise RuntimeError('a supervisor failed during clean shutdown')
+        results['native_game_stops']=[verify_game_stops(s.game_pids(),s.events) for s in supervisors]
         results['checks'].append('both supervisors and game processes close cleanly')
         results['status'] = 'PASS'
     except (OSError, ValueError, RuntimeError, TimeoutError, subprocess.SubprocessError) as error:
