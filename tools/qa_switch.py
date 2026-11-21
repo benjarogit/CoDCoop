@@ -492,13 +492,14 @@ def main(argv=None):
         results['save'] = [{'path': str(p), 'size': p.stat().st_size,
                             'sha256': hashlib.sha256(p.read_bytes()).hexdigest()} for p in saved]
         if args.check_committed_retry:
-            def live_waiting_host():
+            def live_waiting_host(minimum_tick=0):
                 state=read_json(folders[0]/'coop/runtime-state.json') or {}
                 native=read_state(folders[0]) or {}
                 if (state.get('variant')==args.to_variant and state.get('map')==args.to_map and
                         state.get('role')=='host' and state.get('render_ready') is True and
                         state.get('live_players',0)<=1 and native.get('expected_players')==2 and
                         native.get('snapshot_num',0)>0 and
+                        native.get('tick',0)>minimum_tick and
                         any(e.get('phase')=='reconnecting' for e in supervisors[0].events)):
                     return state
             waiting=wait_for(live_waiting_host,supervisors,args.timeout,'real target host waiting for committed peer',folders)
@@ -515,7 +516,7 @@ def main(argv=None):
                      'explicit recovery Retry restarts the live owned target host',folders)
             if supervisors[0].game_pids()[-1]==waiting_pid:
                 raise RuntimeError('recovery Retry reused the waiting native process')
-            replacement=wait_for(live_waiting_host,supervisors,args.timeout,
+            replacement=wait_for(lambda:live_waiting_host(live_after.get('tick',0)),supervisors,args.timeout,
                 'replacement rendered host still requires the committed two-player party',folders)
             replacement_native=read_state(folders[0]) or {}
             if replacement_native.get('tick',0)<=live_after.get('tick',0):
