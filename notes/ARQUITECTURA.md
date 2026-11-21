@@ -112,6 +112,11 @@ Modulo de juego (gamex86.dll): vmMain 0x2001cd70. 0 Init, 1 Shutdown, 2 ClientCo
 - TRAMPA: el motor saltea las entidades 0..3 en la copia servidor->cliente por snapshot (0x44d8e0 empieza en
   serverObjMap+8) y en la confirmacion del tiempo: para los cuerpos se hace a mano cada frame
   (0x47b010 con el arbol en 0xa6d008; +0x3c = +0x38).
+- Joiner: el snapshot trae el bloque cliente (lo que se dibuja). Se guarda como estado confirmado del servidor
+  (+0x3c/+0x42 y +0x44..), se avanza por frame con 0x47ccd0 (inGameCall = 1), se confirma (+0x3c = +0x38,
+  +0x42 = +0x40) y se copia con 0x47b010. El snapshot siguiente solo corrige la fase: antes la animacion
+  avanzaba a la tasa de snapshots (20 Hz) y parecia de muy pocos FPS (issue #4). `Coop_FrozenFrame` usa el
+  delta de sv_time, asi que si el host se pausa las animaciones se quedan quietas.
 - Animar: 0x47d8b0 (ECX arbol, EAX anim; goalWeight, blendTime, rate, 0, 0, 0) y 0x47ccd0 (ECX DObj; dtime,
   notify) con inGameCall = 1. Sin mezcla: se apagan todos los nodos y se enciende la cadena nueva.
 - Postura: ps.pm_flags (+0xc) 1 = cuerpo a tierra, 2 = agachado. Comando `coopanims <texto>` lista las hojas.
