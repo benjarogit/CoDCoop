@@ -2369,3 +2369,99 @@ harness result SHA256
 `ebf59c7f4af081626735d21d0e40cb6bcd834262411b5a8a06d26982ca2bd63b`.
 All owned processes are stopped. No guards or free behavior were changed,
 no GMI-adapted native game ran, and the original native crash remains open.
+
+### GMI-on453995: producer verified partially, corrupt definition at free entry
+
+Immutable Core453995fb executes the GMI-on Noville attempt with corrected
+read-only notify offset, strict native registered bitmap unchanged and bounded
+bootstrap feedback changes. Default255, deferral1, no borrowed-tree/MT/barrier
+extras and real bootstrap v2 remain explicit. The runner now requires the
+validated catalog/epoch, unchanged four submitted manual choices and all four
+application receipts tied to current native FRESH session/slot/ticket/world
+before entering its acceptance phases. Wrong receipt/ticket/disposition/catalog
+fixtures fail; no four-owner result can be inferred from input CVars alone.
+
+The new loader actually compiles and runs: Host PLAN_VALIDATED and exact
+receipts0,1,2 appear. Receipt3 never appears. A separate postmortem verifies all
+submitted plan fields stayed unchanged, all four overlay metadata records carry
+the pinned1062d043 GMI source, but the strict all-four receipt result is false.
+This establishes the loader omission and its partial correction independently
+of a successful four-player session.
+
+The attempt **FAILS with two actual native crashes**, not an acceptance timeout:
+join2 entity341 is created at07:29:43.600 with tree00975400,
+definition3016db60 and988 nodes. At07:29:56.390 the same tree/definition already
+has node count-16777216 at **free-entry**, before server free, client sync or
+info release. It stays negative through native-free entry and faults45fd50.
+Join1 simultaneously reaches the same invalid shared-definition content at
+free-entry (tree00971400, refs14 versus join2 refs0) and faults too. Loaded=true
+does not prove definition-content integrity. This localizes the corruption
+before these particular free sequences; it does not identify the earlier write
+instruction or authorize skipping the allocator. The owned-window hardware
+write-watchpoint investigation is separate and pending.
+
+All runtime/source/overlays and pre-cleanup logs/console/states are archived at
+`run/qa-cod1-four/history/1795329148842541172`, proof SHA256
+`8cbfaa378db53eb06c952c24ddd413d2ab6d1c7f05aec1ac1e04d96f6a89c6a9`,
+result SHA256
+`bc5d500f325a20737bd2e5ef0f954037ad009336436453fc912c1f3d2ba96471`.
+`453995-native-crash-before-cleanup/` retains the actual fault context, and
+`453995-partial-plan-audit.json` explicitly refuses four-owner success. All
+owned processes are stopped; no fire/body phase or Foy four-player run follows.
+
+Peer3 independently preserves a precise compatibility WAIT: index111,
+thompson28, Host expected_registered0 but local Game registered1. All119
+expected/Game/CG names agree; this is the only difference, and peers1/2 have no
+mapping difference. Thus an **extra local registration0→1** persists despite
+the Host's GMI plan, not a missing required1→0 item. Original network mapping
+TSVs and transmitted/received resource text are copied with SHA/mtime into
+`bootstrap-postmortem/`; `audit.json` records the exact comparison.
+
+Host and peer3 logged derived American/German nations,1945 and winter. Raw
+sp_ally/axis/forceweapons/ammo/history/order/campaign/loadgame values were not
+logged; they are unknown rather than assumed empty/equal. The pinned original
+American loadout uses Noville's load5 candidate lists and random rifle/SMG
+selection, including thompson28. Host's initial CG selects m1garand42 while
+peer3's selects m1carbine40 before manual application. Independent original
+random selection is consistent with the mismatch, but neither these logs nor
+the registration bitmap prove which native caller registered thompson28; AI
+startup remains another possible source.
+
+Host's synchronous plan resource pre-cache/PLAN_VALIDATED precedes renderer
+EndRegistration07:29:14.493 and completed init15.025. Bootstrap exports at
+17.327/27.251/38.932 all carry347 models/119 weapons. Therefore the mismatch
+occurs after a plan-aware initial export, rather than proving that the Host
+never prepared the requested resources. Native bitmap enforcement stays strict.
+
+The feedback behavior has a separate bounded positive scope despite the native
+crash/four-owner FAIL: after peer3's explicit mapping WAIT, no repeated host-map
+queue log occurs, and its visible status keeps the concrete failure instead of
+being overwritten. The first partial five-second sample contains101 control
+packets; subsequent complete samples contain24–28, compared with the old rapid
+reload loop. Exact per-type ACK/M_MAP packets were not captured, so total control
+counts are not presented as individual message counters. This feedback evidence
+does not waive either the compatibility rejection or the native corruption.
+
+### All-existing-weapon media option: source-only preparation
+
+The fresh-role runner adds explicit
+`--experimental-all-weapon-media`, default false. For each of its four owned
+game launches this sets only `CODCOOP_QA_ALL_WEAPON_MEDIA=1` in addition to the
+already declared diagnostic flags; it changes no GSC plan, inventory grant,
+model capacity, bitmap comparison or actor/world state. Inherited copies of
+this QA flag are removed when the option is absent, preventing an unrelated
+environment from silently changing a causal trace. Metadata labels it native
+item/media registration, not inventory or native acceptance evidence.
+
+The parent's separate future all-media Core experiment has not been run here.
+Its intended complete existing119-definition media registration must retain
+normal native item registration and strict comparison/255-slot guards; its
+effectiveness and512-entry approved-name closure remain unverified. The next
+hardware write-watchpoint run must use the immutable453995 registration layout
+without this option so it can catch the original definition corruption.
+
+A pure parser/environment regression verifies opt-in behavior, exactly one
+added environment key, inherited-flag suppression, preservation of the input
+environment and no implicit borrowed-tree flag. These tests parse paths without
+accessing a prefix or launching a game. Five fresh-role source/oracle tests pass;
+no native or prefix mutation is performed for this option preparation.

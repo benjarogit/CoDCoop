@@ -278,11 +278,37 @@ bool BootControl(uint8_t type,Reader r,const sockaddr_in& from) {
     }
     return true;
 }
+bool BootQAAllWeaponMedia() {
+    char flag[8]{};
+    return suite::IsQA()&&g_qaDeferredEnabled&&g::uo&&S&&g_identity.variant==4&&
+        GetEnvironmentVariableA("CODCOOP_QA_ALL_WEAPON_MEDIA",flag,sizeof flag)==1&&flag[0]=='1';
+}
 void BootNativeItems() {
     auto live=(uintptr_t)GetModuleHandleA(g::GameDll());
     const uint8_t nativeStage[]={0x51,0x53,0x55,0x56,0x57,0x83,0xcb,0xff};
     if(!live||g_bootItemOriginal!=(void*)(live+g::A(0x3e5a0,0x421f0))||memcmp(g_bootItemOriginal,nativeStage,sizeof nativeStage))return;
     ((void(__cdecl*)())g_bootItemOriginal)();
+    if(BootQAAllWeaponMedia()) {
+        auto game=(uint8_t*)live;int count=*(int*)(game+g::G_NUMWEAPONS);
+        auto definitions=*(uint8_t***)(game+g::G_WEAPONDEFS);
+        if(!*(int*)(game+g::A(0x2db248,0x307f28))||count<1||count>=g::MAX_WEAPONS||
+            !definitions||IsBadReadPtr(definitions,(count+1)*4)) {
+            BootFailure("QA full native weapon media stage is invalid");return;
+        }
+        for(int w=1;w<=count;++w)if(!definitions[w]||IsBadReadPtr(definitions[w],g::uo?0x388:0x320)||
+            !asset_bootstrap::ValidWeaponName(BootString(*(char**)(definitions[w]+4)))) {
+            BootFailure("QA full native weapon table has an invalid definition");return;
+        }
+        void* native=game+0x1e700;
+        for(int w=1;w<=count;++w) {
+            int index=w;
+            asm volatile("push $1; call *%1; add $4,%%esp":"+D"(index):"r"(native):"eax","ecx","edx","memory","cc");
+        }
+        for(int w=1;w<=count;++w)if(!*(int*)(game+g::G_ITEMREGISTERED+w*4)) {
+            BootFailure("QA full native weapon registration did not complete");return;
+        }
+        Log("QA full native weapon media: registered all %d existing definitions before GSC; no inventory granted",count);
+    }
     if(!g_api||!BootStageCurrent()||!g_bootLoading||!g_bootTransferred||g_bootFailed)return;
     uint8_t* game=(uint8_t*)GetModuleHandleA(g::GameDll());
     int count=game?*(int*)(game+g::G_NUMWEAPONS):-1;
@@ -298,10 +324,14 @@ void BootNativeItems() {
     g_bootItemDone=true;Log("Resource bootstrap: native item/alt registration completed before GSC start serial=%u",g_bootReceiver.Header().serial);
 }
 void BootPreInit() {
-    if(!BootEnabled()||!g_bootLoading||!g_bootTransferred)return;
-    if(!BootPeerContext()||g_bootParsedSerial!=g_bootReceiver.Header().serial||_stricmp(g::CvarString("mapname"),g_bootReceiver.Header().map)){BootFailure("native init does not match current approved resource context");return;}
-    S->bootstrap.peer.initSerial=S->preservation.init.serial;S->bootstrap.peer.gameBase=(uint32_t)(uintptr_t)GetModuleHandleA(g::GameDll());g_bootItemEpoch=S->bootstrap.epoch;
-    g_bootItemDone=g_bootEndDone=g_bootNativeReady=false;
+    if(!BootEnabled())return;
+    bool peerStage=g_bootLoading&&g_bootTransferred;
+    if(!peerStage&&!BootQAAllWeaponMedia())return;
+    if(peerStage) {
+        if(!BootPeerContext()||g_bootParsedSerial!=g_bootReceiver.Header().serial||_stricmp(g::CvarString("mapname"),g_bootReceiver.Header().map)){BootFailure("native init does not match current approved resource context");return;}
+        S->bootstrap.peer.initSerial=S->preservation.init.serial;S->bootstrap.peer.gameBase=(uint32_t)(uintptr_t)GetModuleHandleA(g::GameDll());g_bootItemEpoch=S->bootstrap.epoch;
+        g_bootItemDone=g_bootEndDone=g_bootNativeReady=false;
+    }
     if(!g_qaEndEnabled){BootFailure("native EndRegistration hook is unavailable");return;}
     auto base=(uintptr_t)GetModuleHandleA(g::GameDll());if(!base)return;
     uintptr_t call=base+g::A(0x1e3d9,0x2095a),original=base+g::A(0x3e5a0,0x421f0),item=base+g::A(0x1c490,0x1e700);
@@ -316,7 +346,7 @@ void BootPreInit() {
     if(target!=(uintptr_t)BootNativeItems&&target!=original){BootFailure("foreign item stage wrapper");return;}
     if(target==original) {g_bootItemOriginal=(void*)original;g_bootItemCall=call;hook::PatchRel32(call,(void*)BootNativeItems);}
     if(call+5+*(int32_t*)(code+1)!=(uintptr_t)BootNativeItems){BootFailure("native item-stage patch failed");return;}
-    if(g_qaDeferredEnabled)for(const auto& model:g_bootResources.models)if(!g_qaLedger.Approve(model)){BootFailure("approved native model ledger full");return;}
+    if(peerStage&&g_qaDeferredEnabled)for(const auto& model:g_bootResources.models)if(!g_qaLedger.Approve(model)){BootFailure("approved native model ledger full");return;}
 }
 void BootBeforeEnd() {
     if(!g_api||!BootStageCurrent()||!g_bootLoading||!g_bootTransferred||g_bootFailed)return;

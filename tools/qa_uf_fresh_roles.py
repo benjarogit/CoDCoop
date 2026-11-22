@@ -11,6 +11,31 @@ from stage_suite import laa_bytes,UOSP_LAA
 
 def normalized(name):return name.lower().removeprefix('xmodel/')
 
+def owned_game_environment(inherited, *, trace_tree_free=False, borrow_trees=False, all_weapon_media=False):
+ env=dict(inherited)
+ for key in tuple(env):
+  if key.startswith('CODCOOP_QA_') and key!='CODCOOP_QA_NO_STEAM':env.pop(key)
+ env['CODCOOP_QA_DEFER_MODELS']='1'
+ if trace_tree_free:env['CODCOOP_QA_TREE_FREE_TRACE']='1'
+ if borrow_trees:env['CODCOOP_QA_BORROW_TREES']='1'
+ if all_weapon_media:env['CODCOOP_QA_ALL_WEAPON_MEDIA']='1'
+ return env
+
+def host_plan_receipts_match(native,submitted):
+ if native.get('coop_qa_kit_status')!='PLAN_VALIDATED':return False
+ if native.get('coop_qa_kit_verified_catalog')!=submitted['coop_qa_kit_catalog'] or native.get('coop_qa_kit_verified_epoch')!=submitted['coop_qa_kit_epoch']:return False
+ if any(native.get(key)!=value for key,value in submitted.items()):return False
+ session=[native.get('coop_spawn_session_'+part,'') for part in ('a','b','c')]
+ world=native.get('coop_spawn_world','')
+ if not world.isdigit() or int(world)<=0 or any(not part.isdigit() for part in session):return False
+ for slot in range(4):
+  ticket=native.get('coop_spawn_ticket_%d'%slot,'')
+  if not ticket.isdigit() or int(ticket)<=0:return False
+  identity='|'.join(session+[str(slot),ticket,world])
+  if native.get('coop_qa_kit_identity_%d'%slot)!=identity or native.get('coop_qa_kit_applied_%d'%slot)!=identity+'|'+submitted['coop_qa_kit_epoch']:return False
+  if native.get('coop_inventory_%d_state'%slot)!='FRESH' or native.get('coop_inventory_%d_identity'%slot)!=identity:return False
+ return True
+
 def require_body_models(host, observers):
  ownership={}
  for label,observer in observers.items():
@@ -42,7 +67,7 @@ def require_body_models(host, observers):
       raise RuntimeError('Native body component/cache/CS mismatch: %s/%s owner%d component%d id%d'%(label,side,slot,component,-flag))
  return ownership
 
-def main():
+def argument_parser():
  p=argparse.ArgumentParser(description=__doc__)
  for name in ('source','run','runtime-dir'):p.add_argument('--'+name,type=Path,required=True)
  p.add_argument('--map',choices=('brecourt','noville','foy'),default='brecourt');p.add_argument('--port',type=int,default=29966)
@@ -50,7 +75,11 @@ def main():
  p.add_argument('--experimental-borrow-trees',action='store_true',help='Explicit additional legacy QA native-tree ownership experiment, only after a preserved allocator negative')
  p.add_argument('--experimental-gmi-loader',action='store_true',help='QA-only pinned UO/GMI loader startup; leave disabled for original crash-payload causal traces')
  p.add_argument('--trace-tree-free',action='store_true',help='QA-only read-only native tree ownership/free-path trace; changes no free semantics')
- a=p.parse_args();out=a.run.resolve();base=['--source',str(a.source.resolve()),'--run',str(out),'--runtime-dir',str(a.runtime_dir.resolve()),'--variant','united_fronts','--map',a.map,'--players','4','--timeout',str(a.timeout),'--port',str(a.port),'--duration','2']
+ p.add_argument('--experimental-all-weapon-media',action='store_true',help='QA-only existing native item/media registration; no inventory grant or native acceptance proof')
+ return p
+
+def main():
+ a=argument_parser().parse_args();out=a.run.resolve();base=['--source',str(a.source.resolve()),'--run',str(out),'--runtime-dir',str(a.runtime_dir.resolve()),'--variant','united_fronts','--map',a.map,'--players','4','--timeout',str(a.timeout),'--port',str(a.port),'--duration','2']
  qa.main(base+['--prepare-only'])
  folders=[out/name for name in ('host','join1','join2','join3')];kits,expected,fire=kit_fixture(4)
  catalog=json.loads((qa.ROOT/'campaign_patches/uf_equipment_catalog.json').read_text())
@@ -78,6 +107,8 @@ def main():
  report={'status':'FAIL','scope':__doc__,'map':a.map,'players':4,'world_policy':a.world_policy,'hunk_megabytes':512,'inputs':inputs,'host_only_QA_plan_cvars':values,'network_resources':'normal resource-bootstrap v2; no peer-plan/offline media injection','experimental_defer_models':True,'experimental_borrow_trees':a.experimental_borrow_trees,'phases':[],'known_open':['No saved-world or GUID equipment binding proof','Experimental legacy registry globals not production promoted']}
  report['experimental_gmi_loader']=a.experimental_gmi_loader
  report['readonly_tree_free_trace']=a.trace_tree_free
+ report['experimental_all_weapon_media']={'enabled':a.experimental_all_weapon_media,
+     'scope':'QA-only original native item/media registration for existing definitions; no inventory grant or native proof from this option'}
  frozen=out/'runtime/fresh-role-source'
  for name in ('tools/qa_uf_fresh_roles.py','tools/qa_coop.py','tools/build_campaign_patch.py','campaign_patches/uf_starting_kits.gsc','campaign_patches/qa_uf_player_state.cpp','campaign_patches/uf_equipment_catalog.json'):
   target=frozen/name;target.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(qa.ROOT/name,target)
@@ -87,13 +118,9 @@ def main():
  executed=Path(__file__).read_bytes();original=subprocess.Popen
  def launch(command,*args,**kwargs):
   if isinstance(command,list) and any(str(item).endswith('CoDUOSP.exe') for item in command):
-   command=list(command);env=dict(kwargs['env'])
-   for key in tuple(env):
-    if key.startswith('CODCOOP_QA_') and key not in ('CODCOOP_QA_NO_STEAM',):env.pop(key)
-   env['CODCOOP_QA_DEFER_MODELS']='1'
-   if a.trace_tree_free:env['CODCOOP_QA_TREE_FREE_TRACE']='1'
-   if a.experimental_borrow_trees:env['CODCOOP_QA_BORROW_TREES']='1'
-   kwargs['env']=env
+   command=list(command)
+   kwargs['env']=owned_game_environment(kwargs['env'],trace_tree_free=a.trace_tree_free,
+       borrow_trees=a.experimental_borrow_trees,all_weapon_media=a.experimental_all_weapon_media)
    index=command.index('+devmap')
    if '+coopjoin' in command:del command[index:index+2]
    else:command[index:index]=['+exec','coop_qa_fresh_roles.cfg']
@@ -107,6 +134,14 @@ def main():
   controls=[(folder,0 if folder==folders[0] else qa.read_state(folder)['slot']) for folder in folders]
   if sorted(slot for folder,slot in controls)!=list(range(4)):raise RuntimeError('Four unique actual native owner slots required')
   report['actual_owner_slots']={folder.name:slot for folder,slot in controls}
+  def plan_ready():
+   console=(folders[0]/'UnitedFronts/console.log').read_text(errors='replace')
+   native=dict(re.findall(r'^[ \t]*cvar set (coop_[a-z0-9_]+)[ \t]*(.*?)\r?$',console,re.M))
+   report['last_native_plan_cvars']=native
+   status=native.get('coop_qa_kit_status','')
+   if status.startswith(('FAIL_','BLOCKED_')):raise RuntimeError('Actual host kit producer rejected plan: '+status)
+   return native if host_plan_receipts_match(native,values) else None
+  report['validated_native_host_plan']=qa.wait_for(plan_ready,processes,35,'current native FRESH identities and all four unchanged QA kit receipts')
   def capture(phase,names=None,body=False):
    deadline=time.monotonic()+35;last_error=None
    while time.monotonic()<deadline:
