@@ -1714,7 +1714,7 @@ void QATreeTrace(const char* phase,int e,uint8_t* tree,int info)
         auto node=g::xanimInfo+(uintptr_t)info*0x44;
         if(!IsBadReadPtr(node,0x18))notify=*(uint16_t*)(node+0x14); // native node begins16 bytes after pool header
     }
-    Log("QA tree trace phase=%s entity=%d tree=%p definition=%p nodes=%d treeReadable=%d defReadable=%d loaded=%d refs=%d mark=%d info=%d notify=%d nativeEpoch=%u init=%u world=%u",phase,e,tree,definition,nodes,readable,definitionReadable,loaded,refs,mark,info,notify,S?S->memoryEpoch:0,S?S->preservation.init.serial:0,S?S->reloadToken.generation:0);
+    Log("QA tree trace phase=%s pid=%lu entity=%d tree=%p definition=%p nodes=%d treeReadable=%d defReadable=%d loaded=%d refs=%d mark=%d info=%d notify=%d nativeEpoch=%u init=%u world=%u",phase,(unsigned long)GetCurrentProcessId(),e,tree,definition,nodes,readable,definitionReadable,loaded,refs,mark,info,notify,S?S->memoryEpoch:0,S?S->preservation.init.serial:0,S?S->reloadToken.generation:0);
 }
 struct QATreeTraceGuard {
     uint8_t* previous;int entity;

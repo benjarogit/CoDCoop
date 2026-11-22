@@ -41,6 +41,8 @@ def main():
     parser.add_argument('--run', type=Path, required=True, help='owned scenario output directory')
     parser.add_argument('--prefix', type=Path, help='Wine prefix used by the game (defaults to RUN/prefix)')
     parser.add_argument('--timeout-ms', type=int, default=120000)
+    parser.add_argument('--min-nodes', type=int, default=500,
+                        help='ignore small trees; the shared character definition has the large node count')
     args, extra = parser.parse_known_args()
     extra = [value for value in extra if value != '--']
     if '--run' in extra:
@@ -67,7 +69,7 @@ def main():
                     continue
                 for line in text.splitlines():
                     created = parse_created(line)
-                    if not created:
+                    if not created or created['nodes'] < args.min_nodes:
                         continue
                     output = run / ('watch-%s.jsonl' % name)
                     command = ['wine', str(args.watch), '--pid', str(created['pid']),
