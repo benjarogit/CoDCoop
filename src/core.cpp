@@ -181,6 +181,7 @@ struct State {
     int frozenTime;
     char hostMap[64];
     uint8_t* ownTree[g::MAX_GENTITIES];  // arboles de animacion creados por nosotros
+    int ownTreeNodes[g::MAX_GENTITIES];  // node count observed at creation; guards frees after asset teardown
     uint8_t* bodyTree[g::MAX_CLIENTS];   // host: arbol del cuerpo del jugador n (0 = sin cuerpo)
     bool downed[g::MAX_CLIENTS];         // host: caido esperando que lo levanten
     float reviveTime[g::MAX_CLIENTS];    // host: segundos que un compañero lleva levantandolo
@@ -1637,7 +1638,7 @@ void BodyMemoryFailure(const char* reason)
     } else if(S->role==JOINER) SendTo(S->host,bye.buf,bye.len);
     bool active=S->role!=NONE;
     S->memoryReady=false;S->hostBodies.count=0;
-    memset(S->bodyTree,0,sizeof S->bodyTree);memset(S->ownTree,0,sizeof S->ownTree);g_oldTreeCount=0;
+    memset(S->bodyTree,0,sizeof S->bodyTree);memset(S->ownTree,0,sizeof S->ownTree);memset(S->ownTreeNodes,0,sizeof S->ownTreeNodes);g_oldTreeCount=0;
     for(auto& remote:S->remote) remote.active=false;
     S->role=NONE;S->joined=S->frozen=S->waitingForMap=false;
     memset(S->reloadPending,0,sizeof S->reloadPending);
@@ -1693,6 +1694,7 @@ void ForgetMovieWorld()
     for (auto& owner : g_qaNativeOwners) owner = {};
     g_animAssembler.Reset();
     memset(S->ownTree, 0, sizeof S->ownTree);
+    memset(S->ownTreeNodes, 0, sizeof S->ownTreeNodes);
     g_oldTreeCount = 0; // native movie/map cleanup invalidates these allocator indices
 }
 
@@ -1726,10 +1728,12 @@ struct QATreeTraceGuard {
 void JoinerFreeDObj(int e)
 {
     uint8_t* tree = S->ownTree[e];
+    int expectedNodes = S->ownTreeNodes[e];
     QATreeTraceGuard trace(e,tree);
     auto borrowed = g_qaBorrowed[e];
     g_qaBorrowed[e] = {}; // native Game ownership never enters the Core free path
     S->ownTree[e] = nullptr;
+    S->ownTreeNodes[e] = 0;
     if (g::serverObjMap[e]) g::Com_ServerDObjFree(e, true);
     QATreeTrace("after-server-free",e,tree);
     g::Com_SyncClientDObjs();
@@ -1739,6 +1743,17 @@ void JoinerFreeDObj(int e)
     if (tree && (IsBadReadPtr(tree, 4) || !XAnimLoaded(*(uint8_t**)tree))) {
         Log("dobj %d: arbol de antes de la recarga, se olvida", e);
         return;
+    }
+    // El motor llena la definicion compartida con 0xff durante el teardown del mapa. Liberar un arbol propio
+    // despues lee esa cuenta de nodos corrupta y MT_FreeIndex revienta en 0x45fd50. Se compara con la cuenta
+    // observada al crear el arbol y se olvida el bloque si ya no coincide.
+    if (tree && expectedNodes > 0) {
+        uint8_t* definition = *(uint8_t**)tree;
+        int currentNodes = IsBadReadPtr(definition, 8) ? -1 : *(int*)(definition + 4);
+        if (currentNodes != expectedNodes) {
+            Log("dobj %d: definicion del arbol cambio (nodes %d -> %d), se olvida", e, expectedNodes, currentNodes);
+            return;
+        }
     }
     if (g_qaBorrowEnabled) {
         tree_owner::Reference reference = tree_owner::Reference{(uintptr_t)tree, g_qaInitCount, tree_owner::Owner::Core};
@@ -1923,7 +1938,7 @@ void JoinerApplyDObj(Reader r)
             g_qaBorrowed[e] = {(uintptr_t)tree, g_qaInitCount, tree_owner::Owner::Native};
             ++g_qaBorrowCount;
             Log("QA native tree borrowed entity=%d ptr=%p generation=%u", e, tree, g_qaInitCount);
-        } else {S->ownTree[e] = tree;QATreeTrace("create-owned",e,tree);}
+        } else {S->ownTree[e] = tree;S->ownTreeNodes[e] = tree ? *(int*)(*(uint8_t**)tree + 4) : 0;QATreeTrace("create-owned",e,tree);}
         DObjCreate(models, nm, tree, e, u12);
         d = g::ServerDObj(e);
         if (!d) return;
@@ -3503,6 +3518,7 @@ void QueueJoinerMap(const char* map)
     // normal native world loading in the same way as an explicit host reload.
     if (g::uo) KeepOldTrees();
     memset(S->ownTree, 0, sizeof S->ownTree);
+    memset(S->ownTreeNodes, 0, sizeof S->ownTreeNodes);
     S->recoveringConnection = false;
     S->gamestateReady = false;
     snprintf(S->pendingMap, sizeof S->pendingMap, "%s", map);

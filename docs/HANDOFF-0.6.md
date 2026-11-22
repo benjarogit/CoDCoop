@@ -88,6 +88,25 @@ This addendum supersedes pending statements below. Nothing has been published.
   Eigener Baum nach dem Teardown liest die vergiftete Node-Zahl → frühere
   `free-entry`-Korruption. Borrow vermeidet das. Kausale Diagnose, keine
   Produktionslösung; Windows/Steam und weitere Karten fehlen.
+- **M4 stale-tree free guard / M4 Guard für veraltete Bäume:** the own-tree free
+  path now records the node count at creation and skips the free when the
+  shared definition reports a different count (the teardown `0xff` fill).
+  `run/qa-noville-m1-reload3` PASSes with borrow (185.4/146.1/223.7 units after
+  the reload, no guard hit, no allocator failure). `run/qa-brecourt-m4-guard1`
+  PASSes without borrow (165.5/181.1/208.3 units, reload, no allocator failure);
+  the guard did not trigger there because Brecourt does not reach the Noville
+  teardown path. The exact Noville non-borrow path is still blocked by the
+  7918-byte join allocation, so the guard is a conservative crash guard, not a
+  proven production fix, and it deliberately leaks a stale block until the pool
+  reset instead of freeing with a poisoned size.
+  / Eigener Free-Pfad merkt sich die Node-Zahl beim Erzeugen und überspringt den
+  Free, wenn die geteilte Definition eine andere Zahl meldet (Teardown-`0xff`).
+  `reload3` besteht mit Borrow, `brecourt-m4-guard1` ohne Borrow; der Guard
+  wurde dort nicht ausgelöst, weil Brecourt den Noville-Teardown-Pfad nicht
+  erreicht. Der exakte Noville-Ohne-Borrow-Pfad bleibt durch die
+  7918-Byte-Join-Allokation blockiert. Konservativer Crash-Guard, kein
+  bewiesener Produktionsfix; veralteter Block wird bis zum Pool-Reset bewusst
+  nicht freigegeben.
 - **Latest worker checkpoint / Neuester Worker-Stand:** local source `277fc47`
   fixes actual Windows/Wine atomic-replace sharing failures and physical-link
   rejection. Fresh immutable worker source graph
