@@ -37,7 +37,8 @@ symlinks, Windows reparse points and duplicate JSON fields. ACK paths are fixed.
 `CHALLENGE_FIELDS` in `tools/party_native_bridge.py` is the executable schema.
 Required: schema/kind, pending index, unpredictable **32-byte** host nonce and
 **32-byte** local client-join nonce (64 lowercase hexadecimal characters each),
-native session (16 hex), native world (8 hex), engine `uo`, variant
+native session (16 hex), globally increasing uint64 `challenge_serial` (16 hex),
+native world (8 hex), engine `uo`, variant
 `united_fronts`, bounded registered map name, echoed client target IPv4 endpoint
 and distinct host-observed client endpoint, party session, catalog/package/world
 SHA, member GUID, roster revision, plan SHA, resource SHA, creation/expiry Unix
@@ -68,13 +69,27 @@ an archive, package or roster digest. A C++ encoder parity test checks these byt
 4. Host verifies admitted public key/GUID, Ed25519 proof, still-current roster,
    still-present exact Native pending record and real local phase2 resource SHA.
    It writes one atomic ACK. Removing/consuming that ACK never causes retries to
-   rewrite it. Nonce tombstones are bounded to 256 per worker lifetime; reaching
-   the bound fails closed and requires a new party.
+   rewrite it. Three fixed per-pending-index highwater records retain serial,
+   descriptor SHA, first monotone observation and one-use state. A new serial
+   on the same index must be strictly higher; that Native-issued replacement
+   fences the old descriptor without keeping a lifetime nonce list. Lower
+   serials on other still-active indices remain valid out of order. There is
+   no campaign-total count limit and no manual party restart requirement.
 5. **Still required in Native:** compare the ACK against its exact pending tuple,
    enforce its own monotone POD deadline, consume once, then allocate/associate
    the native slot. Apply personal kits only through the later verified native
    owner/roster/resource transaction. Missing worker/context/proof must remain
    visible asynchronous WAIT, never fall back to granting a slot in party mode.
+
+Native must increase its global uint64 `challenge_serial` across worlds,
+retries and pending-index reuse within the same native session. It may only
+reset the serial epoch with an explicitly new native session; a Python worker
+restart does not imply a new native session. Worker fences switch epochs only
+after validating the matching trusted local Native ready-context/own client
+record, never from a network challenge alone. Native must still consume once,
+check its own monotone deadline and retire/remove its consumed pending file.
+This policy was coordinated with the Native implementer; actual emission and
+ACK consumption remain pending.
 
 Host expiry is at most 30 seconds and the worker retains a non-resettable
 monotone first-seen deadline. Peer clocks need not agree with Host UTC: Peer
@@ -89,7 +104,10 @@ fixtures, actual signed UDP traffic and actual fixed-file reads/atomic ACK write
 The Native file producer in these tests is explicitly a **test harness**, not
 CoD/CoD UO. Tests cover no-intent and wrong received-challenge/source/client-nonce
 refusal, then valid signed proof, one-use consume, stale plan/resources, expiry,
-unknown/host owner rejection, new nonce recovery, safe paths and C++ resource
+unknown/host owner rejection, new nonce/serial recovery, safe paths, 300 actual
+worker approvals in the same session with stable party identity, 1,100 bounded
+ledger cycles, independent out-of-order indices, expired-serial/clock rollback
+rejection and C++ resource
 encoding parity. No native end-to-end, game slot allocation, native kit
 application or frozen-worker acceptance is claimed by these tests.
 
@@ -106,6 +124,13 @@ Beitrittsauftrag **und genau der am eigenen Spiel-Socket empfangenen Challenge**
 Spielerkennung, Sitzung, Welt, Mission, Paket/Katalog, Gruppenrevision, Plan,
 Ressourcen und beide Zufallswerte müssen zusammenpassen. Eine gefälschte Anfrage
 mit der Spielerkennung eines anderen Teilnehmers reicht nicht aus.
+
+Die bisherige Gesamtgrenze von 256 Vorgängen wurde entfernt. Drei feste
+Datensätze merken sich die steigende native Seriennummer je offenem Platz.
+Neue, nativ ausgestellte Seriennummern ersetzen alte sicher; verspätete
+Vorgänge bleiben gesperrt. Gruppenidentität und Spielerplätze bleiben auch
+über viele Missionen und Checkpoints bestehen. Die native Gegenseite muss
+ihre eigene einmalige Verarbeitung und monotone Frist weiterhin prüfen.
 
 Der Host-Worker erstellt danach eine einmalige Antwort unter einem festen
 lokalen Dateinamen. Das Spiel muss diese Antwort noch gegen seinen offenen

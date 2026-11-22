@@ -24,7 +24,7 @@ MAX_LOCAL_BYTES = 131072
 MAX_PENDING = 3  # remote pending index; not the assigned native player slot
 MAX_TTL_MS = 30000
 HEX64 = re.compile('[0-9a-f]{64}')
-CHALLENGE_FIELDS = {'schema','kind','pending_index','nonce','client_join_nonce','native_session','native_world',
+CHALLENGE_FIELDS = {'schema','kind','pending_index','nonce','client_join_nonce','native_session','native_world','challenge_serial',
                     'engine','variant','map','client_target','client_endpoint','party_session','catalog_sha256',
                     'package_sha256','world_sha256','member_guid','roster_revision','plan_sha256',
                     'resource_sha256','created_unix_ms','expires_unix_ms'}
@@ -53,6 +53,7 @@ def validate_challenge(value, now_ms=None):
         raise ValueError('Invalid native pending index')
     for field in ('nonce','client_join_nonce','party_session','catalog_sha256','package_sha256','world_sha256','member_guid','plan_sha256','resource_sha256'):
         if not hex_value(value[field],64): raise ValueError('Invalid native challenge digest or nonce')
+    if not hex_value(value['challenge_serial'],16) or value['challenge_serial']=='0'*16:raise ValueError('Invalid native challenge serial')
     if not hex_value(value['native_session'],16) or not hex_value(value['native_world'],8):raise ValueError('Invalid native world identity')
     if value['nonce']=='0'*64 or value['client_join_nonce']=='0'*64:raise ValueError('Missing native unpredictable nonce')
     if value['native_session']=='0'*16 or value['native_world']=='0'*8:raise ValueError('Missing native world identity')
@@ -126,22 +127,45 @@ class FixedFiles:
         atomic_private(path,value)
 
 
+class NativeSerialLedger:
+    """Three per-index highwater records; no lifetime nonce-count budget.
+
+    activate() is called only after a matching trusted local Native record is
+    checked. Network fields never select/reset the native session epoch.
+    Native globally increasing serials also increase independently per index;
+    therefore lower serials on OTHER live indices remain valid out of order.
+    """
+    def __init__(self,clock=time.monotonic):
+        self.clock=clock;self.session=None;self.records=[None]*MAX_PENDING
+    def activate(self,native_session):
+        if not hex_value(native_session,16) or native_session=='0'*16:raise ValueError('Invalid trusted native session')
+        if native_session!=self.session:
+            self.session=native_session;self.records=[None]*MAX_PENDING
+    def admit(self,challenge,first_seen=None):
+        if challenge['native_session']!=self.session:raise ValueError('Untrusted native serial epoch')
+        index=challenge['pending_index'];serial=int(challenge['challenge_serial'],16)
+        if type(index) is not int or not 0<=index<MAX_PENDING or serial<=0:raise ValueError('Invalid native serial index')
+        digest=hashlib.sha256(canonical(challenge)).hexdigest();before=self.records[index]
+        if before is not None:
+            if serial<before['serial']:raise ValueError('Retired native challenge serial')
+            if serial==before['serial']:
+                if digest!=before['digest']:raise ValueError('Native reused a serial for a conflicting challenge')
+                if self.clock()-before['seen']>MAX_TTL_MS/1000:raise ValueError('Native monotone worker deadline elapsed')
+                return before
+        # A higher locally issued serial on this index retires the previous
+        # descriptor, even while other indices still have older live serials.
+        seen=self.clock() if first_seen is None else min(self.clock(),first_seen)
+        record={'serial':serial,'digest':digest,'seen':seen,'consumed':False}
+        self.records[index]=record
+        return record
+
+
 class NativePartyBridge:
     def __init__(self,node,game,wall_clock=time.time,clock=time.monotonic):
         self.node=node;self.files=FixedFiles(game);self.wall_clock=wall_clock;self.clock=clock
-        self.pending={};self.used={};self.seen={};self.latest_plan=None;self.last_error=None;self.last_context_write=0
+        self.pending={};self.ledger=NativeSerialLedger(clock);self.latest_plan=None;self.last_error=None;self.last_context_write=0
         self.stats={'challenges':0,'proofs':0,'approvals':0,'rejected':0}
     def now_ms(self):return int(self.wall_clock()*1000)
-    def remember(self,challenge):
-        nonce=challenge['nonce'];digest=hashlib.sha256(canonical(challenge)).hexdigest()
-        if nonce in self.seen:
-            before=self.seen[nonce]
-            if before['digest']!=digest:raise ValueError('Native reused a nonce for a conflicting challenge')
-            if self.clock()-before['seen']>MAX_TTL_MS/1000:raise ValueError('Native monotone worker deadline elapsed')
-            return before['seen']
-        if len(self.seen)>=256:raise ValueError('Native challenge limit reached; start a new party')
-        self.seen[nonce]={'digest':digest,'seen':self.clock()}
-        return self.seen[nonce]['seen']
     def current(self):
         node=self.node;snapshot=node.snapshot
         if node.cancelled or snapshot is None:raise ValueError('No active authenticated party')
@@ -172,6 +196,7 @@ class NativePartyBridge:
             raise ValueError('Native resources omit current kit models')
         registered={w['name'] for w in ready['resources']['weapons'] if w['registered']}
         if not set(plan['required_weapons'])<=registered:raise ValueError('Native resource table omits registered kit weapons')
+        self.ledger.activate(ready['context']['native_session'])
     def read_pending(self,index):
         challenge=validate_challenge(self.files.read(f'host-{index}.json'),self.now_ms())
         if challenge['pending_index']!=index:raise ValueError('Native pending index mismatch')
@@ -184,8 +209,9 @@ class NativePartyBridge:
         if challenge['member_guid']!=self.node.identity.guid:raise ValueError('Native challenge belongs to another owner')
         previous=self.pending.get(challenge['nonce'])
         if previous and previous['challenge']!=challenge:raise ValueError('Native reused a nonce for another challenge')
-        seen=self.remember(challenge)
-        if not previous:self.pending[challenge['nonce']]={'challenge':challenge,'seen':seen,'last':0}
+        # Do not advance the serial fence from a network-only challenge.
+        # Local JoinerCore intent/receipt must authenticate its epoch first.
+        if not previous:self.pending[challenge['nonce']]={'challenge':challenge,'seen':self.clock(),'last':0}
         if len(self.pending)>MAX_PENDING:self.pending.pop(next(iter(self.pending)))
     def peer_proof(self,challenge):
         local=self.files.read('client.json')
@@ -201,6 +227,10 @@ class NativePartyBridge:
         fields=('client_join_nonce','native_session','native_world','engine','variant','map','client_target','member_guid','party_session','catalog_sha256','package_sha256','world_sha256','roster_revision','plan_sha256','resource_sha256')
         if not isinstance(local['intent'],dict) or set(local['intent'])!=set(fields) or any(local['intent'][key]!=challenge[key] for key in fields):
             raise ValueError('Native challenge does not match local current join intent')
+        self.ledger.activate(local['intent']['native_session'])
+        pending=self.pending.get(challenge['nonce'])
+        record=self.ledger.admit(challenge,pending['seen'] if pending else None)
+        if record['consumed']:raise ValueError('Native proof already completed')
         message=canonical(challenge)
         return {'schema':1,'challenge':deepcopy(challenge),'public':self.node.identity.public,'signature':self.node.identity.key.sign(message).hex()}
     def proof(self,guid,proof):
@@ -209,8 +239,6 @@ class NativePartyBridge:
             raise ValueError('Invalid native owner proof')
         challenge=validate_challenge(proof['challenge'],self.now_ms());self.matches_party(challenge)
         nonce=challenge['nonce']
-        if nonce in self.used:raise ValueError('Native challenge was already consumed')
-        if len(self.used)>=256:raise ValueError('Native one-use approval limit reached; start a new party')
         if challenge!=self.read_pending(challenge['pending_index']):raise ValueError('Native pending challenge changed')
         if guid!=challenge['member_guid'] or self.node.members[guid]['public']!=proof['public'] or hashlib.sha256(bytes.fromhex(proof['public'])).hexdigest()!=guid:
             raise ValueError('Native proof does not belong to admitted owner')
@@ -219,18 +247,26 @@ class NativePartyBridge:
         pending=self.pending.get(nonce)
         if not pending or pending['challenge']!=challenge or self.clock()-pending['seen']>MAX_TTL_MS/1000:
             raise ValueError('Native pending monotone worker deadline elapsed')
+        record=self.ledger.admit(challenge,pending['seen'])
+        if record['consumed']:raise ValueError('Native challenge was already consumed')
         # ACK contains no paths/commands and is written only under a fixed host
         # directory. Native must compare its pending tuple and own monotone
         # deadline, atomically consume once, then allocate its own slot.
         ack={'schema':1,'kind':IDL,'decision':'approve','challenge':challenge,'challenge_sha256':hashlib.sha256(canonical(challenge)).hexdigest(),
              'owner_public':proof['public'],'owner_signature':proof['signature']}
-        self.files.write(f"ack-{challenge['pending_index']}.json",ack)
-        self.used[nonce]=challenge['expires_unix_ms'];self.pending.pop(nonce,None);self.stats['approvals']+=1
-        self.node.events.append({'phase':'party_native_proof','status':'owner-proof-approved','runtime_ready':False,'pending_index':challenge['pending_index']})
+        # Fence before publishing. A write failure may require Native to issue
+        # its next serial, but can never recreate an already visible ACK.
+        record['consumed']=True
+        try:self.files.write(f"ack-{challenge['pending_index']}.json",ack)
+        except OSError as error:
+            self.node.events.append({'phase':'party_native_waiting','error':'Local approval write failed; waiting for a new native challenge','runtime_ready':False})
+            raise ValueError('Native approval could not be published safely') from error
+        self.pending.pop(nonce,None);self.stats['approvals']+=1
+        self.node.events.append({'phase':'party_native_proof','status':'owner-proof-approved','runtime_ready':False,'pending_index':challenge['pending_index'],'serial_records':sum(record is not None for record in self.ledger.records)})
     def poll(self):
         now=self.now_ms()
-        # Keep one-use tombstones for the worker lifetime. Wall-clock rollback
-        # must never make an already approved nonce reusable.
+        # Each native pending index retains one serial fence. No total-party
+        # request count accumulates across mission/checkpoint transitions.
         try:
             snapshot,members=self.current()
             view=self.node.latest_view if self.node.hosting else self.node.public_view
@@ -250,8 +286,10 @@ class NativePartyBridge:
                     except FileNotFoundError:continue
                     except (OSError,ValueError,KeyError,TypeError,RecursionError):self.stats['rejected']+=1;continue
                     nonce=challenge['nonce'];active.add(nonce)
-                    if nonce in self.used:continue
-                    if nonce not in self.pending:self.pending[nonce]={'challenge':challenge,'seen':self.remember(challenge),'last':0};self.stats['challenges']+=1
+                    try:record=self.ledger.admit(challenge)
+                    except ValueError:self.stats['rejected']+=1;continue
+                    if record['consumed']:continue
+                    if nonce not in self.pending:self.pending[nonce]={'challenge':challenge,'seen':record['seen'],'last':0};self.stats['challenges']+=1
                     pending=self.pending[nonce]
                     if pending['challenge']!=challenge:raise ValueError('Native reused a nonce for another challenge')
                     if self.clock()-pending['seen']>MAX_TTL_MS/1000:continue

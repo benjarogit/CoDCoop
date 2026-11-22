@@ -62,8 +62,25 @@ This addendum supersedes pending statements below. Nothing has been published.
   half only; real worker UDP/file transactions and native C++ resource-encoder
   parity pass54 focused checks. Native files are emitted by a test program;
   actual Native slot/owner/kit binding is still unimplemented. Current draft
-  nonce policy is being revised for >256 same-session bindings without party
-  loss; see `run/party-native-bridge-handoff.json`.
+  nonce policy now uses three per-pending-index monotone uint64 serial fences,
+  replacing the256 lifetime cap. Actual two-worker300-request transactions
+  preserve party/GUIDs;1100 replay/expiry/out-of-order/clock cases and55 focused
+  checks pass. Native producers/consumers remain test programs. See
+  `run/party-native-serial-handoff.json`; Native still must consume/expire its
+  own POD challenge before slot allocation.
+- **Four actual players:**
+  `run/qa-cod1-four/history/four-owner-d982-training-distinct-yaw-saved-not-latest-pose-vitals-nativeCP-PASS-1795309048301166085/`
+  passes real input-separated positions and distinct saved yaw for four owners,
+  health600/550/500/450, then extra movement/look and guest2damage to490 after
+  saving. Native load restores saved500, not latest490; all four pose/view deltas
+  are0, ownCGclient0..3/cameras and inventory match, all four move afterwards
+  and quit0. Training is unarmed and is not campaign completion. Earlier yaw
+  fixture with coincident directions is retained as the narrower first proof.
+- **Still required for save acceptance:** downed/special-role snapshots, actual
+  host-process stop/restart/resume with authenticated stable member identity,
+  and saved guest mapping independent of arrival order. Current sidecar VERSION1
+  is bound to session/lease/endpoint, not stable GUIDs; same-process cold A→B→A
+  proof does not establish resume on another game-process lifetime.
 
 - **Inactive-owner departure:** frozen Core
   `23d6cb34b3dfcfd3a86cd1440efeb454401b7bf25b2f3a6a73979ab8a995dfcf`

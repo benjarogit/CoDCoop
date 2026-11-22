@@ -25,7 +25,7 @@ import uf_equipment_roster as roster
 class Worker:
     def __init__(self,args,env):
         self.process=subprocess.Popen([sys.executable,str(ROOT/'tools/coop_party.py'),*args],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,env=env)
-        self.events=queue.Queue();self.latest=None
+        self.events=queue.Queue();self.latest=None;self.proof_events=[]
         def reader():
             for line in self.process.stdout:
                 try:self.events.put(json.loads(line))
@@ -36,6 +36,7 @@ class Worker:
         while not self.events.empty():
             event=self.events.get()
             if event.get('phase')=='party':self.latest=event
+            if event.get('phase')=='party_native_proof':self.proof_events.append(event)
     def stop(self):
         if self.process.poll() is None:
             self.send({'action':'stop'})
@@ -87,7 +88,7 @@ class NativeBridgeWorkers(unittest.TestCase):
         state=roster.update_kit(state,catalog,1,1,view['members'][1]['kit'],state['revision']);plan=roster.plan(state,catalog)
         resources={'models':sorted(set(plan['required_server_models']+plan['required_media_models'])),'weapons':[{'index':i,'name':name,'registered':True} for i,name in enumerate(plan['required_weapons'],1)]}
         now=int(time.time()*1000)
-        c={'schema':1,'kind':IDL,'pending_index':0,'nonce':'1'*64,'client_join_nonce':'2'*64,'native_session':'1234567890abcdef','native_world':'1234abcd','engine':'uo','variant':'united_fronts','map':'noville',
+        c={'schema':1,'kind':IDL,'pending_index':0,'nonce':'1'*64,'client_join_nonce':'2'*64,'native_session':'1234567890abcdef','challenge_serial':'0000000000000001','native_world':'1234abcd','engine':'uo','variant':'united_fronts','map':'noville',
            'client_target':'127.0.0.1:28960','client_endpoint':'127.0.0.1:31000','party_session':context['party_session'],'catalog_sha256':context['catalog_sha256'],'package_sha256':context['package_sha256'],
            'world_sha256':context['world_sha256'],'member_guid':next(m['guid'] for m in host.latest['members'] if m['slot']==1),'roster_revision':view['revision'],'plan_sha256':view['plan_sha256'],
            'resource_sha256':hashlib.sha256(encode_resources(resources)).hexdigest(),'created_unix_ms':now,'expires_unix_ms':now+20000}
@@ -131,7 +132,7 @@ class NativeBridgeWorkers(unittest.TestCase):
         now=int(time.time()*1000);expired=dict(c,created_unix_ms=now-2000,expires_unix_ms=now-1)
         self.host_files.write('host-0.json',expired);self.peer_files.write('client.json',self.local_intent(expired))
         time.sleep(.6);self.assertFalse(ack.exists())
-        fresh=dict(c,nonce='4'*64,client_join_nonce='5'*64,created_unix_ms=int(time.time()*1000),expires_unix_ms=int(time.time()*1000)+20000)
+        fresh=dict(c,nonce='4'*64,client_join_nonce='5'*64,challenge_serial='0000000000000002',created_unix_ms=int(time.time()*1000),expires_unix_ms=int(time.time()*1000)+20000)
         self.host_files.write('host-0.json',fresh);self.peer_files.write('client.json',self.local_intent(fresh));self.wait(ack.exists)
         self.assertEqual(json.loads(ack.read_text())['challenge']['nonce'],'4'*64)
         for changes in ({'schema':True},{'pending_index':3},{'nonce':'0'*64},{'native_session':'0'*16},{'client_target':'../arbitrary.exe'},{'engine':'cod2'},{'created_unix_ms':int(time.time()*1000)+100000}):
@@ -154,20 +155,61 @@ class NativeBridgeWorkers(unittest.TestCase):
         for owner in ('f'*64,next(m['guid'] for m in host.latest['members'] if m['slot']==0)):
             wrong=dict(c,member_guid=owner);self.host_files.write('host-0.json',wrong);self.peer_files.write('client.json',self.local_intent(wrong))
             time.sleep(.5);self.assertFalse(ack.exists())
-        valid=dict(c,nonce='6'*64,client_join_nonce='7'*64);self.host_files.write('host-0.json',valid);self.peer_files.write('client.json',self.local_intent(valid));self.wait(ack.exists)
+        valid=dict(c,nonce='6'*64,client_join_nonce='7'*64,challenge_serial='0000000000000002');self.host_files.write('host-0.json',valid);self.peer_files.write('client.json',self.local_intent(valid));self.wait(ack.exists)
         self.assertEqual(json.loads(ack.read_text())['challenge']['member_guid'],c['member_guid'])
 
-    def test_monotone_deadline_cannot_be_reset_by_retries_or_wall_rollback(self):
-        from party_native_bridge import NativePartyBridge
-        now=[10.0];bridge=NativePartyBridge(None,self.host_game,wall_clock=lambda:1,clock=lambda:now[0])
-        value={'nonce':'8'*64,'binding':'fixed private helper fixture'}
-        self.assertEqual(bridge.remember(value),10)
-        now[0]=20;self.assertEqual(bridge.remember(value),10)
-        with self.assertRaises(ValueError):bridge.remember(dict(value,binding='conflicting'))
+    def test_per_index_serial_ledger_handles_1100_cycles_out_of_order_expiry_and_epoch(self):
+        from party_native_bridge import NativeSerialLedger
+        now=[10.0];ledger=NativeSerialLedger(clock=lambda:now[0]);session='1234567890abcdef';ledger.activate(session)
+        def challenge(serial,index=0,epoch=session):return {'nonce':f'{serial+16:064x}','pending_index':index,'native_session':epoch,'challenge_serial':f'{serial:016x}','native_world':f'{serial//3+1:08x}'}
+        # Higher serial on index0 must not reject two older, still legitimate
+        # pending challenges on independent indices1/2.
+        for serial,index in ((3,0),(1,1),(2,2)):ledger.admit(challenge(serial,index))['consumed']=True
+        with self.assertRaises(ValueError):ledger.admit(dict(challenge(3),nonce='9'*64))
+        for serial in range(4,1104):
+            index=serial%3;value=challenge(serial,index);record=ledger.admit(value);self.assertFalse(record['consumed']);record['consumed']=True
+            self.assertEqual(len(ledger.records),3)
+        with self.assertRaises(ValueError):ledger.admit(challenge(1,1))
+        current=challenge(1103,1103%3);self.assertTrue(ledger.admit(current)['consumed'])
         now[0]=41
-        with self.assertRaises(ValueError):bridge.remember(value)
-        # Tombstones are not expired using untrusted/rolled-back wall time.
-        self.assertIn(value['nonce'],bridge.seen)
+        with self.assertRaises(ValueError):ledger.admit(current)
+        # Neither retries, expiry nor a rolled-back wall clock reset serials.
+        with self.assertRaises(ValueError):ledger.admit(challenge(1))
+        new=challenge(1104);self.assertFalse(ledger.admit(new)['consumed'])
+        other='abcdef1234567890'
+        with self.assertRaises(ValueError):ledger.admit(challenge(1,epoch=other))
+        ledger.activate(other)  # explicit trusted local Native session only
+        self.assertFalse(ledger.admit(challenge(1,epoch=other))['consumed'])
+        with self.assertRaises(ValueError):ledger.admit(challenge(1105))
+
+    def test_actual_workers_300_consumed_requests_keep_party_identity_and_three_records(self):
+        host,peer,c,ready=self.party();ack=self.host_game/'coop/party-bridge/ack-0.json'
+        baseline=[(w.latest['members'],w.latest['roster']['revision']) for w in self.workers]
+        for serial in range(2,302):
+            now=int(time.time()*1000)
+            current=dict(c,challenge_serial=f'{serial:016x}',nonce=f'{serial+16:064x}',client_join_nonce=f'{serial+10000:064x}',created_unix_ms=now,expires_unix_ms=now+20000)
+            self.peer_files.write('client.json',self.local_intent(current));self.host_files.write('host-0.json',current)
+            self.wait(ack.exists)
+            approved=json.loads(ack.read_text());self.assertEqual(approved['challenge']['challenge_serial'],f'{serial:016x}')
+            ack.unlink()  # actual filesystem consumption by the Native stand-in
+        for w,before in zip(self.workers,baseline):
+            self.assertEqual((w.latest['members'],w.latest['roster']['revision']),before)
+            self.assertFalse(w.latest['runtime_ready'])
+        self.wait(lambda:len(host.proof_events)==300)
+        self.assertTrue(all(e['serial_records']<=3 for e in host.proof_events))
+        # Replay an expired older serial after host wallclock rollback would
+        # still lose to this index's persistent highwater, not be reapproved.
+        old=dict(c,nonce='a'*64,client_join_nonce='b'*64,created_unix_ms=int(time.time()*1000),expires_unix_ms=int(time.time()*1000)+20000)
+        self.peer_files.write('client.json',self.local_intent(old));self.host_files.write('host-0.json',old)
+        time.sleep(.5);self.assertFalse(ack.exists())
+        # A network/new-host challenge alone cannot reset peer epoch. Only
+        # the matching current local Native intent/receipt permits it.
+        next_session=dict(c,native_session='fedcba0987654321',nonce='c'*64,client_join_nonce='d'*64,created_unix_ms=int(time.time()*1000),expires_unix_ms=int(time.time()*1000)+20000)
+        ready['context']['native_session']=next_session['native_session'];self.host_files.write('host-ready.json',ready);self.host_files.write('host-0.json',next_session)
+        time.sleep(.5);self.assertFalse(ack.exists())
+        self.peer_files.write('client.json',self.local_intent(next_session));self.wait(ack.exists)
+        self.assertEqual(json.loads(ack.read_text())['challenge']['native_session'],next_session['native_session'])
+        for w,before in zip(self.workers,baseline):self.assertEqual((w.latest['members'],w.latest['roster']['revision']),before)
 
     def test_fixed_paths_and_exact_native_resource_encoding(self):
         files=FixedFiles(self.host_game)
