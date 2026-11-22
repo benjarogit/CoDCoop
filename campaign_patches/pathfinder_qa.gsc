@@ -9,6 +9,8 @@ main()
     bag = getent("legbag", "targetname");
     beacon = getent("beacon", "targetname");
     level.coop_pathfinder_qa_bag_origin = bag.origin;
+    setcvar("coop_pathfinder_qa_bag_entity",bag getentitynumber());
+    setcvar("coop_pathfinder_qa_beacon_entity",beacon getentitynumber());
     setcvar("coop_pathfinder_qa_bag_x",bag.origin[0]);
     setcvar("coop_pathfinder_qa_bag_y",bag.origin[1]);
     setcvar("coop_pathfinder_qa_bag_z",bag.origin[2]);

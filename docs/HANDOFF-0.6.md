@@ -17,6 +17,54 @@ published v0.5.4 binaries have not been replaced.
 This addendum supersedes pending statements below. Nothing has been published.
 / Diese Ergänzung ersetzt ältere Offen-Angaben unten. Nichts wurde veröffentlicht.
 
+- **Latest native checkpoint — State21:** Core
+  `d982970ed3bac9ef70b4068a593b044ade6656f95105dfe1bb2f5956b469caf5`
+  under `run/saved-vitals-native-prototype/` preserves the returning owner's
+  plain standing pose and coherent native PS/entity health/maxhealth after
+  ClientConnect/Begin. The original SVG already contained the right values;
+  the reconnect lifecycle discarded them. View restoration waits for a current
+  native command so delta angles use the returning client's actual raw basis.
+  Scope: alive, standing, unlinked, view-unlocked players; vehicle/scripted,
+  crouched/prone/downed save roles remain open. Ownership/world transitions
+  clear receipts, and no complete PS, script or link pointers are copied.
+  Actual CoD1 and UO+YAP tests apply nonfatal native damage600→550, then save/load:
+  guest PS/entity health stays550, Host600 remains unchanged, both owners'
+  position and all view angles have delta0, and ammo/slots/active Game+ownCG
+  choice and no-repeat equipment receipts still match. Both games quit0.
+  Exact evidence under `run/qa-cod1-four/history/`:
+  `pathfinderd982-CoD1-actualDamage50-strictPOSE-VITALS-nativeCP-PASS-1795308507691535724`
+  and `pathfinderd982-UO-YAP-actualDamage50-strictPOSE-VITALS-nativeCP-PASS-1795308585953522895`.
+  Earlier4861 preserves pose but heals550→600;1805 proves loaded health550 before
+  cleanup. Those negative results remain archived. No complete checkpoint or
+  campaign certification is inferred from this ordinary-player fixture.
+- **Generated script precedence:** canonical mission overlay is now
+  `zzzz_coop_triggers.pk3`, before both QA `zzzz_coop_campaign.pk3` and staged
+  `zzzz_codcoop.pk3` under native ASCII-uppercase sorting. UF's actual old
+  variant layer shadowed Pathfinder's new remote Use adapter. Renaming only
+  the generated layer fixes it; authored packages are unchanged. Actual UF+YAP
+  two-player arranged bag/beacon Use now passes with both native search paths
+  proving the correct provider;512MiB/raw experimental resource scope remains.
+  Evidence: `pathfinder7f19-UF-canonical-provider-ARRANGED-actualREMOTE-USE-PASS-1795307700843026510`.
+  QA clones archive recognized obsolete overlays. Installation retires only
+  unchanged old runtime-lock-owned layers with rollback; modified/unowned old
+  layers fail before downloads and remain untouched. Four filesystem/rollback
+  tests and the installer regression pass.
+- **Actual UO joiner mouse:**
+  `run/UO-YAP-23d6-real-joiner-mouse-PASS-1795308246501481986/` proves one Win32
+  relative event to the validated owned foreground joiner main window. Current
+  ownCGclient1 and authoritative HostPS1 yaw both change17.59461degrees; common
+  two-player liveness/observation and clean exits pass. UO caption/class is
+  `CoD:United Offensive`; the old test helper wrongly required `Call of Duty`.
+  Host mouse has a separate earlier positive, not this same run. Physical mouse
+  hardware is not claimed. Prior focus/surface, observer-index and occupied-port
+  harness failures are retained in `run/input-window-investigation/`.
+- **Worker bridge checkpoint:** local source `e0692dc` implements the Python
+  half only; real worker UDP/file transactions and native C++ resource-encoder
+  parity pass54 focused checks. Native files are emitted by a test program;
+  actual Native slot/owner/kit binding is still unimplemented. Current draft
+  nonce policy is being revised for >256 same-session bindings without party
+  loss; see `run/party-native-bridge-handoff.json`.
+
 - **Inactive-owner departure:** frozen Core
   `23d6cb34b3dfcfd3a86cd1440efeb454401b7bf25b2f3a6a73979ab8a995dfcf`
   now passes actual CoD1 and UO+YAP timeout→Leave→fresh-rejoin checks. Temporary
@@ -70,7 +118,8 @@ This addendum supersedes pending statements below. Nothing has been published.
   pass remote bag/beacon actions and numeric inventory restoration in CoD1,
   UO+YAP and SPI+YAP. They do not preserve the guest's saved position/look;
   the guest respawns at the map start while the host pose is correct. This is
-  an open gameplay bug, not full checkpoint acceptance. Root's read-only trace
+  the historical bug corrected by the newer State21 ordinary-player fixture
+  above, not full checkpoint acceptance. Root's read-only trace
   Core `1805e8117c47e327b9c12fff021885621d03c76a613e1bb0fdd3ce37aef76ec7`
   under `run/saved-pose-investigation/` observes loaded native PS before ghost
   cleanup. A strict arranged-position test is pending; no pose fix is claimed.

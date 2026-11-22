@@ -1,13 +1,52 @@
 import sys
+import json
 import tempfile
 import unittest
 import zipfile
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
 from campaign_inventory import inventory,layer_files,native_package_key
+from build_campaign_patch import quarantine_obsolete_qa_trigger_overlays, TRIGGER_OVERLAY_BASENAME
 
 
 class NativePackageOrder(unittest.TestCase):
+    def test_generated_mission_provider_overrides_variant_pathfinder(self):
+        # Both real overlays contain this entry. More Zs lost to '_' in the
+        # native ASCII-uppercase comparator; explicit T > C fixes precedence.
+        with tempfile.TemporaryDirectory() as directory:
+            folder=Path(directory)/'UnitedFronts';folder.mkdir()
+            for name,body in [('ZUnitedFronts_1.1_beta.pk3',b'original'),
+                              ('zzzz_coop_campaign.pk3',b'variant-asset-repair'),
+                              ('zzzzz_codcoop_triggers.pk3',b'old-mission')]:
+                with zipfile.ZipFile(folder/name,'w') as archive:
+                    archive.writestr('maps/pathfinder.gsc',body)
+            def provider():
+                for package in sorted(folder.glob('*.pk3'),key=lambda p:native_package_key(p.name),reverse=True):
+                    with zipfile.ZipFile(package) as archive:
+                        if 'maps/pathfinder.gsc' in archive.namelist():
+                            return package.name,archive.read('maps/pathfinder.gsc')
+            self.assertEqual(provider(),('zzzz_coop_campaign.pk3',b'variant-asset-repair'))
+            with zipfile.ZipFile(folder/TRIGGER_OVERLAY_BASENAME,'w') as archive:
+                archive.writestr('maps/pathfinder.gsc',b'eligible-remote-use-and-helmet-repair')
+            self.assertEqual(provider(),(TRIGGER_OVERLAY_BASENAME,b'eligible-remote-use-and-helmet-repair'))
+
+    def test_qa_retirement_archives_only_known_generated_old_layers(self):
+        with tempfile.TemporaryDirectory() as directory:
+            game=Path(directory);folder=game/'UnitedFronts';folder.mkdir()
+            old=folder/'zzzzz_codcoop_triggers.pk3'
+            marker={'schema':1,'profile':'united_fronts','sources':{'maps/pathfinder.gsc':'pin'},
+                    'changes':['reviewed-player-trigger-activators']}
+            with zipfile.ZipFile(old,'w') as archive:
+                archive.writestr('codcoop/trigger-overlay.json',json.dumps(marker))
+            original=old.read_bytes();current=folder/TRIGGER_OVERLAY_BASENAME;current.write_bytes(b'current')
+            unknown=folder/'zzzzz_coop_triggers.pk3';unknown.write_bytes(b'unowned')
+            with self.assertRaisesRegex(ValueError,'unrecognized'):quarantine_obsolete_qa_trigger_overlays(game)
+            self.assertEqual(old.read_bytes(),original) # preflight before any move
+            unknown.unlink()
+            archived=quarantine_obsolete_qa_trigger_overlays(game)
+            self.assertEqual(len(archived),1);self.assertEqual(Path(archived[0]).read_bytes(),original)
+            self.assertFalse(old.exists());self.assertEqual(current.read_bytes(),b'current')
+
     def test_observed_native_search_order_is_not_lowercase_sort(self):
         # Exact order printed by the real CoD1 engine, highest priority first.
         observed=['zzz_patch.pk3','zzzzz_codcoop_triggers.pk3',

@@ -3,7 +3,7 @@
 import argparse,json,math,re,shutil,time
 from pathlib import Path
 import qa_coop
-from build_campaign_patch import build_trigger_patch
+from build_campaign_patch import quarantine_obsolete_qa_trigger_overlays, build_trigger_patch
 
 def main():
  p=argparse.ArgumentParser(description=__doc__)
@@ -27,7 +27,8 @@ def main():
     quarantined.append(str(target))
   for old in ('zzzzzzzz_qa_brecourt.pk3','zz_codcoop_brecourt_qa.pk3'):
    (out/n/folder/old).unlink(missing_ok=True)
-  build_trigger_patch(a.source.resolve(),out/n/folder/'zzzzz_codcoop_triggers.pk3',a.variant,qa=True)
+  quarantine_obsolete_qa_trigger_overlays(out/n)
+  build_trigger_patch(a.source.resolve(),out/n/folder/'zzzz_coop_triggers.pk3',a.variant,qa=True)
  report={'status':'NOT_RUN','scope':__doc__,'variant':a.variant,'scenario':a.scenario,'arrangement':'QA models the post-goal precondition at the actual live NPC position; original NPC navigation and battle are not tested. Original post-docs clip is nonsolid and scene axis actors removed. Players are arranged once via existing native cooplook; Joiner approach uses actual input. Explicit1/0health boundaries do not claim native damage/death history. Original shared normal post-goal NPC animation/Has_Explosives/objective4/bomb enable are not fabricated.','input':[]}
  report['quarantined_unrelated_qa_inputs']=quarantined
  sequence=0
@@ -128,6 +129,6 @@ def main():
  finally:
   (out/'brecourt-handoff-proof.json').write_text(json.dumps(report,indent=2)+'\n')
   shutil.copy2(__file__,out/'qa_brecourt_handoff.py')
-  for n in ['host','join1']:shutil.copy2(out/n/folder/'zzzzz_codcoop_triggers.pk3',out/(n+'-brecourt-overlay.pk3'))
+  for n in ['host','join1']:shutil.copy2(out/n/folder/'zzzz_coop_triggers.pk3',out/(n+'-brecourt-overlay.pk3'))
  return 0 if report['status']=='PASS' else 1
 if __name__=='__main__':raise SystemExit(main())

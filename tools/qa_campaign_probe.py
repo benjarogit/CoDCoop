@@ -14,7 +14,7 @@ import time
 import zipfile
 
 import qa_coop
-from build_campaign_patch import build, build_trigger_patch
+from build_campaign_patch import quarantine_obsolete_qa_trigger_overlays, build, build_trigger_patch
 
 
 def read_new_log(path, offset):
@@ -93,7 +93,8 @@ def main():
         folder = output / name
         overlay = folder / 'UnitedFronts/zzzz_coop_campaign.pk3'
         build(folder / 'UnitedFronts/ZUnitedFronts_1.1_beta.pk3', overlay, 'united_fronts', qa=True)
-        build_trigger_patch(folder, folder / 'UnitedFronts/zzzzz_coop_triggers.pk3', 'united_fronts')
+        quarantine_obsolete_qa_trigger_overlays(folder)
+        build_trigger_patch(folder, folder / 'UnitedFronts/zzzz_coop_triggers.pk3', 'united_fronts')
         if args.mutant_host_stockpile:
             with zipfile.ZipFile(overlay) as z:
                 entries = [(info, z.read(info.filename)) for info in z.infolist()]

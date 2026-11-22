@@ -7,12 +7,17 @@
 #include <cstring>
 #include <cstdlib>
 #include <string>
-struct Target{DWORD pid;HWND window;};
+struct Target{DWORD pid;HWND window;bool uo;};
 static BOOL CALLBACK windowForProcess(HWND w,LPARAM raw){
  auto& t=*reinterpret_cast<Target*>(raw);DWORD pid=0;GetWindowThreadProcessId(w,&pid);
  if(pid!=t.pid||!IsWindowVisible(w))return TRUE;
  char title[256]={};GetWindowTextA(w,title,255);
- if(!std::strstr(title,"Call of Duty"))return TRUE;
+ char windowClass[256]={};GetClassNameA(w,windowClass,255);
+ // Observed native UO caption/class are "CoD:United Offensive", not
+ // "Call of Duty". Never target its separate WinConsole or an IME window.
+ if(t.uo) {
+  if(std::strcmp(windowClass,"CoD:United Offensive")||std::strcmp(title,"CoD:United Offensive"))return TRUE;
+ } else if(!std::strstr(title,"Call of Duty")||std::strstr(windowClass,"Console"))return TRUE;
  t.window=w;return FALSE;
 }
 int main(int argc,char** argv){
@@ -26,18 +31,19 @@ int main(int argc,char** argv){
   HANDLE p=OpenProcess(PROCESS_QUERY_INFORMATION,FALSE,entry.th32ProcessID);if(!p)continue;
   char path[4096]={};DWORD length=4095;bool valid=QueryFullProcessImageNameA(p,0,path,&length)!=0;CloseHandle(p);
   size_t size=std::strlen(path);if(!valid||size<suffix.size()||_stricmp(path+size-suffix.size(),suffix.c_str()))continue;
-  target.pid=entry.th32ProcessID;EnumWindows(windowForProcess,reinterpret_cast<LPARAM>(&target));if(target.window)break;
+  target.pid=entry.th32ProcessID;target.uo=uo;EnumWindows(windowForProcess,reinterpret_cast<LPARAM>(&target));if(target.window)break;
  }while(Process32Next(list,&entry));CloseHandle(list);if(!target.window)return 3;
- DWORD before=0,after=0;HWND foreground=GetForegroundWindow();DWORD foregroundThread=GetWindowThreadProcessId(foreground,&before);
+ DWORD before=0,after=0;GetWindowThreadProcessId(GetForegroundWindow(),&before);
+ // Attach only this helper to its owned target. Never merge the two game
+ // processes' input queues through the currently foreground third thread.
  DWORD thread=GetCurrentThreadId(),targetThread=GetWindowThreadProcessId(target.window,nullptr);
- bool attachTarget=thread!=targetThread&&AttachThreadInput(thread,targetThread,TRUE);
- bool attachForeground=foregroundThread&&foregroundThread!=thread&&foregroundThread!=targetThread&&AttachThreadInput(thread,foregroundThread,TRUE);
- ShowWindow(target.window,SW_RESTORE);BringWindowToTop(target.window);SetForegroundWindow(target.window);SetFocus(target.window);
- Sleep(100);GetWindowThreadProcessId(GetForegroundWindow(),&after);
+ bool attached=thread!=targetThread&&AttachThreadInput(thread,targetThread,TRUE);
+ if(IsIconic(target.window))ShowWindowAsync(target.window,SW_RESTORE);
+ SetForegroundWindow(target.window);SetFocus(target.window);
+ Sleep(100);HWND active=GetForegroundWindow();GetWindowThreadProcessId(active,&after);
  UINT sent=0;
- if(after==target.pid){INPUT input={};input.type=INPUT_MOUSE;input.mi.dx=dx;input.mi.dy=dy;input.mi.dwFlags=MOUSEEVENTF_MOVE;sent=SendInput(1,&input,sizeof(input));Sleep(150);}
- if(attachForeground)AttachThreadInput(thread,foregroundThread,FALSE);
- if(attachTarget)AttachThreadInput(thread,targetThread,FALSE);
+ if(after==target.pid&&active==target.window){INPUT input={};input.type=INPUT_MOUSE;input.mi.dx=dx;input.mi.dy=dy;input.mi.dwFlags=MOUSEEVENTF_MOVE;sent=SendInput(1,&input,sizeof(input));Sleep(150);}
+ if(attached)AttachThreadInput(thread,targetThread,FALSE);
  std::printf("{\"target_pid\":%lu,\"foreground_before\":%lu,\"foreground_after\":%lu,\"dx\":%ld,\"dy\":%ld,\"sent\":%u}\n",target.pid,before,after,dx,dy,sent);
- return after==target.pid&&sent==1?0:4;
+ return after==target.pid&&active==target.window&&sent==1?0:4;
 }

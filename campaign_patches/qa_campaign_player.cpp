@@ -60,7 +60,14 @@ int main(int argc,char** argv){
   float predictedAngles[3]={};read(p,cg+(uo?0x26d9e4:0x11e0b4)+0xb0+off,predictedAngles,12);
   std::printf(",\"predicted_angles\":[%.5f,%.5f,%.5f]}",predictedAngles[0],predictedAngles[1],predictedAngles[2]);
   std::printf(",\"pm_flags\":%u,\"cmd_angles\":[%u,%u,%u]",u32(p,ps+0xc),u32(p,ps+(uo?0x822c:0x73e4)+8),u32(p,ps+(uo?0x822c:0x73e4)+12),u32(p,ps+(uo?0x822c:0x73e4)+16));
-  if(!uo){
+  unsigned playerEntities=u32(p,uo?0x47fefb8:0x152bc58),playerEntitySize=u32(p,uo?0x47fefbc:0x152bc5c);
+  bool linked=playerEntities&&u32(p,playerEntities+slot*playerEntitySize+(uo?0x29c:0x294));
+  // Native PS_HEALTH/GE_HEALTH (game.h, verified Damage/ClientSpawn paths).
+  std::printf(",\"pm_type\":%u,\"linked\":%s,\"health\":%u,\"entity_health\":%u",u32(p,ps+4),linked?"true":"false",u32(p,ps+(uo?0x10c:0xe4)),u32(p,playerEntities+slot*playerEntitySize+(uo?0x1e0:0x1d8)));
+  if(uo){
+   // Independently verified UO native40F110 setter / SV_Frame branches.
+   std::printf(",\"native_input\":{\"frame_msec\":%u,\"server_residue\":%u}",u32(p,0x4842220),u32(p,0x4842224));
+  }else{
    // Engine40A5B0 consumes key86CDA8/+10 and strafe86CE68/+10,
    // frame msec1439380 and yaw CVar1423C54; writes CL angles142F304.
    float view[3]={};read(p,0x142f304,view,12);

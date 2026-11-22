@@ -134,7 +134,7 @@ struct PendingReload {
     char map[64];
     uint32_t movieCutoff;
 };
-constexpr uint32_t STATE_VERSION = 18; // completed native-world identity for preservation receipts
+constexpr uint32_t STATE_VERSION = 21; // saved plain-player pose/vitals; private bootstrap uses separate State19
 struct State {
     int role;
     host_body_owner::Store hostBodies;
@@ -975,6 +975,8 @@ bool OwnInventoryInstalled(int n)
 void CapturePeerInventory(int n, const char* reason, bool restoredCheckpoint=false)
 {
     auto& record=S->inventories.slots[n];
+    record.pose={};
+    record.vitals={};
     bool observedWorld=g_gameLifecycleReady&&patch_owner::JumpTargets((uint8_t*)g::A(0x44f270,0x451570),(uintptr_t)Hook_QAPreVM);
     if(restoredCheckpoint&&record.reserved&&(!observedWorld||!record.lease||S->loadedInventoryLease[n]!=record.lease)) {
         record.captured=record.installed=false;
@@ -992,8 +994,49 @@ void CapturePeerInventory(int n, const char* reason, bool restoredCheckpoint=fal
         Log("inventory: invalid native numeric IDs slot=%d weapon=%d viewmodel=%d",n,weapon,viewmodel); return;
     }
     if(peer_inventory::Capture(record,n,S->reloadToken,record.endpoint,g::CvarString("mapname"),
-        ps+g::PS_AMMO,g::PS_LOADOUT_END-g::PS_AMMO,weapon,viewmodel))
+        ps+g::PS_AMMO,g::PS_LOADOUT_END-g::PS_AMMO,weapon,viewmodel)) {
         Log("inventory: captured own slot=%d weapon=%d viewmodel=%d world=%u reason=%s",n,weapon,viewmodel,S->reloadToken.generation,reason);
+        bool plain=*(int*)(ps+4)==0&&*(int*)(ps+g::PS_HEALTH)>0&&!S->downed[n]&&
+            !(*(int*)(ps+12)&3)&&!*(uint8_t**)(g::Entity(n)+g::GE_LINK)&&
+            !*(int*)(ps+g::A(0x35c,0x5a0))&&!S->movieWorldSuspended;
+        if(peer_pose::Capture(record.pose,(const float*)(ps+0x14),(const float*)(ps+g::A(0xb0,0xd8)),plain))
+            Log("pose: captured own slot=%d origin=%.6f,%.6f,%.6f view=%.6f,%.6f,%.6f",n,
+                record.pose.origin[0],record.pose.origin[1],record.pose.origin[2],record.pose.angles[0],record.pose.angles[1],record.pose.angles[2]);
+        if(peer_vitals::Capture(record.vitals,*(int*)(ps+g::PS_HEALTH),
+            *(int*)(g::Entity(n)+g::GE_HEALTH),*(int*)(ps+g::PS_MAXHEALTH),plain))
+            Log("vitals: captured own slot=%d health=%d max=%d",n,record.vitals.health,record.vitals.maxHealth);
+    }
+}
+
+void RestorePeerPose(int n,uint8_t* ps)
+{
+    auto& pose=S->inventories.slots[n].pose;
+    if(!pose.valid||!ps||S->downed[n]||S->movieWorldSuspended||*(int*)(ps+4)!=0||
+        *(uint8_t**)(g::Entity(n)+g::GE_LINK)||*(uint8_t**)(g::Entity(0)+g::GE_LINK)||
+        *(int*)(ps+g::A(0x35c,0x5a0)))return;
+    memcpy(ps+0x14,pose.origin,12);memset(ps+0x20,0,12);
+    memcpy(g::Entity(n)+g::GE_ORIGIN,pose.origin,12);
+    memcpy(g::Entity(n)+0x20,pose.origin,12); // stationary player trajectory
+    pose.commandFloor=*(uint32_t*)ps;pose.pending=true;
+    Log("pose: restored own position slot=%d origin=%.6f,%.6f,%.6f; awaiting current native command",n,pose.origin[0],pose.origin[1],pose.origin[2]);
+}
+
+void RestorePeerPoseView(int n,const uint8_t* cmd)
+{
+    if(!cmd||!S->remote[n].active||!S->remote[n].worldReady||!OwnInventoryInstalled(n))return;
+    auto& pose=S->inventories.slots[n].pose;
+    if(!peer_pose::CommandReady(pose,*(const uint32_t*)cmd))return;
+    uint8_t* ps=g::PlayerState(n);
+    if(!ps)return;
+    if(*(int*)(ps+4)!=0||S->downed[n]||S->movieWorldSuspended||
+        *(uint8_t**)(g::Entity(n)+g::GE_LINK)||*(int*)(ps+g::A(0x35c,0x5a0))) {
+        pose.pending=false;Log("pose: cancelled saved view for changed scripted/downed role slot=%d",n);return;
+    }
+    for(unsigned k=0;k<3;++k)
+        *(uint32_t*)(ps+g::PS_DELTA_ANGLES+k*4)=peer_pose::Delta(pose.angles[k],*(const uint32_t*)(cmd+8+k*4));
+    memcpy(ps+g::A(0xb0,0xd8),pose.angles,12);
+    pose.pending=false;
+    Log("pose: restored own view slot=%d command=%u view=%.6f,%.6f,%.6f",n,*(const uint32_t*)cmd,pose.angles[0],pose.angles[1],pose.angles[2]);
 }
 
 void RestorePeerInventory(int n)
@@ -1003,6 +1046,13 @@ void RestorePeerInventory(int n)
     if(ps && peer_inventory::Restore(record,n,S->reloadToken,InventoryEndpoint(S->remote[n].addr),g::CvarString("mapname"),
         ps+g::PS_AMMO,g::PS_LOADOUT_END-g::PS_AMMO,*(int*)(ps+g::PS_WEAPON),*(int*)(ps+g::PS_VIEWMODEL))) {
         Log("inventory: restored own slot=%d weapon=%d viewmodel=%d world=%u",n,record.weapon,record.viewmodel,S->reloadToken.generation);
+        if(record.vitals.valid&&*(int*)(ps+4)==0&&!S->downed[n]&&!S->movieWorldSuspended&&
+            !*(uint8_t**)(g::Entity(n)+g::GE_LINK)&&!*(int*)(ps+g::A(0x35c,0x5a0))) {
+            *(int*)(ps+g::PS_HEALTH)=*(int*)(g::Entity(n)+g::GE_HEALTH)=record.vitals.health;
+            *(int*)(ps+g::PS_MAXHEALTH)=record.vitals.maxHealth;
+            Log("vitals: restored own slot=%d health=%d max=%d",n,record.vitals.health,record.vitals.maxHealth);
+        }
+        RestorePeerPose(n,ps);
         QueueWeaponSelection(n,record.weapon,true);
         PreservationCommit(n,true);
     }
@@ -2399,7 +2449,7 @@ void Cmd_CoopKill()
 extern "C" void __cdecl FilterUsercmd(int n, uint8_t* cmd)
 {
     if (!S || n < 0 || n >= g::MAX_CLIENTS) return;
-    if(S->role==HOST&&n>0) SelectionUsercmd(n,cmd,false);
+    if(S->role==HOST&&n>0) {RestorePeerPoseView(n,cmd);SelectionUsercmd(n,cmd,false);}
     if(!S->downed[n]) return;
     uint32_t& buttons = *(uint32_t*)(cmd + 4);
     buttons = (buttons & 0xffff0000) | 0x4000;

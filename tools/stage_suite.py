@@ -90,7 +90,7 @@ def stage(game, output, yap_archive, yap_extras, include_base=False, launcher_so
         copy(ROOT/'content/variants.json','coop/variants.json')
         copy(ROOT/'tools/coop_suite.py','coop/coop_suite.py')
         copy(ROOT/'tools/coop_session.py','coop/coop_session.py')
-        for name in ('coop_party.py','party_gui.py','party_binding.py','uf_equipment_roster.py','uf_equipment_catalog.py'):
+        for name in ('coop_party.py','party_gui.py','party_binding.py','party_native_bridge.py','uf_equipment_roster.py','uf_equipment_catalog.py'):
             copy(ROOT/'tools'/name,'coop/'+name)
         copy(ROOT/'tools/frozen_runtime.py','coop/frozen_runtime.py')
         copy(ROOT/'tools/runtime_protocol.py','coop/runtime_protocol.py')
@@ -122,7 +122,7 @@ def stage(game, output, yap_archive, yap_extras, include_base=False, launcher_so
             copy(resolve(game,rel),rel)
             build_campaign_patch(temporary/rel,temporary/folder/'zzzz_codcoop.pk3',profile)
         for profile, folder in (('cod1', 'Main'), ('uo', 'uo'), ('sp_improved', 'sp_improved'), ('united_fronts', 'UnitedFronts')):
-            build_trigger_patch(game, temporary/folder/'zzzzz_codcoop_triggers.pk3', profile)
+            build_trigger_patch(game, temporary/folder/'zzzz_coop_triggers.pk3', profile)
         build_mainline_patch(game, temporary/'sp_improved/zzzzzz_codcoop_mainline.pk3')
         for rel in ('sp_improved/readme.txt', 'sp_improved/description.txt', 'UnitedFronts/Readme-UnitedFronts.txt'):
             source = resolve(game, rel)

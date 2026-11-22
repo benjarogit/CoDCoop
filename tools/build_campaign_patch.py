@@ -427,6 +427,45 @@ def transform_trigger(path, data):
     return text.encode('latin-1')
 
 
+
+TRIGGER_OVERLAY_BASENAME = 'zzzz_coop_triggers.pk3'
+OBSOLETE_TRIGGER_OVERLAYS = ('zzzzz_codcoop_triggers.pk3', 'zzzzz_coop_triggers.pk3')
+
+
+def quarantine_obsolete_qa_trigger_overlays(game):
+    """Archive only identified generated overlays inside an owned QA clone.
+
+    Explicit QA callers only: production installation cleanup is transactional
+    and separately validates installed runtime-lock ownership.
+    """
+    import time
+    game = Path(game)
+    candidates = []
+    for folder in ('Main', 'main', 'uo', 'sp_improved', 'UnitedFronts'):
+        for basename in OBSOLETE_TRIGGER_OVERLAYS:
+            path = game / folder / basename
+            if not path.exists():
+                continue
+            try:
+                with zipfile.ZipFile(path) as archive:
+                    marker = json.loads(archive.read('codcoop/trigger-overlay.json'))
+                if (marker.get('schema') != 1 or marker.get('profile') not in ('cod1', 'uo', *PROFILES)
+                        or not isinstance(marker.get('sources'), dict) or not marker['sources']
+                        or 'reviewed-player-trigger-activators' not in marker.get('changes', [])):
+                    raise ValueError('Unknown generated-overlay marker')
+            except (ValueError, KeyError, zipfile.BadZipFile) as error:
+                raise ValueError(f'Refusing to retire unrecognized QA package: {path}') from error
+            candidates.append(path)
+    archive_root = game / 'codcoop_qa_obsolete_overlays' / str(time.time_ns())
+    moved = []
+    for path in candidates:
+        target = archive_root / path.relative_to(game)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        path.rename(target)
+        moved.append(str(target))
+    return moved
+
+
 def build_trigger_patch(game, output, profile, qa=False, qa_pathfinder=False):
     """Patch only reviewed trigger activator predicates in installed sources."""
     from campaign_inventory import layer_files

@@ -22,7 +22,7 @@ python3 tools/build_campaign_patch.py --game "/path/to/Call of Duty" \
 python3 tools/build_campaign_patch.py --game "/path/to/Call of Duty" \
   --profile united_fronts --output run/overlays/UnitedFronts/zzzz_coop_campaign.pk3
 python3 tools/build_campaign_patch.py --game "/path/to/Call of Duty" \
-  --profile united_fronts --triggers-only --output run/overlays/UnitedFronts/zzzzz_coop_triggers.pk3
+  --profile united_fronts --triggers-only --output run/overlays/UnitedFronts/zzzz_coop_triggers.pk3
 python3 -m unittest discover -s tests -p test_campaign_patch.py -v
 ```
 
@@ -1225,9 +1225,92 @@ verified; no Host-ammo exception was added. The negative evidence is
 `pathfinder-bac5739-remote-Colt-CP-exact-PASS-Host-stock4-FAIL-1795303251601764946`.
 The complete original-recipe prerequisite is in
 `pathfinder-bac5739-exactslots-ammo-ownCG-PASS-remote-keyboard-clock0-FAIL-1795302951051601090`.
-All archives are under the same owned QA history directory. UO/SP Improved's
-new initial-grant behavior, actual shared Use, complete mission flow, native
-Windows and physical mouse input still need acceptance.
+All archives are under the same owned QA history directory. At that source
+boundary UO/SP Improved's new initial-grant behavior and actual shared Use
+still needed runtime checks; subsequent scoped results are recorded below.
+Complete mission flow, native Windows and physical mouse input remain open.
+
+The following CoD1 **equipment/checkpoint-only** run now passes completely:
+`pathfinder7f19-nearHost-Colt-nativeCP-exact-MOUSE-KEYBOARD-PASS-1795304573891484772`.
+It uses immutable `7f19ec02b05655cd3fbdc993ae664c11576a9d1ac66958a98bd741e665b56449`
+with the original engine and 256 MiB hunk. The actual managed-ghost log records
+numeric capture followed by native connected state2→1 before ordinary cleanup.
+After real save/load and rejoin, Host pistol reserve28/clip7 remains exact;
+the remote's normally selected Colt reserve28/consumed clip6, every inventory
+slot and active Game/own-CGame selection remain exact. Give-count stays1 and
+the current lifecycle receipt becomes PRESERVED/no give. The post-load world
+item snapshot has no added items. Strict Host-ammo comparison remains enabled.
+
+The same run separately exercises owned-window Win32 `SendInput` on both
+actual processes: Host yaw29.998→65.528 and remote yaw122.333→136.549, with
+matching own predicted CGame angles. Each target's actual foreground PID and
+successful injected event are recorded. This proves the native injected
+mouse path, **not physical mouse hardware**. It is independent of the keyboard
+counterfactual. The inspected original-engine images show Host M1 Carbine and
+remote Colt6/28 after the checkpoint in
+`run/campaign-investigation/pathfinder7f19-postcheckpoint-hostM1-peerColt.png`.
+Both processes render, pass strict log checks and quit successfully. Shared
+legbag/beacon Use is explicitly not exercised in this accepted scope.
+
+A subsequent genuine-input straight-line route stops at a solid map barrier
+(remote Y1348.875); it does not disable collision or fabricate progress. The
+preserved failure is `pathfinder7f19-natural-directline-worldbarrier-FAIL-1795305318751775284`.
+The route controller is now following the pinned map's initial farm/road
+pathnode corridor. The Host also walks the remote's actually traversed trail,
+keeping the original automatic catch-up enabled while remaining outside each
+final object's Use zone. These are ordinary input targets, not entity or
+navigation-script changes. The complete natural route remains pending.
+
+The isolated **actual remote legbag/beacon activation plus checkpoint** case
+now passes in CoD1 under the same7f19 native snapshot:
+`pathfinder7f19-ARRANGED-actualREMOTE-USE-bag-beacon-CP-PASS-1795306469849525361`.
+Pre-action actor positions use the existing native debug setup at the two
+original objects: Host1000units and remote300units. After setup, actual owner
+movement/look/`+activate` is required; no `useBy`, injected trigger notification,
+mission-flag setter, collision change or AI deletion substitutes for the action.
+The preceding tutorial touch, route and full intro participation are explicitly
+outside this acceptance scope.
+
+Both original native Use events report actual actor1, with Host distances
+1000.03 and999.997. The original legbag disappears, beacon changes to
+`xmodel/eureka_beacon`, original objectives1/2 each complete once, and repeating
+Use cannot repeat them. Every owner's inventory/ammo/active Game and own CGame
+selection remains unchanged during the shared actions. Real remote M1 fire
+consumes only its own ammunition; a subsequent normal Colt choice/fire and
+actual save/load preserve both owners exactly, without recipe repeat or new
+post-load items. Strict engine logs, final rendering, native QUIT and both
+actual process exit codes pass. This remains an isolated action proof, not
+natural navigation, a complete mission or campaign completion.
+
+The first run passed these action assertions but correctly failed the generic
+harness's262KiB evidence bound; its raw274,847byte report is retained as
+`pathfinder7f19-actualUse-andCP-phases-PASS-evidence-limit-FAIL-1795306357078332936`.
+The limit remains unchanged. The accepted repeat returns a bounded summary and
+SHA256-binds its full native JSON sidecar; the sidecar hash was independently
+checked against the final generic result. All action assertions and normal
+screenshot/log/cleanup checks still execute. No generic PASS exception or
+liveness bypass was introduced.
+
+The inherited UO script/engine with actual YAP also passes the same arranged
+remote Use and inventory/selection checkpoint scope, archived as
+`pathfinder7f19-UO-ARRANGED-actualREMOTE-USE-numericCP-PASS-1795306804727853302`.
+Actor1 operates both objects with Host1000.03/999.996 away; original goals
+complete once and strict personal-ammo/selection and clean-exit checks pass.
+These raw-copy UO checks use256 MiB and the original UO executable; they do not
+establish an installed Windows/LAA/production-quality preset.
+
+**Checkpoint pose is a newly observed open gate, separate from the numeric
+inventory PASS.** After the CoD1 beacon save, Host position/look restore, but
+the remote moves from saved(−1359.238,5227.633,0), yaw137.318 to initial map
+spawn(−1052,−68,−191.872), yaw29.998 after reconnect. UO reproduces the same
+position reset. The inspected post-load image independently shows the remote
+back at the starting house; the full raw observations retain both owners'
+positions and angles. No complete checkpoint-position acceptance is claimed.
+`--require-pose-restore` adds a strict optional plain-unlinked-standing gate
+(8world units/2degrees); numeric-only runs always record their pose difference
+instead of silently treating it as restored. A map-start respawn cannot pass
+the focused pose-oracle fixture. Native loaded-state capture/restore is being
+traced before the saved ghost cleanup; no GSC teleport or re-give masks it.
 
 The zero-health test remains a **failed live-gate test setup**, not a passing
 death-lifecycle proof. An entity-only GSC health 0 write was observed as 600 on
@@ -1242,8 +1325,8 @@ under the same history directory. No mission-failure guard was disabled.
 Earlier filename/scene failures are also retained. Actual engine `path` output
 showed a new QA PK3 shadowed by the older generated overlay; a subsequent real
 `zz_` filename was not mounted because CoD1 reserves that prefix for its
-`sp_` alias handling. The current fixture updates only the known owned generated
-`zzzzz_codcoop_triggers.pk3`. Native comparator evidence and engine-aware
+`sp_` alias handling. That historical fixture updated the then-current owned generated
+`zzzzz_codcoop_triggers.pk3`; its precedence defect is corrected below. Native comparator evidence and engine-aware
 inventory ordering are separate from historical source-only inventories; no
 general package renaming or authored-package reorder was applied.
 
@@ -1252,3 +1335,165 @@ Python callback API. It first proves real connection and advancing clocks,
 requires bounded explicit scope/checks/evidence, and retains screenshot/log
 checks, native QUIT and exit-code checks. Targeted scenarios cannot silently
 skip requested checkpoint reloads. The ordinary CLI smoke path is unchanged.
+
+
+### Generated mission overlay precedence correction (2026-11-22)
+
+The canonical generated mission package is now `zzzz_coop_triggers.pk3` in
+Main, uo, sp_improved and UnitedFronts. The required-content manifest, stager
+and campaign QA tools agree on that name. This is a generated-package change;
+authored packages and the native search comparator remain unchanged.
+
+The preserved UF failure
+`pathfinder7f19-UF-generated-variant-shadowed-mission-overlay-FAIL-1795307264124166898`
+shows actual native `Current search path` placing `zzzz_coop_campaign.pk3`
+before `zzzzz_codcoop_triggers.pk3`. Both contain `maps/pathfinder.gsc`, so the
+variant's asset-only repair shadowed the mission compatibility code and QA
+observer. Native comparison folds ASCII to uppercase: underscore sorts after
+Z, so adding Z characters cannot establish the intended priority. At the
+shared `ZZZZ_COOP_` prefix, the new mission name's T sorts after the variant
+name's C. A ZIP-provider regression checks this exact overlapping entry under
+the verified native comparator, including the previously failing order.
+
+Owned QA clones quarantine only recognized old generated trigger packages
+(`zzzzz_codcoop_triggers.pk3` and `zzzzz_coop_triggers.pk3`) before building.
+Their original bytes remain in timestamped clone-local archives. Unrecognized
+same-name packages cause a preflight error before any move. Production cleanup
+is separately transactional and requires the prior installed runtime-lock
+ownership; a modified or unowned package is never silently removed.
+
+The read-only pose trace is preserved as
+`pathfinder1805-loaded-pose-correct-before-disconnect-strict-postCP-pose-FAIL-1795307542640380149`.
+Core SHA1805e8117c47e327b9c12fff021885621d03c76a613e1bb0fdd3ce37aef76ec7
+reports the actual restored guest immediately before ghost disconnect:
+origin(-1359.238159,5227.186035,0.002634), view(51.586304,137.312622,0),
+plain pm_type0, health600, unlinked, matching lease1. The strict post-reconnect
+pose assertion still fails. Thus deserialization has the correct saved pose;
+the subsequent disconnect/connect lifecycle loses it. This is an observed
+negative result, not a pose restoration implementation or acceptance claim.
+
+The corrected UF arrangement now passes with two real Wine game processes:
+`pathfinder7f19-UF-canonical-provider-ARRANGED-actualREMOTE-USE-PASS-1795307700843026510`
+under `run/qa-cod1-four/history/`. Both native search-path reports show the
+canonical mission overlay first and the variant overlay second. Actual remote
+actor1 activates the original legbag and beacon; Host distances are1000.03 and
+999.999. Original objectives1/2 complete once, the legbag is deleted, and the
+beacon becomes `xmodel/eureka_beacon`. Shared actions leave both owners'
+inventory, ammunition and active Game/own CGame selection unchanged. Subsequent
+real remote fire consumes only its own clip. Both native screenshots render
+normally (YAP visible), strict logs pass and both actual processes quit0.
+
+This UF proof uses the unchanged7f19 Core snapshot, raw original UO executable,
+YAP and512MiB harness setting. It does not certify the production256MiB preset,
+checkpoint pose, individual UF starting-kit bootstrap, natural tutorial/route
+or complete mission. The accepted screenshot contact is
+`run/campaign-investigation/pathfinder-UF-canonical-provider-actual-use.png`.
+The prior shadowed-layer failure and exact old packages remain archived.
+
+### Plain-owner checkpoint pose: targeted native regression PASS
+
+The previously observed position/look reset is now fixed for the tested plain
+standing, healthy, unlinked owners by candidate Core
+`4861e9a0464916726d3fb9a9d5f31dc3aa3fff44459c2bc63c25b92dfd006cfa`
+(State20, loader85fc). The original negative trace above remains unchanged.
+Two real-player tests with `--arranged-interactions --checkpoint
+--require-pose-restore` pass for CoD1 and UO with YAP, using256MiB and the
+existing isolated raw-copy installations:
+
+- `pathfinder4861-CoD1-arrangedUse-strictPOSE-nativeCP-PASS-1795307830696259045`
+- `pathfinder4861-UO-YAP-arrangedUse-strictPOSE-nativeCP-PASS-1795307912327709811`
+
+Both full archives are under `run/qa-cod1-four/history/`. The command uses
+`tools/qa_pathfinder_use.py --source run/campaign-host --run run/qa-cod1-four
+--runtime-dir run/saved-pose-prototype --variant cod1 --port 29950 --timeout 180
+--arranged-interactions --checkpoint --require-pose-restore`; the second test
+changes only the variant to `uo`.
+
+Both Host and remote position deltas and all three look-angle deltas are
+exactly0 after actual save/load, reconnection and stable current snapshots.
+CoD1 remote saved/restored position is(-1359.23816,5227.80859,-0.00423),
+view(51.76758,137.26868,0); UO is(-1359.23572,5229.19434,-0.01952),
+view(52.46521,138.55408,0). Actual own CGame current client1 and predicted
+angles agree before/after. The inspected images retain the remote Colt6/28
+at the beacon instead of returning to the initial house; Host remains M1.
+Screenshot contacts are `run/campaign-investigation/pathfinder4861-strict-pose-CoD1.png`
+and `run/campaign-investigation/pathfinder4861-strict-pose-UO.png`.
+
+All earlier assertions remain active: actual remote bag/beacon Use with Host
+outside512units, original objectives once, exact original initial slots/ammo,
+real remote fire and later normal Colt selection/fire, both owners' consumed
+ammunition/active Game and own CGame selection retained, no recipe repeat
+(give_count1/PRESERVED), no added ghost Colt item, clean strict logs, final
+rendering and native exit0 for both processes. The fix restores bounded numeric
+plain pose after ClientBegin and applies view deltas only against a real current
+owner command; it does not copy script, vehicle or entity pointers. Linked,
+vehicle, scripted-camera, dead/downed and other exclusive-role restoration
+remain separate acceptance work. Neither test is natural route or full mission
+completion, native Windows testing or general campaign checkpoint acceptance.
+
+### Damaged-owner checkpoint health: confirmed negative counterfactual
+
+The added opt-in `--require-vitals-restore` preserves the same actual Use,
+checkpoint, pose, inventory and selection checks, disables only remote
+`coopgod`, then calls the existing native `coopkill 1 50` damage path before
+saving. No direct health-memory setter or scripted damage substitute is used.
+The read-only observer records both verified PS_HEALTH and GE_HEALTH (CoD1
+PS+0xe4/entity+0x1d8; UO+0x10c/+0x1e0), independently of the QA convenience
+state. The fixture requires a real nonfatal drop in both fields, plain standing
+unlinked owners and unchanged Host health.
+
+On immutable4861 CoD1 this correctly **FAILS**: the actual remote PS/entity
+health drops600→550, remains550 in the pre-save native observation, but becomes
+600/600 after actual checkpoint load and reconnect. Host stays600/600. Both
+owners' position/look deltas remain0; health preservation is a distinct open
+checkpoint gate. The full failed fixture, source/helper, original packages,
+runtime, logs and numeric evidence are retained in
+`run/qa-cod1-four/history/pathfinder4861-CoD1-nonfatalNativeDamage-strictCP-vitals-550to600-FAIL-1795308050024091614`.
+The failure is reported before successful scenario completion; it is not a
+clean-exit acceptance result. No health restoration workaround or Native guard
+change is included in the QA producer. A loaded-PS-before-cleanup trace is the
+next cause-isolation step; the current evidence alone does not distinguish
+native save deserialization from ClientBegin resetting health.
+
+The exact native cause boundary is now confirmed with the unchanged read-only
+1805 trace Core. Archive
+`pathfinder1805-preGhost-health550-postBegin600-nativeCP-vitals-FAIL-1795308167222866938`
+under the same history directory records actual nonfatal damage550, saved
+PS/entity550, and the pre-Capture/pre-Disconnect native log:
+`01:42:25.683 pose: loaded ghost slot=1 lease=1 loaded_lease=1 world=3 pm=0 health=550 linked=0`.
+After ClientConnect/ClientBegin the observer reads PS/entity600/600; Host remains
+600/600. Thus native deserialization does retain saved health, and the subsequent
+remote lifecycle loses it. The old diagnostic Core's known pose reset is also
+recorded (5309units), explicitly not required in this health-isolation run.
+Overall strict vitals result remains FAIL; no Native health fix is implied.
+
+### Damaged plain-owner checkpoint health: targeted native regression PASS
+
+Core `d982970ed3bac9ef70b4068a593b044ade6656f95105dfe1bb2f5956b469caf5`
+(State21, exact snapshot `run/saved-vitals-native-prototype`, loader85fc)
+passes the identical nonfatal-damage counterfactual for both CoD1 and UO+YAP.
+The preceding failure/trace archives remain intact. Complete new archives under
+`run/qa-cod1-four/history/` are:
+
+- `pathfinderd982-CoD1-actualDamage50-strictPOSE-VITALS-nativeCP-PASS-1795308507691535724`
+- `pathfinderd982-UO-YAP-actualDamage50-strictPOSE-VITALS-nativeCP-PASS-1795308585953522895`
+
+Use the strict pose command above with runtime `run/saved-vitals-native-prototype`
+and add `--require-vitals-restore`. The existing native damage command genuinely
+reduces the remote from600 to550 before save; independent PS and entity reads
+both remain550 after actual load/reconnect. Host stays600. Native capture and
+restore logs also report health550/max600. Both owners' position and all look
+angle deltas remain exactly0, with own CGame currentclient1 and predicted angles
+matching. All earlier actual Use, precise personal inventory/ammunition, active
+Game/own CGame weapon, recipe-once, ghost-item and strict log/render/exit checks
+remain enabled and pass. The screenshot contacts
+`run/campaign-investigation/pathfinderd982-strict-vitals-CoD1.png` and
+`run/campaign-investigation/pathfinderd982-strict-vitals-UO.png` were inspected:
+Host M1 remains at the bunker, remote Colt6/28 remains beside the beacon.
+
+Both tests use256MiB isolated raw-copy Wine installations. This closes only the
+shown healthy, unlinked, ordinary-owner checkpoint health/pose counterexample.
+It does not establish linked/vehicle/cinematic/downed/dead restoration,
+checkpoint correctness in all missions, full campaigns or native Windows.
+The Native fix adds bounded owner/world-bound numeric vitals after ClientBegin;
+no script, links, entity pointers or full playerState are copied by the fixture.

@@ -1728,11 +1728,60 @@ def write_suite_launchers(game, transaction):
         transaction.remember(stem + '.bat').write_bytes(text.encode('ascii'))
 
 
+RETIRED_TRIGGER_BASENAMES = ('zzzzz_codcoop_triggers.pk3', 'zzzzz_coop_triggers.pk3')
+
+
+def preflight_retired_trigger_overlays(game, overlay):
+    """A renamed effective script layer must not leave a stale extra PK3 loaded.
+
+    Only a previous payload's unchanged owned bytes may be retired. An edited
+    or manually supplied overlay needs an explicit user backup/decision instead.
+    This check runs before downloads and again immediately before mutation.
+    """
+    from pathlib import Path
+    game, overlay = Path(game), Path(overlay)
+    new_path = overlay / 'coop/runtime-lock.json'
+    if not new_path.is_file():
+        return
+    new = json.loads(new_path.read_text()).get('files', {})
+    old_path = game / 'coop/runtime-lock.json'
+    old = json.loads(old_path.read_text()).get('files', {}) if old_path.is_file() else {}
+    if not isinstance(new, dict) or not isinstance(old, dict):
+        raise ValueError('invalid previous or replacement payload ownership')
+    new = {name.lower(): (name, digest) for name, digest in new.items()}
+    old = {name.lower(): digest for name, digest in old.items()}
+    destination = InstallTransaction(game)
+    source = InstallTransaction(overlay)
+    for folder in ('Main', 'uo', 'sp_improved', 'UnitedFronts'):
+        replacement = folder + '/zzzz_coop_triggers.pk3'
+        pin = new.get(replacement.lower())
+        if pin is None:
+            continue
+        replacement_file = source.destination(replacement)
+        if (replacement_file.is_symlink() or not replacement_file.resolve().is_relative_to(source.game) or
+                not replacement_file.is_file() or
+                not isinstance(pin[1], str) or not re.fullmatch(r'[0-9a-f]{64}', pin[1]) or
+                sha256(replacement_file) != pin[1]):
+            raise ValueError('replacement mission overlay is missing or changed: ' + replacement)
+        for basename in RETIRED_TRIGGER_BASENAMES:
+            relative = folder + '/' + basename
+            if relative.lower() in new:
+                continue
+            path = destination.destination(relative)
+            if not path.exists() and not path.is_symlink():
+                continue
+            if (path.is_symlink() or not path.resolve().is_relative_to(destination.game) or
+                    not path.is_file() or old.get(relative.lower()) != sha256(path)):
+                raise ValueError('Previous mission overlay is modified or not payload-owned; back it up and '
+                                 'remove it explicitly before updating: ' + relative)
+
+
 def remove_obsolete_owned_files(game, overlay, transaction):
     """Retire only unchanged publisher-owned overlays and launcher libraries."""
     from pathlib import Path, PurePosixPath
     old_path = Path(game) / 'coop/runtime-lock.json'
     new_path = Path(overlay) / 'coop/runtime-lock.json'
+    preflight_retired_trigger_overlays(game, overlay)
     if not old_path.is_file() or not new_path.is_file():
         return
     old = json.loads(old_path.read_text()).get('files', {})
@@ -1740,7 +1789,8 @@ def remove_obsolete_owned_files(game, overlay, transaction):
     new_names = {name.lower() for name in new}
     for rel, expected in old.items():
         lower = rel.lower()
-        generated = ((lower.endswith('.pk3') and 'codcoop' in lower.rsplit('/', 1)[-1]) or
+        generated = ((lower.endswith('.pk3') and ('codcoop' in lower.rsplit('/', 1)[-1] or
+                     lower.rsplit('/', 1)[-1] in (*RETIRED_TRIGGER_BASENAMES, 'zzzz_coop_triggers.pk3', 'zzzz_coop_campaign.pk3'))) or
                      lower.startswith('coop/launcher/'))
         if not generated or lower in new_names or protected_user_file(rel):
             continue
@@ -1912,6 +1962,7 @@ def suite_main(argv=None):
     try:
         require_suite_owned_patches(overlay)
         require_original_campaign_source(game, overlay, args.source)
+        preflight_retired_trigger_overlays(game, overlay)
     except (OSError, ValueError, TypeError, KeyError) as error:
         say('INSTALLATION FAILED: '+str(error))
         return 2

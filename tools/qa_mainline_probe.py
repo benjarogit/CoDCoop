@@ -12,7 +12,7 @@ import shutil
 import time
 
 import qa_coop
-from build_campaign_patch import build, build_mainline_patch, build_trigger_patch
+from build_campaign_patch import quarantine_obsolete_qa_trigger_overlays, build, build_mainline_patch, build_trigger_patch
 
 
 def main():
@@ -41,7 +41,8 @@ def main():
         # not only the bridge itself. The source packages remain untouched.
         (folder / 'sp_improved/zzzzzz_coop_mainline.pk3').unlink(missing_ok=True)
         build(folder / 'sp_improved/sp_improved_1.5.pk3', folder / 'sp_improved/zzzz_codcoop.pk3', 'sp_improved')
-        build_trigger_patch(folder, folder / 'sp_improved/zzzzz_codcoop_triggers.pk3', 'sp_improved')
+        quarantine_obsolete_qa_trigger_overlays(folder)
+        build_trigger_patch(folder, folder / 'sp_improved/zzzz_coop_triggers.pk3', 'sp_improved')
         build_mainline_patch(folder, folder / 'sp_improved/zzzzzz_codcoop_mainline.pk3')
     original = qa_coop.assess_liveness
     entered = False

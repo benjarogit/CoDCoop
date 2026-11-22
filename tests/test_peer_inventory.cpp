@@ -40,7 +40,15 @@ int main() {
     assert(Restore(r,2,a,alice,"brecourt",restored,0x210,weapon,view));
     assert(r.installed && weapon==0 && view==0);
     assert(!Capture(r,2,a,alice,"brecourt",native,BYTES+1,0,0));
+    float origin[3]={12,34,56},angles[3]={1,137,0};
+    assert(peer_pose::Capture(r.pose,origin,angles,true));r.pose.pending=true;
+    assert(peer_vitals::Capture(r.vitals,550,550,600,true));
+    Store poseReload;std::memcpy(&poseReload,&store,sizeof store);
+    assert(poseReload.slots[2].pose.valid&&poseReload.slots[2].pose.pending);
+    assert(poseReload.slots[2].vitals.valid&&poseReload.slots[2].vitals.health==550);
     Transition(r,newer,"brecourt");
+    assert(!r.pose.valid&&!r.pose.pending);
+    assert(!r.vitals.valid);
     assert(Owner(r,2,a.session,alice) && !r.captured && !r.installed);
     assert(!Restore(r,2,newer,alice,"brecourt",restored,0x210,weapon,view));
     Transition(r,stranger,"brecourt"); assert(!r.reserved);

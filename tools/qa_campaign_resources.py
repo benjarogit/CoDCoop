@@ -19,7 +19,7 @@ import time
 import zipfile
 
 import qa_coop
-from build_campaign_patch import build, build_trigger_patch
+from build_campaign_patch import quarantine_obsolete_qa_trigger_overlays, build, build_trigger_patch
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -153,12 +153,13 @@ def main():
         shutil.copy2(snapshot/name, game/name)
         report['runtime'][name] = hashlib.sha256((snapshot/name).read_bytes()).hexdigest()
     build(game/'UnitedFronts/ZUnitedFronts_1.1_beta.pk3', game/'UnitedFronts/zzzz_coop_campaign.pk3', 'united_fronts', qa=False, world_policy=args.world_policy)
-    build_trigger_patch(game, game/'UnitedFronts/zzzzz_coop_triggers.pk3', 'united_fronts')
-    for name in ('zzzz_coop_campaign.pk3', 'zzzzz_coop_triggers.pk3'):
+    quarantine_obsolete_qa_trigger_overlays(game)
+    build_trigger_patch(game, game/'UnitedFronts/zzzz_coop_triggers.pk3', 'united_fronts')
+    for name in ('zzzz_coop_campaign.pk3', 'zzzz_coop_triggers.pk3'):
         shutil.copy2(game/'UnitedFronts'/name, output/name)
     if args.baseline_scripts:
         disabled = []
-        for name in ('zzzz_coop_campaign.pk3', 'zzzzz_coop_triggers.pk3'):
+        for name in ('zzzz_coop_campaign.pk3', 'zzzz_coop_triggers.pk3'):
             source, destination = game/'UnitedFronts'/name, output/('disabled-'+name)
             source.replace(destination); disabled.append((source, destination))
         def restore_overlays():
