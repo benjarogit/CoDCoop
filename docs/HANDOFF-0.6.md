@@ -33,6 +33,23 @@ This addendum supersedes pending statements below. Nothing has been published.
   kept in `run/qa-noville-m1-awm1*`; no result is claimed before it completes.
   / Drei lokale Commits, nichts veröffentlicht; Fixture 9/9, Build und
   Regressionstests grün.
+- **M1 planned kit union / M1 geplante Kit-Union:** local commits `237b4c3`
+  (plan-scoped union) and `1802cab` (trace pid, `--min-nodes`). The four-player
+  Noville run `run/qa-noville-m1-union7` PASSes with
+  `--experimental-gmi-loader --experimental-plan-union-media
+  --experimental-borrow-trees`: the host declares 15 planned definitions
+  (14 kit weapons plus the map-registered `thompson28`), the export stays at
+  347 models/119 weapons, all three joiners verify the strict native
+  index/name/registered mapping, and the four fresh kits pass. No `MT_AllocIndex`
+  failure occurs with borrowed trees. `MatchWeapons`, registration guards,
+  ID order and capacity are unchanged; the union and the map-scoped extra are
+  QA-only, and catalog enum numbers are resolved to native definition names.
+  This is not native Windows/Steam acceptance and not a production registry fix.
+  / Zwei lokale Commits, nichts veröffentlicht. Noville-Vier-Spieler-Lauf
+  `union7` besteht mit geplanter Union und geliehenen Bäumen; Host deklariert
+  15 Definitions, Export bleibt 347/119, alle drei Joiner bestehen das strikte
+  Mapping, vier frische Kits bestehen, kein `MT_AllocIndex`-Fehler. QA-only,
+  keine Produktionslösung und keine Windows/Steam-Abnahme.
 - **Latest worker checkpoint / Neuester Worker-Stand:** local source `277fc47`
   fixes actual Windows/Wine atomic-replace sharing failures and physical-link
   rejection. Fresh immutable worker source graph
