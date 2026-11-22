@@ -41,13 +41,27 @@ def canonical(value):
     return json.dumps(value, sort_keys=True, separators=(',', ':'), ensure_ascii=True).encode('ascii')
 
 
+def _replace_private(temporary, path):
+    # Windows readers (including a briefly open UI/antivirus handle) may deny
+    # replacement. Keep the original intact and bound retry to 250 ms.
+    deadline=time.monotonic()+.25
+    while True:
+        try:
+            os.replace(temporary,path)
+            return
+        except PermissionError as error:
+            if getattr(error,'winerror',None) not in (5,32,33) or time.monotonic()>=deadline:
+                raise
+            time.sleep(.01)
+
+
 def atomic_private(path, value):
     path = Path(path); path.parent.mkdir(parents=True, exist_ok=True)
     fd, temporary = tempfile.mkstemp(prefix='.' + path.name, dir=path.parent)
     try:
         with os.fdopen(fd, 'wb') as stream:
             stream.write(canonical(value)); stream.flush(); os.fsync(stream.fileno())
-        os.replace(temporary, path)
+        _replace_private(temporary, path)
         if os.name != 'nt': path.chmod(0o600)
     finally:
         if os.path.exists(temporary): os.unlink(temporary)

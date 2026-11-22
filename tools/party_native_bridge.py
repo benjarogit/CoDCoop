@@ -90,22 +90,70 @@ def encode_resources(resources):
     return encoded
 
 
+def _wine_no_link(path):
+    if os.name!='nt':return True
+    import ctypes
+    from ctypes import wintypes
+    kernel=ctypes.WinDLL('kernel32',use_last_error=True)
+    try:convert=kernel.wine_get_unix_file_name
+    except AttributeError:
+        # On native Windows reparse checks apply. An unexpected Wine without
+        # its physical-path conversion cannot safely certify POSIX links.
+        return not hasattr(ctypes.WinDLL('ntdll'),'wine_get_version')
+    text=str(path)
+    if not 1<len(text)<=32700:return False
+    parent=str(Path(path).parent);leaf=Path(path).name
+    convert.argtypes=[wintypes.LPCWSTR];convert.restype=ctypes.c_void_p
+    kernel.GetProcessHeap.restype=wintypes.HANDLE
+    kernel.HeapFree.argtypes=[wintypes.HANDLE,wintypes.DWORD,ctypes.c_void_p]
+    pointers=[]
+    try:
+        actual=convert(text);pointers.append(actual)
+        directory=convert(parent);pointers.append(directory)
+        return bool(actual and directory and ctypes.string_at(actual)==ctypes.string_at(directory).rstrip(b'/')+b'/'+leaf.encode('utf-8'))
+    finally:
+        for pointer in pointers:
+            if pointer:kernel.HeapFree(kernel.GetProcessHeap(),0,pointer)
+
+
+def _shared_read_fd(path):
+    if os.name!='nt':
+        return os.open(path,os.O_RDONLY|getattr(os,'O_NOFOLLOW',0)|getattr(os,'O_BINARY',0))
+    # CRT os.open omits FILE_SHARE_DELETE, so even this short read can block
+    # the Native/worker atomic rename. Open the record without following a
+    # reparse point, sharing replacement while retaining the opened snapshot.
+    import ctypes
+    import msvcrt
+    from ctypes import wintypes
+    kernel=ctypes.WinDLL('kernel32',use_last_error=True)
+    kernel.CreateFileW.argtypes=[wintypes.LPCWSTR,wintypes.DWORD,wintypes.DWORD,ctypes.c_void_p,wintypes.DWORD,wintypes.DWORD,wintypes.HANDLE]
+    kernel.CreateFileW.restype=wintypes.HANDLE
+    kernel.CloseHandle.argtypes=[wintypes.HANDLE]
+    kernel.CloseHandle.restype=wintypes.BOOL
+    if not _wine_no_link(path):raise ValueError('Native bridge record resolves through a POSIX symlink')
+    handle=kernel.CreateFileW(str(path),0x80000000,7,None,3,0x00200000,None)
+    if handle==ctypes.c_void_p(-1).value:raise ctypes.WinError(ctypes.get_last_error())
+    try:return msvcrt.open_osfhandle(handle,os.O_RDONLY|os.O_BINARY)
+    except BaseException:
+        kernel.CloseHandle(handle)
+        raise
+
+
 class FixedFiles:
     def __init__(self, game):
         self.root=Path(game).absolute()/'coop'/'party-bridge'
     def path(self,name):
         if not re.fullmatch(r'(?:host-[012]|ack-[012]|client|host-ready|party)\.json',name):raise ValueError('Unknown bridge path')
         for path in (self.root.parent,self.root):
-            if path.is_symlink() or (path.exists() and getattr(path.lstat(),'st_file_attributes',0)&0x400):raise ValueError('Native bridge directory cannot be a symlink')
+            if path.is_symlink() or (path.exists() and (getattr(path.lstat(),'st_file_attributes',0)&0x400 or not _wine_no_link(path))):raise ValueError('Native bridge directory cannot be a symlink')
             if path.exists() and (not path.is_dir() or (os.name!='nt' and (path.stat().st_uid!=os.getuid() or path.stat().st_mode&0o022))):
                 raise ValueError('Native bridge directory is not owned safely')
         result=self.root/name
-        if result.is_symlink() or (result.exists() and getattr(result.lstat(),'st_file_attributes',0)&0x400):raise ValueError('Native bridge record cannot be a symlink')
+        if result.is_symlink() or (result.exists() and (getattr(result.lstat(),'st_file_attributes',0)&0x400 or not _wine_no_link(result))):raise ValueError('Native bridge record cannot be a symlink')
         return result
     def read(self,name):
         path=self.path(name)
-        flags=os.O_RDONLY|getattr(os,'O_NOFOLLOW',0)|getattr(os,'O_BINARY',0)
-        fd=os.open(path,flags)
+        fd=_shared_read_fd(path)
         try:
             info=os.fstat(fd)
             if getattr(info,'st_file_attributes',0)&0x400 or not stat.S_ISREG(info.st_mode) or not 0<info.st_size<=MAX_LOCAL_BYTES or (os.name!='nt' and (info.st_uid!=os.getuid() or info.st_mode&0o022)):
