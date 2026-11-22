@@ -153,6 +153,15 @@ Weitere Einzelheiten: [Linux / Proton](docs/linux.md).
 
 ## Entwicklungsstand
 
+United Fronts hat weiterhin einen blockierenden Ressourcenfehler: Foy und
+Noville können beim sauberen Start mit dem vollständigen Ausrüstungsbestand
+die 255 Modellplätze der Engine ausschöpfen. Eine Registrierung erst bei
+tatsächlicher Verwendung wird experimentell geprüft. Vier individuelle
+Ausrüstungen, Checkpoint-Wiederherstellung und vollständige Missionen sind
+damit noch nicht bestätigt. Die signierte Ausrüstungslobby funktioniert in
+gebauten Linux- und Windows/Wine-Workern; ihre native Spieler-/Ausrüstungsbindung
+im Spiel ist noch nicht fertig.
+
 Für die stabile Veröffentlichung zählen **vollständig geprüfte Kampagnen**,
 nicht nur geladene Karten. Native Windows-10/11-Tests, Steam mit getrennten
 Accounts, sämtliche Kampagnen und Zusatzmechaniken müssen nachgewiesen sein.

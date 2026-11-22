@@ -145,6 +145,13 @@ See [Linux / Proton details](docs/linux.md).
 
 ## Development status
 
+United Fronts still has a blocking resource issue: clean Foy and Noville startup
+can exhaust the engine's 255 model slots with the complete equipment set.
+Deferred registration is being tested; it is experimental and does not yet
+certify four individual kits, checkpoint recovery or complete missions.
+The signed equipment lobby works in frozen Linux and Windows/Wine workers;
+its native game owner/kit binding is still unfinished.
+
 The release gate is **complete tested campaigns**, not merely successful map
 loads. Native Windows 10/11 tests, Steam with separate accounts, all campaign
 playthroughs and the extra mechanics must be recorded before a stable release.

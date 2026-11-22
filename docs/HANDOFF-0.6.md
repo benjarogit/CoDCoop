@@ -17,6 +17,44 @@ published v0.5.4 binaries have not been replaced.
 This addendum supersedes pending statements below. Nothing has been published.
 / Diese Ergänzung ersetzt ältere Offen-Angaben unten. Nichts wurde veröffentlicht.
 
+- **Latest worker checkpoint / Neuester Worker-Stand:** local source `277fc47`
+  fixes actual Windows/Wine atomic-replace sharing failures and physical-link
+  rejection. Fresh immutable worker source graph
+  `8f7e3a4d000abc755813a3af44dddee9243b23c1a3e27b159c0d2e035c0e5de5`
+  at `run/worker9-dev6-win-io/` passes strict embedded-provenance/crypto probes,
+  tiny synthetic suite seal/check/prepare, legacy protocol rejection and personal
+  file preservation. Linux signed-worker suite:11 passed; Windows/Wine:10 passed,
+  one unavailable compiler case skipped. Actual300 challenge/ACK cycles and a
+  separate abrupt four-party worker restart preserve the required identity/plan
+  semantics. Executable hashes: Linux
+  `63619c9fc00950e69af67dbc287f2c95aeb3fbca8126274e0f1b5c68918d8623`,
+  Windows `df6030662bcda46acf5f65107aa8265b4cc517f30c84e9d1ad27a395f77e647c`.
+  Exact handoff SHA256 `f46541fba4cb1be66ca828fd2149669c1d5f5fa0f4480db4fae8658f3b8d2687`:
+  `run/worker9-dev6-win-io/handoff.json`. These are real frozen workers but NOT
+  native game owner/kit binding, full suite setup/AppImage or physical Windows.
+  Older statements about the missing fresh-worker positive are superseded.
+- **UF resource blocker / UF-Ressourcenblockade:** clean normal255-slot universal
+  startup passes Brecourt250CS but fails Foy and Noville with native model overflow.
+  Selected-host-only diagnostic startup passes Foy249 and Noville252; the union
+  of the four chosen American roles would need259/263 respectively, so reducing
+  universal helpers alone is insufficient. No selected-host test certifies the
+  user's required four individual kits. A QA-only six-pure-precache-caller defer
+  prototype starts all three maps at normal255, imports no old model ledger,
+  retains every approved renderer asset and leaves native guards unchanged.
+  Core `6ffc8fd0fd0eea1a5dedde03e47d925468122d659716b417087bba97fea8eb1a`
+  at `run/uf-observer-epoch-prototype/`; evidence and exact archives are in
+  `docs/campaign-compatibility.md`. This remains experimental: visible body/gun
+  first use, real four-owner kit union, current peer model mappings, cumulative
+  mission usage and checkpoint asset persistence still require proof and proper
+  production integration. Do not enable the QA environment flag in a release.
+- **Real paused UF world / Tatsächlich pausierte UF-Welt:** source-pinned,
+  epoch-bound read-only diagnostics observe actual native ordered campaign/
+  climate/year decisions while the original journal holds world time at300ms.
+  Normal Start resumes the world. Fresh initialization was proved on the three
+  maps above, with selected-only diagnostic scope where universal startup fails.
+  Runtime-ready remains false. BSP-derived candidates independently match the
+  compact three-map witnesses; this is not proof for all122 maps or saved games.
+
 - **Current native candidate / Aktueller nativer Kandidat:** State24/protocol9,
   compiled APIs63. `LOCALIZED_BANNERS=32` requires the owned EN/DE text bank;
   it is not an individual-kit capability. Exact Core

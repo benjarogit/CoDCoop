@@ -6,6 +6,14 @@
 
 **Unreleased. No full-campaign or native-Windows certification yet.**
 
+- Fix atomic lobby-file exchange when a Windows/Wine reader temporarily blocks
+  replacement; keep bounded retries, prior-file preservation and link rejection.
+  Fresh frozen Linux and Windows/Wine workers pass signed party transactions,
+  including four-party restart/ownership checks. Native game kit binding remains open.
+- Record clean UF Foy/Noville startup failures at the native 255-model limit.
+  First-use registration remains experimental; selected-host-only startup is
+  diagnostic evidence, not support for four individual kits.
+
 - Source `0.6.0-dev.6` requires compiled Core feature mask 63, including native
   asset bootstrap and localized Coop banners. Reject historical API15/API31 DLLs before new staging; individual
   UF kit application remains gated pending native owner/plan binding.
@@ -97,6 +105,16 @@ mechanics remain acceptance gates. See [handoff](docs/HANDOFF-0.6.md).
 ## 0.6.0 Entwicklung — Deutsch
 
 **Noch nicht veröffentlicht. Keine Bestätigung vollständiger Kampagnen oder nativer Windows-Läufe.**
+
+- Atomaren Lobby-Dateiaustausch bei vorübergehend blockierenden Windows-/Wine-
+  Lesern korrigieren; begrenzte Wiederholungen, Erhalt der vorherigen Datei und
+  Link-Abweisung beibehalten. Neu gebaute Linux- und Windows/Wine-Worker bestehen
+  signierte Gruppentests einschließlich Vierergruppe, Neustart und Spielerbindung.
+  Die native Ausrüstungsbindung im Spiel bleibt offen.
+- Saubere UF-Startfehler in Foy/Noville an der nativen Grenze von 255 Modellen
+  dokumentieren. Registrierung bei tatsächlicher Verwendung bleibt experimentell;
+  der Start nur mit Host-Ausrüstung ist ein Diagnosetest, kein Nachweis für vier
+  individuelle Ausrüstungen.
 
 - Quellenstand `0.6.0-dev.6` verlangt Core-Maske 63 einschließlich nativer
   Ressourcenübertragung und lokalisierter Coop-Hinweise. Alte API 15-DLLs werden vor neuem Staging abgewiesen;
