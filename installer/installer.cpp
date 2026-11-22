@@ -60,7 +60,7 @@ enum {
     IDC_ST_SET, IDC_ST_NAME, IDC_NAME, IDC_ST_RES, IDC_RES, IDC_FULL,
     IDC_ST_FOV, IDC_FOV, IDC_FOVNOTE, IDC_ST_Q, IDC_Q,
     IDC_FIXNOTE, IDC_ST_EXTRAS, IDC_SP, IDC_UF, IDC_MAP, IDC_EXNOTE,
-    IDC_PROGRESS, IDC_STATUS, IDC_INSTALL, IDC_QUIT, IDC_CONFIGURE = 130
+    IDC_PROGRESS, IDC_STATUS, IDC_INSTALL, IDC_QUIT, IDC_CONFIGURE = 130, IDC_ROLLBACK = 131
 };
 
 enum { L_DE = 0, L_EN = 1 };
@@ -77,9 +77,10 @@ static int g_state = S_IDLE;
 static std::wstring g_overlayOverride;
 static HWND g_dlg = nullptr;
 
-struct ChangedFile { std::wstring path, backup; bool existed; };
+struct ChangedFile { std::wstring path, backup; bool existed; std::string backupHash; };
 static std::vector<ChangedFile> g_changes;
 static bool g_transactionActive=false;
+static bool g_rollbackMode=false;
 static void RememberFile(const std::wstring& path) {
     if (!g_transactionActive) return;
     for (const auto& change:g_changes) if (!_wcsicmp(change.path.c_str(),path.c_str())) return;
@@ -99,7 +100,7 @@ static void RememberFile(const std::wstring& path) {
         }
         if (!copied) throw std::runtime_error("cannot back up "+suite::Utf8(path));
     }
-    g_changes.push_back({path,backup,exists});
+    g_changes.push_back({path,backup,exists,exists?suite::Hash(backup):std::string()});
 }
 static void RollbackFiles() {
     for (auto i=g_changes.rbegin();i!=g_changes.rend();++i) {
@@ -1890,21 +1891,22 @@ static bool RunInstall(std::wstring& err)
     return true;
 }
 
+ #include "installer_rollback.h"
+
 static DWORD WINAPI Worker(LPVOID)
 {
     std::wstring err;
     bool ok=false;
-    try { ok=RunInstall(err); }
+    try { ok=g_rollbackMode?RollbackLastInstall(g_job.dir,err):RunInstall(err); }
     catch (const std::exception& e) { err=Widen(e.what()); }
-    if (!ok) RollbackFiles();
-    else {
-        g_transactionActive=false;
-        suite::Json journal=suite::Json::array();
-        for (const auto& item:g_changes) journal.push_back({{"path",suite::Utf8(item.path)},
-            {"backup",suite::Utf8(item.backup)},{"existed",item.existed}});
-        try { suite::Write(g_job.dir+L"\\coop\\last-install-backup.json",suite::Canonical(journal)+"\n"); }
-        catch (const std::exception& e) { err=Widen(e.what()); ok=false; RollbackFiles(); }
-    }
+    if (!g_rollbackMode) {
+        if (!ok) RollbackFiles();
+        else {
+            g_transactionActive=false;
+            try { SaveInstallJournal(g_job.dir); }
+            catch (const std::exception& e) { err=Widen(e.what()); ok=false; RollbackFiles(); }
+        }
+    } else if(ok) g_summary=L("Letzte Installation zurueckgenommen. Aktuelle Einstellungen und Spielstaende wurden behalten.","Last installation rolled back. Current settings and saves were retained.");
     std::wstring* msg = new std::wstring(ok ? g_summary : err);
     PostMessageW(g_dlg, WM_APP_DONE, ok ? 1 : 0, (LPARAM)msg);
     return 0;
@@ -1919,7 +1921,7 @@ static bool g_settingName = false;
 static void EnableInputs(HWND dlg, BOOL on)
 {
     for (int id : {IDC_LIST, IDC_BROWSE, IDC_DE, IDC_EN, IDC_NAME, IDC_RES, IDC_FULL,
-                   IDC_FOV, IDC_Q, IDC_MAP, IDC_CONFIGURE})
+                   IDC_FOV, IDC_Q, IDC_MAP, IDC_CONFIGURE, IDC_ROLLBACK})
         EnableWindow(GetDlgItem(dlg, id), on);
 }
 
@@ -1959,6 +1961,7 @@ static void ApplyLanguage(HWND dlg)
                      "SP Improved + United Fronts + YAP are required.\r\nUO Map Pack: separate multiplayer addition."));
     if (g_state == S_IDLE) SetWindowTextW(GetDlgItem(dlg, IDC_INSTALL), L("Installieren", "Install"));
     SetWindowTextW(GetDlgItem(dlg, IDC_QUIT), L("Beenden", "Quit"));
+    SetWindowTextW(GetDlgItem(dlg, IDC_ROLLBACK), L("Letzte Installation zuruecknehmen", "Roll back last install"));
 
     SetWindowTextW(GetDlgItem(dlg, IDC_CONFIGURE), L("Vorhandene Einstellungen aendern", "Change existing settings"));
     HWND q = GetDlgItem(dlg, IDC_Q);
@@ -2092,6 +2095,7 @@ static void OnInstall(HWND dlg)
         return;
     }
 
+    g_rollbackMode=false;
     g_job.dir = g_found[sel];
     g_job.german = g_game == L_DE;
     g_job.name = player;
@@ -2110,6 +2114,14 @@ static void OnInstall(HWND dlg)
     SetWindowTextW(GetDlgItem(dlg, IDC_STATUS), L("Startet...", "Starting..."));
     SetProgress(dlg, -1);
     CloseHandle(CreateThread(nullptr, 0, Worker, nullptr, 0, nullptr));
+}
+
+static void OnRollback(HWND dlg) {
+    int sel=(int)SendMessageW(GetDlgItem(dlg,IDC_LIST),LB_GETCURSEL,0,0);
+    if(sel<0||sel>=(int)g_found.size()){MessageBoxW(dlg,L("Bitte zuerst eine Installation auswaehlen.","Choose an installation first."),TITLE,MB_ICONWARNING);return;}
+    if(MessageBoxW(dlg,L("Dateien der letzten abgeschlossenen Installation wiederherstellen?\nAktuelle Einstellungen und Spielstaende werden behalten.\nVeraenderte Laufzeitdateien oder Sicherungen verhindern die Ruecknahme.","Restore files from the last completed installation?\nCurrent settings and saves are kept.\nChanged runtime files or backups prevent rollback."),TITLE,MB_YESNO|MB_ICONQUESTION|MB_DEFBUTTON2)!=IDYES)return;
+    g_job.dir=g_found[sel];g_rollbackMode=true;g_state=S_RUNNING;g_summary.clear();EnableInputs(dlg,FALSE);EnableWindow(GetDlgItem(dlg,IDC_QUIT),FALSE);EnableWindow(GetDlgItem(dlg,IDC_INSTALL),FALSE);
+    SetWindowTextW(GetDlgItem(dlg,IDC_STATUS),L("Sicherung wird geprueft...","Checking backup..."));SetProgress(dlg,-1);CloseHandle(CreateThread(nullptr,0,Worker,nullptr,0,nullptr));
 }
 
 static INT_PTR CALLBACK DlgProc(HWND dlg, UINT msg, WPARAM wParam, LPARAM lParam)
@@ -2204,6 +2216,9 @@ static INT_PTR CALLBACK DlgProc(HWND dlg, UINT msg, WPARAM wParam, LPARAM lParam
             if (g_state == S_IDLE) OnInstall(dlg);
             else if (g_state == S_DONE || g_state == S_FAILED) EndDialog(dlg, 0);
             return TRUE;
+        case IDC_ROLLBACK:
+            if(g_state!=S_RUNNING)OnRollback(dlg);
+            return TRUE;
         case IDC_QUIT:
         case IDCANCEL:
             if (g_state == S_RUNNING) return TRUE;  // do not abandon a running install
@@ -2238,7 +2253,7 @@ static INT_PTR CALLBACK DlgProc(HWND dlg, UINT msg, WPARAM wParam, LPARAM lParam
         delete text;
 
         // Steam invites need Valve's free test app Spacewar (AppID 480), once per PC
-        if (ok && MessageBoxW(dlg,
+        if (ok && !g_rollbackMode && MessageBoxW(dlg,
                               L("Steam-Einladungen (\"Join <Name>\" im Co-op-Menue) brauchen einmalig\n"
                                 "Valves kostenlose Test-App Spacewar (AppID 480), mit laufendem Steam.\n\n"
                                 "Steam jetzt oeffnen, um Spacewar zu installieren?",
@@ -2263,37 +2278,42 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, LPWSTR, int)
     // Unattended deployment uses exactly the GUI's worker implementation.
     // No release URL, executable or command is accepted from the network.
     int argc=0; LPWSTR* argv=CommandLineToArgvW(GetCommandLineW(),&argc);
-    bool unattended=false;
+    bool unattended=false,repairRequested=false,configureRequested=false;
     for (int i=1;argv && i<argc;++i) {
         if (!wcscmp(argv[i],L"--yes")) unattended=true;
+        else if (!wcscmp(argv[i],L"--rollback")) g_rollbackMode=true;
         else if (!wcscmp(argv[i],L"--game") && i+1<argc) g_job.dir=argv[++i];
         else if (!wcscmp(argv[i],L"--suite-source") && i+1<argc) g_overlayOverride=argv[++i];
         else if (!wcscmp(argv[i],L"--language") && i+1<argc) {
             std::wstring lang=argv[++i];
             if (lang!=L"de" && lang!=L"en") { LocalFree(argv); return 2; }
             g_job.german=lang==L"de";
-        } else if (!wcscmp(argv[i],L"--repair")) g_job.configure=false;
+        } else if (!wcscmp(argv[i],L"--repair")) {repairRequested=true;g_job.configure=false;}
+        else if (!wcscmp(argv[i],L"--configure")) {configureRequested=true;g_job.configure=true;}
         else { LocalFree(argv); return 2; }
     }
     if (argv) LocalFree(argv);
+    if ((repairRequested&&configureRequested)||(g_rollbackMode&&(repairRequested||configureRequested)))return 2;
     if (unattended) {
-        if (g_job.dir.empty() || g_overlayOverride.empty()) return 2;
+        if (g_job.dir.empty() || (g_rollbackMode?!g_overlayOverride.empty():g_overlayOverride.empty())) return 2;
         std::wstring error; bool ok=false;
-        try { ok=RunInstall(error); }
+        try { ok=g_rollbackMode?RollbackLastInstall(g_job.dir,error):RunInstall(error); }
         catch (const std::exception& e) { error=Widen(e.what()); }
-        if (!ok) RollbackFiles();
-        else {
-            g_transactionActive=false;
-            suite::Json journal=suite::Json::array();
-            for (const auto& item:g_changes) journal.push_back({{"path",suite::Utf8(item.path)},
-                {"backup",suite::Utf8(item.backup)},{"existed",item.existed}});
-            try { suite::Write(g_job.dir+L"\\coop\\last-install-backup.json",suite::Canonical(journal)+"\n"); }
-            catch (...) { RollbackFiles(); ok=false; }
+        if (!g_rollbackMode) {
+            if (!ok) RollbackFiles();
+            else {
+                g_transactionActive=false;
+                try { SaveInstallJournal(g_job.dir); }
+                catch (const std::exception& e) { error=Widen(e.what());RollbackFiles();ok=false; }
+            }
         }
+        auto message=ok?(g_rollbackMode?std::string("CoDCoop: rollback complete; current personal settings and saves retained.\n"):std::string("CoDCoop: installation complete; required suite files verified.\n")):std::string("CoDCoop: ")+suite::Utf8(error)+"\n";
+        HANDLE output=GetStdHandle(ok?STD_OUTPUT_HANDLE:STD_ERROR_HANDLE);DWORD written=0;
+        if(output&&output!=INVALID_HANDLE_VALUE)WriteFile(output,message.data(),(DWORD)message.size(),&written,nullptr);
         CoUninitialize();
         return ok?0:1;
     }
-    if (!g_job.dir.empty() || !g_overlayOverride.empty()) return 2;
+    if (g_rollbackMode || !g_job.dir.empty() || !g_overlayOverride.empty()) return 2;
     HRSRC r = FindResourceW(nullptr, MAKEINTRESOURCEW(200), MAKEINTRESOURCEW(5));  // RT_DIALOG
     if (!r) {
         MessageBoxW(nullptr, L"Installer resource missing.", TITLE, MB_ICONERROR);

@@ -66,7 +66,7 @@ def main():
                         '-lole32','-lshell32','-lurlmon','-lcomctl32','-loleaut32','-luuid','-ladvapi32'],cwd=ROOT,check=True)
         provenance['setup_sha256']=sha256(args.output)
         provenance['sources']={name:sha256(ROOT/name) for name in (
-            'installer/installer.cpp','installer/suite_check.h','installer/installer.rc',
+            'installer/installer.cpp','installer/installer_rollback.h','installer/suite_check.h','installer/installer.rc',
             'installer/README.txt','tools/build-installer.py')}
         # Keep each candidate's proof beside its binary, rather than only in the
         # shared intermediate directory overwritten by a later build.

@@ -37,8 +37,13 @@ repaired first. Successful installation does not certify campaign playthroughs.
 See the bilingual project README and acceptance notes for observed tests.
 
 Rollback on Linux: install-linux.py --game PATH --rollback
-Windows: coop\suite-check.exe rollback GAME_FOLDER
-Keep the installer's backup files if you want to restore an earlier state.
+Windows: use "Roll back last install" in the current setup, or:
+Install-CoD-Coop.exe --rollback --yes --game "GAME_FOLDER"
+Keep setup backups. Only the latest guarded (schema2) completed setup backup
+is supported. Legacy backups require manual recovery; the old low-level
+suite-check rollback command is not an approved public recovery route.
+Current settings and saves are retained, including edits made after setup.
+Changed runtime files or backups are refused before any rollback changes.
 
 --------------------------------------------------------------------------
 DEUTSCH
@@ -83,5 +88,10 @@ Nachweis eines vollstaendigen Kampagnendurchlaufs. Getestete Faelle stehen in
 der zweisprachigen Projektanleitung und den Abnahmenotizen.
 
 Ruecknahme unter Linux: install-linux.py --game PFAD --rollback
-Windows: coop\suite-check.exe rollback SPIELORDNER
-Die Sicherungsdateien des Installers fuer eine spaetere Wiederherstellung behalten.
+Windows: "Letzte Installation zuruecknehmen" im aktuellen Setup, oder:
+Install-CoD-Coop.exe --rollback --yes --game "SPIELORDNER"
+Sicherungen behalten. Nur die letzte abgeschlossene, gepruefte Schema2-Sicherung
+wird unterstuetzt. Alte Sicherungen erfordern manuelle Wiederherstellung; der
+alte suite-check-rollback-Befehl ist kein freigegebener oeffentlicher Weg.
+Aktuelle Einstellungen/Spielstaende bleiben samt spaeteren Aenderungen erhalten.
+Veraenderte Laufzeitdateien/Sicherungen verhindern die Ruecknahme vorab.
