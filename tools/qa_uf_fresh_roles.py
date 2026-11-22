@@ -89,7 +89,7 @@ def argument_parser():
  p=argparse.ArgumentParser(description=__doc__)
  for name in ('source','run','runtime-dir'):p.add_argument('--'+name,type=Path,required=True)
  p.add_argument('--map',choices=('brecourt','noville','foy'),default='brecourt');p.add_argument('--port',type=int,default=29966)
- p.add_argument('--timeout',type=int,default=180);p.add_argument('--world-policy',choices=('universal','selected'),default='universal')
+ p.add_argument('--timeout',type=int,default=180);p.add_argument('--duration',type=int,default=2);p.add_argument('--world-policy',choices=('universal','selected'),default='universal')
  p.add_argument('--experimental-borrow-trees',action='store_true',help='Explicit additional legacy QA native-tree ownership experiment, only after a preserved allocator negative')
  p.add_argument('--experimental-gmi-loader',action='store_true',help='QA-only pinned UO/GMI loader startup; leave disabled for original crash-payload causal traces')
  p.add_argument('--trace-tree-free',action='store_true',help='QA-only read-only native tree ownership/free-path trace; changes no free semantics')
@@ -98,7 +98,7 @@ def argument_parser():
  return p
 
 def main():
- a=argument_parser().parse_args();out=a.run.resolve();base=['--source',str(a.source.resolve()),'--run',str(out),'--runtime-dir',str(a.runtime_dir.resolve()),'--variant','united_fronts','--map',a.map,'--players','4','--timeout',str(a.timeout),'--port',str(a.port),'--duration','2']
+ a=argument_parser().parse_args();out=a.run.resolve();base=['--source',str(a.source.resolve()),'--run',str(out),'--runtime-dir',str(a.runtime_dir.resolve()),'--variant','united_fronts','--map',a.map,'--players','4','--timeout',str(a.timeout),'--port',str(a.port),'--duration',str(a.duration)]
  qa.main(base+['--prepare-only'])
  folders=[out/name for name in ('host','join1','join2','join3')];kits,expected,fire=kit_fixture(4)
  catalog=json.loads((qa.ROOT/'campaign_patches/uf_equipment_catalog.json').read_text())
