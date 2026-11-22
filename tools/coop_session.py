@@ -447,6 +447,7 @@ def supervise(args):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--game', required=True, type=Path)
+    parser.add_argument('--party-equipment', action='store_true', help='Require verified native individual-equipment party binding')
     parser.add_argument('--variant', choices=VARIANTS, default='sp_improved')
     parser.add_argument('--host')
     parser.add_argument('--hosting', action='store_true')
@@ -456,7 +457,11 @@ def main(argv=None):
     parser.add_argument('--difficulty', type=int, choices=range(4), default=1)
     args = parser.parse_args(argv)
     if args.host and args.hosting: parser.error('choose joining or hosting')
-    try: return supervise(args)
+    try:
+        if args.party_equipment:
+            from party_binding import require_native_party_binding
+            require_native_party_binding({'runtime_ready': False})
+        return supervise(args)
     except (OSError, ValueError, KeyError, subprocess.SubprocessError) as error:
         event('error', error=str(error))
         return 1

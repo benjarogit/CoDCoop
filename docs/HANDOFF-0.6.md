@@ -54,6 +54,26 @@ This addendum supersedes pending statements below. Nothing has been published.
   stable installation identities and individual signed equipment choices are
   being implemented separately; native per-member roster/plan ACK and actual
   pre-mission kit application remain required before enabling that launch path.
+- **Signed launcher lobby milestone:** actual two-/four-process UDP parties,
+  controlled loss/reordering, forgery/stale/conflict negatives, stable identity
+  through a worker restart, heartbeat waits without party shrinkage and genuine
+  bilingual GUI worker connections pass. Source includes `coop_party.py`,
+  `party_gui.py`, `party_binding.py` and supervisor/freezer/staging dependencies;
+  cryptography50.0.2 is pinned. Private installation keys stay outside the game
+  tree and are never part of public snapshots. This confirms equipment choices,
+  not Native readiness; its launch action stays disabled until actual owner,
+  roster, plan and resource ACKs exist. Exact source/proofs:
+  `run/party-transport-milestone.json`. No packages were rebuilt for this change.
+  Full current source run:263 Python cases,240 passed,23 opt-in native skips,
+  `run/unit-party-45858-current.log`;47 focused party/GUI/session cases pass.
+- **New checkpoint acceptance gap:** the arranged Pathfinder interaction tests
+  pass remote bag/beacon actions and numeric inventory restoration in CoD1,
+  UO+YAP and SPI+YAP. They do not preserve the guest's saved position/look;
+  the guest respawns at the map start while the host pose is correct. This is
+  an open gameplay bug, not full checkpoint acceptance. Root's read-only trace
+  Core `1805e8117c47e327b9c12fff021885621d03c76a613e1bb0fdd3ce37aef76ec7`
+  under `run/saved-pose-investigation/` observes loaded native PS before ghost
+  cleanup. A strict arranged-position test is pending; no pose fix is claimed.
 
 - **Brecourt:** seven targeted native checks now pass across CoD1, UO,
   SP Improved and United Fronts. An eligible real joiner triggers the original

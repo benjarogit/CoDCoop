@@ -11,15 +11,12 @@ from pathlib import Path
 import re
 import zipfile
 
-from campaign_inventory import layer_files, uncomment
-from build_campaign_patch import blocks
-
-
 def digest(data):
     return hashlib.sha256(data).hexdigest()
 
 
 def processors(text):
+    from campaign_inventory import uncomment
     clean = uncomment(text)
     matches = list(re.finditer(r'(?m)^process_weapon_(\w+)\s*\([^\n]*\)\s*\{', clean))
     result = {}
@@ -42,6 +39,8 @@ def processors(text):
 
 
 def menu_choices(text):
+    from campaign_inventory import uncomment
+    from build_campaign_patch import blocks
     clean = uncomment(text)
     result = []
     for start, _, end in blocks(clean, 'itemDef'):
@@ -68,6 +67,7 @@ def weapon_fields(data):
 
 
 def extract(game):
+    from campaign_inventory import layer_files
     game = Path(game)
     effective, archives, invalid = {}, [], []
     try:

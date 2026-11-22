@@ -32,7 +32,7 @@ def collect_notices(root, bundle, analysis_toc=None):
     from PySide6.QtCore import qVersion
     inventory['qt_version'] = qVersion()
     for name in ('PySide6', 'PySide6_Essentials', 'PySide6_Addons', 'PySide6_Pdf', 'PySide6_WebEngine', 'shiboken6',
-                 'PyInstaller', 'pyinstaller-hooks-contrib', 'altgraph', 'packaging', 'pefile'):
+                 'PyInstaller', 'pyinstaller-hooks-contrib', 'altgraph', 'packaging', 'pefile', 'cryptography', 'cffi', 'pycparser'):
         try:
             dist = importlib.metadata.distribution(name)
         except importlib.metadata.PackageNotFoundError:
@@ -104,7 +104,7 @@ def main(argv=None):
     parser.add_argument("--output", type=Path)
     args = parser.parse_args(argv)
     root = Path(__file__).resolve().parent.parent
-    for package, expected in (("PySide6", "6.12.0"), ("PyInstaller", "6.22.3")):
+    for package, expected in (("PySide6", "6.12.0"), ("PyInstaller", "6.22.3"), ("cryptography", "50.0.2")):
         try:
             actual = importlib.metadata.version(package)
         except importlib.metadata.PackageNotFoundError:
@@ -122,7 +122,7 @@ def main(argv=None):
                "--name", name, "--distpath", str(destination),
                "--workpath", str(root / ("build/launcher-work-" + sys.platform)),
                "--specpath", str(root / "build/launcher-spec"),
-               "--paths", str(root / "tools"), "--hidden-import", "coop_suite", "--hidden-import", "coop_session",
+               "--paths", str(root / "tools"), "--hidden-import", "coop_suite", "--hidden-import", "coop_session", "--hidden-import", "coop_party",
                "--add-data", str(catalog) + os.pathsep + ".",
                str(root / "tools/launch-gui.py")]
     result = subprocess.run(command, cwd=root, check=False)

@@ -3,3 +3,9 @@ PySide6==6.12.0
 PyInstaller==6.22.3
 pyinstaller-hooks-contrib==2026.10
 altgraph==0.17.5
+
+# Signed installation identities for the pre-mission LAN lobby.
+cryptography==50.0.2
+cffi==2.1.1
+pycparser==3.12
+typing_extensions==4.16.0

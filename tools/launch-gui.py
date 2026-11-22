@@ -165,18 +165,18 @@ def load_equipment_catalog():
 
 def worker_command(kind, arguments):
     """Use the same dispatch in source and frozen bundles; never invoke a shell."""
-    if kind not in {"suite", "session"}:
+    if kind not in {"suite", "session", "party"}:
         raise ValueError("unknown launcher worker")
     if getattr(sys, "frozen", False):
         return [sys.executable, "--internal-command", kind, *arguments]
-    name = "coop_suite.py" if kind == "suite" else "coop_session.py"
+    name = {"suite": "coop_suite.py", "session": "coop_session.py", "party": "coop_party.py"}[kind]
     return [sys.executable, str(Path(__file__).resolve().with_name(name)), *arguments]
 
 
 def internal_worker(argv):
     if argv[:1] != ["--internal-command"]:
         return None
-    if len(argv) < 2 or argv[1] not in {"suite", "session"}:
+    if len(argv) < 2 or argv[1] not in {"suite", "session", "party"}:
         return 2
     # A Windows windowed bundle normally sets sys.std* to None. QProcess still
     # supplies inherited pipes for worker invocations; attach Python streams to
@@ -197,7 +197,7 @@ def internal_worker(argv):
                     return 2
                 fd = msvcrt.open_osfhandle(handle, flags)
                 setattr(sys, name, os.fdopen(fd, mode, encoding="utf-8", buffering=1))
-    module = importlib.import_module("coop_suite" if argv[1] == "suite" else "coop_session")
+    module = importlib.import_module({"suite":"coop_suite", "session":"coop_session", "party":"coop_party"}[argv[1]])
     return module.main(argv[2:])
 
 
@@ -340,6 +340,9 @@ def main(argv=None):
             self.save_info.setObjectName("muted")
             info.addWidget(self.installation_info)
             info.addWidget(self.save_info)
+            self.party_button = QPushButton()
+            self.party_button.clicked.connect(self.open_party)
+            info.addWidget(self.party_button, 0, Qt.AlignmentFlag.AlignLeft)
             self.equipment_button = QPushButton()
             self.equipment_button.clicked.connect(self.edit_equipment)
             info.addWidget(self.equipment_button, 0, Qt.AlignmentFlag.AlignLeft)
@@ -567,6 +570,9 @@ def main(argv=None):
                 return
             words = EQUIPMENT_TEXT[self.lang]
             visible = self.campaigns.currentItem().data(Qt.ItemDataRole.UserRole) == 'united_fronts'
+            self.party_button.setText('Group lobby…' if self.lang == 'en' else 'Gruppen-Lobby…')
+            self.party_button.setVisible(visible)
+            self.party_button.setEnabled(not self.busy and self.equipment_catalog is not None)
             self.equipment_button.setText(words['open'])
             self.equipment_button.setVisible(visible)
             self.equipment_button.setEnabled(not self.busy and self.equipment_catalog is not None)
@@ -579,6 +585,21 @@ def main(argv=None):
                     ready=sum(member['ready'] for member in roster['members']), total=len(roster['members'])))
             self.roster_note.setVisible(visible and self.roster_unavailable)
             self.roster_note.setText(ROSTER_TEXT[self.lang]['invalid'])
+
+        def open_party(self):
+            if self.busy or self.equipment_catalog is None or not self.folder.text().strip():
+                return
+            if getattr(self, 'party_dialog', None) is not None:
+                self.party_dialog.show(); self.party_dialog.raise_(); return
+            from party_gui import create_dialog
+            dialog = create_dialog(self, language=self.lang, game=Path(self.folder.text().strip()),
+                map_name=self.map.text().strip() or 'pathfinder', difficulty=self.difficulty.currentData(),
+                preferences=lambda: self.equipment_preferences, command_factory=worker_command,
+                settings_directory=self.equipment_path.parent / 'party-invitations')
+            self.party_dialog = dialog
+            dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+            dialog.finished.connect(lambda: setattr(self, 'party_dialog', None))
+            dialog.show()  # independent worker survives owned native restarts
 
         def present_authoritative_roster(self, snapshot, native_capability):
             """Future trusted-controller seam; deliberately not a stdout handler.
@@ -1002,6 +1023,8 @@ def main(argv=None):
             self.settings.setValue("runner", self.runner.text().strip())
             self.settings.setValue("difficulty", self.difficulty.currentData())
             self.settings.sync()
+            if getattr(self, 'party_dialog', None) is not None:
+                self.party_dialog.reject()
             event.accept()
 
     app = QApplication.instance() or QApplication([sys.argv[0]])

@@ -68,6 +68,12 @@
   save directories during installation and repair.
 - Record actual game exit codes during launcher retries and process transitions;
   a successful supervisor exit alone does not prove successful game shutdown.
+- Add a signed LAN launcher lobby with persistent participant identities,
+  individual equipment choice, confirmation, retry and visible reconnect waits.
+  Actual two-/four-process and GUI checks pass. Native owner/plan/resource
+  acknowledgement remains in development, so the equipment launch stays disabled.
+- Honor intentional departure after a temporary timeout: release only the
+  current inactive owner's seat, then give an explicit fresh rejoin a new lease.
 
 Mission-level coverage, Steam across accounts, native Windows and all special
 mechanics remain acceptance gates. See [handoff](docs/HANDOFF-0.6.md).
@@ -145,6 +151,13 @@ mechanics remain acceptance gates. See [handoff](docs/HANDOFF-0.6.md).
   Spielstandverzeichnisse bei Installation und Reparatur erhalten.
 - Tatsächliche Spielprozess-Exitcodes bei Launcher-Wiederholungen und Neustarts
   erfassen; ein erfolgreicher Begleitprozess allein belegt kein sauberes Spielende.
+- Signierte LAN-Lobby im Launcher mit dauerhaften Teilnehmerkennungen,
+  individueller Ausrüstungswahl, Bestätigung, Wiederholungen und sichtbarem
+  Warten ergänzen. Echte Zwei-/Vierprozess- und GUI-Prüfungen bestehen.
+  Die native Besitzer-/Plan-/Ressourcenbestätigung ist noch in Arbeit;
+  der Ausrüstungsstart bleibt deshalb gesperrt.
+- Bewusstes Verlassen nach einem Ausfall beachten: ausschließlich den Platz
+  dieses inaktiven Besitzers freigeben; ein neuer Beitritt erhält eine neue Kennung.
 
 Missionsabdeckung, Steam zwischen Accounts, native Windows-Läufe und sämtliche
 Spezialmechaniken bleiben Abnahmekriterien. Siehe [Übergabe](docs/HANDOFF-0.6.md).

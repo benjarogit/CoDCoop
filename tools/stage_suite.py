@@ -90,6 +90,8 @@ def stage(game, output, yap_archive, yap_extras, include_base=False, launcher_so
         copy(ROOT/'content/variants.json','coop/variants.json')
         copy(ROOT/'tools/coop_suite.py','coop/coop_suite.py')
         copy(ROOT/'tools/coop_session.py','coop/coop_session.py')
+        for name in ('coop_party.py','party_gui.py','party_binding.py','uf_equipment_roster.py','uf_equipment_catalog.py'):
+            copy(ROOT/'tools'/name,'coop/'+name)
         copy(ROOT/'tools/frozen_runtime.py','coop/frozen_runtime.py')
         copy(ROOT/'tools/runtime_protocol.py','coop/runtime_protocol.py')
         copy(ROOT/'tools/launch-gui.py','coop/launch-gui.py')
