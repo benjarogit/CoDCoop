@@ -1854,6 +1854,10 @@ def require_suite_owned_patches(overlay):
         if relative.is_absolute() or '..' in relative.parts:
             raise ValueError('invalid required suite patch path')
         source=base.joinpath(*relative.parts)
+        if item.get('kind')=='coop_localization':
+            from coop_localization import preflight
+            preflight(base,manifest)
+            continue
         expected=item.get('sha256')
         if not re.fullmatch('[0-9a-f]{64}',expected or ''):
             raise ValueError('invalid required suite patch pin: '+name)
@@ -2065,6 +2069,9 @@ def suite_main(argv=None):
             marker.unlink(missing_ok=True)
         elif args.language == 'en' and german_installed(str(game)):
             raise ValueError('Verified English localization inventory is missing; use a complete canonical suite payload to change language')
+        if any(item.get('kind')=='coop_localization' for item in json.loads((game/'coop/variants.json').read_text()).get('required',[])):
+            from coop_localization import apply
+            apply(game,args.language,tx)
         # Existing settings are preserved unless the person explicitly requests reconfiguration.
         if not args.repair and (args.configure or not Path(target(str(game), 'Main/config.cfg')).exists()):
             for rel in ('Main/config.cfg', 'Main/config_mp.cfg', 'uo/config.cfg', 'uo/config_mp.cfg'):

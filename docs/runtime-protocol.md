@@ -48,6 +48,7 @@ python3 tools/stage_suite.py \
   --game-source /path/to/owned-game \
   --runtime-source /path/to/frozen-runtime \
   --launcher-source /path/to/matching-launcher-bundle \
+  --source-graph /path/to/captured-launcher-source-graph.json \
   --checker-prefix /path/to/isolated-checker-wine-prefix \
   --output /path/to/new-local-overlay
 ```
@@ -81,16 +82,19 @@ Ausrüstungsfähigkeit.
 
 ## Compiled API mask / Kompilierte API-Maske
 
-Current `0.6.0-dev.5` suite manifests require `core_features_required: 31`. `Coop_Features`
+Current `0.6.0-dev.6` suite manifests require `core_features_required: 63`. `Coop_Features`
 is a readonly, nonexecutable PE DATA export: owner inventory=1, actor selection=2,
-actor eligibility=4, Pathfinder initial recipe=8, asset bootstrap=16. All five required bits must be set;
+actor eligibility=4, Pathfinder initial recipe=8, asset bootstrap=16, localized banners=32. All six required bits must be set;
 missing/forwarded/writable/executable/out-of-bounds exports are rejected without
 loading the DLL. This describes compiled support. Native readiness CVars still
 control whether an initialized engine can actually use the API.
 
 Bit16 describes the asset bootstrap API only: it does not enable GUID/roster/plan
-binding or individual UF kit application. Protocol9/API15 historical DLLs fail
+binding or individual UF kit application. Protocol9/API15 and API31 historical DLLs fail
 the new manifest requirement even though their protocol number matches.
+
+Bit32 requires the owned CODCOOP English/German banner bank. It also does not
+provide individual-kit application or owner/plan readiness.
 
 The native checker advertises `core_features_validation: true` in its
 `capabilities` JSON. Staging requires that capability for a nonzero manifest
@@ -98,7 +102,7 @@ mask, so an older protocol9 checker cannot silently ignore the new requirement.
 An absent or explicit zero requirement is retained only for legacy fixtures and
 historical profiles; it does not establish current API readiness.
 
-Aktuelle `0.6.0-dev.5`-Paketmanifeste verlangen alle fünf Bits (`31`); Bit16 steht für den Ressourcen-Bootstrap. Python, nativer
+Aktuelle `0.6.0-dev.6`-Paketmanifeste verlangen alle sechs Bits (`63`); Bit16 steht für den Ressourcen-Bootstrap; Bit32 für lokalisierte Coop-Hinweise. Python, nativer
 Validator und Stager lesen dafür ausschließlich das begrenzte PE-Datenexport;
 die DLL wird nicht ausgeführt. Vorhandener Code ist noch kein Laufzeitnachweis:
 Die nativen Bereitschafts-CVars bleiben maßgeblich. Ein alter Protokoll9-Validator

@@ -76,4 +76,51 @@ class NativeRetirement(unittest.TestCase):
         self.old_pins[self.old[0].lower()]=self.old_pins[self.old[0].upper()];self.locks();baseline=self.tree();code,value=self.run_native('retire')
         self.assertEqual(code,1);self.assertIn('ambiguous payload',value['error']);self.assertEqual(value['changes'],0);self.assertEqual(self.tree(),baseline)
 
+
+@unittest.skipUnless(os.environ.get('COOP_NATIVE_RETIREMENT_PROBE') and (os.name=='nt' or os.environ.get('COOP_WINE_PREFIX')),'requires compiled locale/retirement probe and private prefix')
+class NativeCoopUi(unittest.TestCase):
+    run_native=NativeRetirement.run_native
+    def setUp(self):
+        import sys
+        root=Path(__file__).resolve().parents[1];sys.path.insert(0,str(root/'tools'))
+        import coop_localization as locale
+        self.locale=locale;self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup);self.root=Path(self.temp.name);self.game=self.root/'game';self.overlay=self.root/'suite'
+        self.manifest=json.loads((root/'content/variants.json').read_text())
+        for folder in (self.game,self.overlay):
+            (folder/'coop').mkdir(parents=True);(folder/'coop/variants.json').write_text(json.dumps(self.manifest));locale.generate_banks(folder,self.manifest)
+        self.personal={'Main/config.cfg':b'personal settings','Main/save/autosave/progress.svg':b'native-style save'}
+        for relative,data in self.personal.items():path=self.game/relative;path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(data)
+    def test_native_ui_preflight_language_switch_and_transaction_rollback(self):
+        from build_coop_localization import package_bytes,INSTALLED_PATH
+        self.assertEqual(self.run_native('ui-preflight')[0],0)
+        self.assertEqual(self.run_native('ui-de-rollback')[0],0);self.assertEqual((self.game/INSTALLED_PATH).read_bytes(),package_bytes('en'))
+        self.assertEqual(self.run_native('ui-de')[0],0);self.assertEqual((self.game/INSTALLED_PATH).read_bytes(),package_bytes('de'))
+        self.assertEqual(self.run_native('ui-en')[0],0);self.assertEqual((self.game/INSTALLED_PATH).read_bytes(),package_bytes('en'))
+        for relative,data in self.personal.items():self.assertEqual((self.game/relative).read_bytes(),data)
+    def test_native_ui_missing_mutated_and_additional_resource_banks_rejected(self):
+        from build_coop_localization import package_bytes
+        import zipfile
+        for mode in ('missing','mutated','added-resource'):
+            self.locale.generate_banks(self.overlay,self.manifest);path=self.overlay/self.locale.BANKS['de']
+            if mode=='missing':path.unlink()
+            elif mode=='mutated':path.write_bytes(b'corrupt')
+            else:
+                with zipfile.ZipFile(path,'a') as archive:archive.writestr('maps/injection.gsc','main() {}')
+            active=(self.game/self.locale.INSTALLED_PATH).read_bytes();code,value=self.run_native('ui-preflight')
+            self.assertEqual(code,1);self.assertFalse(value['ok']);self.assertEqual(value['changes'],0);self.assertEqual((self.game/self.locale.INSTALLED_PATH).read_bytes(),active)
+    def test_native_rehashed_extra_resource_is_still_not_an_owned_ui_bank(self):
+        import zipfile
+        bank=self.overlay/self.locale.BANKS['en']
+        with zipfile.ZipFile(bank,'a') as archive:archive.writestr('maps/injection.gsc','main() {}')
+        data=bank.read_bytes();changed=json.loads(json.dumps(self.manifest));item=next(i for i in changed['required'] if i.get('kind')=='coop_localization')
+        item['locales']['en']={'sha256':sha(data),'size':len(data)};item['sha256_any'][0]=sha(data);changed['approved_localizations'][self.locale.INSTALLED_PATH][0]=sha(data)
+        (self.overlay/self.locale.INSTALLED_PATH).write_bytes(data);(self.overlay/'coop/variants.json').write_text(json.dumps(changed))
+        code,value=self.run_native('ui-preflight');self.assertEqual(code,1);self.assertIn('exactly one',value['error']);self.assertEqual(value['changes'],0)
+
+    def test_native_ui_repairs_damaged_active_copy_from_immutable_bank(self):
+        from build_coop_localization import package_bytes
+        (self.game/self.locale.INSTALLED_PATH).write_bytes(b'damaged previous version')
+        self.assertEqual(self.run_native('ui-de')[0],0);self.assertEqual((self.game/self.locale.INSTALLED_PATH).read_bytes(),package_bytes('de'))
+        for relative,data in self.personal.items():self.assertEqual((self.game/relative).read_bytes(),data)
+
 if __name__=='__main__':unittest.main()

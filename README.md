@@ -4,7 +4,7 @@
 
 **The original campaigns. One squad.**
 
-[![Development](https://img.shields.io/badge/0.6.0--dev.5-development-orange)](#development-status)
+[![Development](https://img.shields.io/badge/0.6.0--dev.6-development-orange)](#development-status)
 ![Players](https://img.shields.io/badge/players-2%E2%80%934-blue)
 ![Windows target](https://img.shields.io/badge/target-Windows%2010%20%2F%2011-0078D4)
 ![Linux](https://img.shields.io/badge/Linux-Wine%20%2F%20Proton-FCC624)
@@ -16,13 +16,13 @@
 
 </div>
 
-> **0.6.0-dev.5 is under development.** This branch implements the complete-suite upgrade;
+> **0.6.0-dev.6 is under development.** This branch implements the complete-suite upgrade;
 > it is not a verified full-campaign release. The existing [v0.5.4 release](https://github.com/benjarogit/CoDCoop/releases/tag/v0.5.4)
 > predates this work and does **not** provide Coop for SP Improved or United Fronts.
 > A successful install or short connection test does not certify a campaign.
 
-The current package contract requires Core API mask 31, including native
-asset bootstrap. This does not enable individual UF kits; their party/native
+The current package contract requires Core API mask 63, including native
+asset bootstrap and owned English/German Coop banners. This does not enable individual UF kits; their party/native
 binding and equipment start remain gated.
 
 ## Campaigns

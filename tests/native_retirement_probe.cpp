@@ -6,7 +6,12 @@ int wmain(int argc,wchar_t** argv) {
     if (argc==5 && std::wstring(argv[4])==L"de") g_ui=L_DE;
     try {
         const std::wstring action=argv[1],game=argv[2],overlay=argv[3];
-        if (action==L"preflight") PreflightRetiredTriggerOverlays(game,overlay);
+        if (action==L"ui-preflight") PreflightCoopUiBanks(overlay);
+        else if (action==L"ui-en" || action==L"ui-de" || action==L"ui-de-rollback") {
+            g_changes.clear();g_transactionActive=true;ApplyCoopUiLanguage(game,action!=L"ui-en");
+            if(action==L"ui-de-rollback")RollbackFiles();
+        }
+        else if (action==L"preflight") PreflightRetiredTriggerOverlays(game,overlay);
         else if (action==L"retire" || action==L"retire-rollback") {
             g_changes.clear();g_transactionActive=true;RetireOldPayload(game,overlay);
             if (action==L"retire-rollback") RollbackFiles();

@@ -48,13 +48,21 @@ class NativeInterop(unittest.TestCase):
         self.assertEqual(json.loads(result.stdout),{'kind':'codcoop_suite_checker','schema':1,'protocol':suite.PROTOCOL,'core_features_validation':True})
 
     def test_readonly_compiled_features_are_required_and_match_python(self):
-        examples=[core_pe(suite.PROTOCOL,bits) for bits in (None,0,1,3,7,15)]
+        examples=[core_pe(suite.PROTOCOL,bits) for bits in (None,0,1,3,7,15,31)]
         examples += [malformed_feature(kind,suite.PROTOCOL) for kind in ('missing','forwarded','writable','executable','out_of_bounds','ordinal')]
         for data in examples:
             self.fixture.repin_core(data)
             with self.assertRaises(ValueError):suite.seal_installation(self.game)
             self.assertNotEqual(self.native('seal').returncode,0)
             self.assertFalse((self.game/'coop/install.json').exists())
+        self.fixture.repin_core(core_pe(suite.PROTOCOL,63))
+        python=suite.seal_installation(self.game)
+        self.assertEqual(self.native('check').returncode,0)
+        self.assertEqual(self.native('seal').returncode,0)
+        self.assertEqual(json.loads((self.game/'coop/install.json').read_text()),python)
+
+    def test_explicit_historical_api31_requirement_is_still_generic_compatibility(self):
+        self.fixture.manifest['core_features_required']=31
         self.fixture.repin_core(core_pe(suite.PROTOCOL,31))
         python=suite.seal_installation(self.game)
         self.assertEqual(self.native('check').returncode,0)

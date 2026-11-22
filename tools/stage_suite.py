@@ -62,6 +62,14 @@ def laa_bytes(original):
     return bytes(data)
 
 
+def runtime_files(output):
+    """Immutable banks are owned inputs; active approved locale is selectable."""
+    output=Path(output)
+    return {path.relative_to(output).as_posix():sha256(path) for path in sorted(output.rglob('*'))
+            if path.is_file() and path.relative_to(output).as_posix() not in ('coop/runtime-lock.json','coop/install.json','coop/profile.ini') and not (path.name.lower().startswith('localized_') and path.suffix.lower()=='.pk3'
+                                       and not path.is_relative_to(output/'coop/languages'))}
+
+
 def stage(game, output, yap_archive, yap_extras, include_base=False, launcher_source=None, base_archive=None, runtime_source=None, checker_prefix=None, source_graph=None):
     game, output = Path(game).resolve(), Path(output).resolve()
     if output.exists():
@@ -95,7 +103,7 @@ def stage(game, output, yap_archive, yap_extras, include_base=False, launcher_so
         copy(ROOT/'content/variants.json','coop/variants.json')
         copy(ROOT/'tools/coop_suite.py','coop/coop_suite.py')
         copy(ROOT/'tools/coop_session.py','coop/coop_session.py')
-        for name in ('coop_party.py','party_gui.py','party_binding.py','party_native_bridge.py','launcher_provenance.py','uf_equipment_roster.py','uf_equipment_catalog.py'):
+        for name in ('coop_party.py','party_gui.py','party_binding.py','party_native_bridge.py','launcher_provenance.py','coop_localization.py','build_coop_localization.py','uf_equipment_roster.py','uf_equipment_catalog.py'):
             copy(ROOT/'tools'/name,'coop/'+name)
         copy(ROOT/'tools/frozen_runtime.py','coop/frozen_runtime.py')
         copy(ROOT/'tools/runtime_protocol.py','coop/runtime_protocol.py')
@@ -167,7 +175,10 @@ def stage(game, output, yap_archive, yap_extras, include_base=False, launcher_so
                             raise ValueError('English content evidence failed: '+rel)
                 target = temporary/'coop/languages/en'/rel
                 target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(data)
-        copy(ROOT/'content/localizations.json','coop/languages/en/manifest.json')
+        from coop_localization import generate_banks
+        generated=generate_banks(temporary,manifest)
+        locale['files']['Main/localized_english_codcoop_ui.pk3']=generated
+        (temporary/'coop/languages/en/manifest.json').write_bytes(canonical(locale)+b'\n')
         with zipfile.ZipFile(yap_archive) as archive:
             for name in archive.namelist():
                 if name.endswith('/'):
@@ -195,7 +206,7 @@ def stage(game, output, yap_archive, yap_extras, include_base=False, launcher_so
                 copy(source,'coop/licenses/yap/'+source.relative_to(ROOT/'third_party/yap').as_posix())
         copy(ROOT/'LICENSE','coop/licenses/CoDCoop-MIT.txt')
         copy(ROOT/'installer/vendor/LICENSE.nlohmann-json','coop/licenses/nlohmann-json-MIT.txt')
-        files={p.relative_to(temporary).as_posix():sha256(p) for p in sorted(temporary.rglob('*')) if p.is_file() and not (p.name.lower().startswith('localized_') and p.suffix.lower()=='.pk3')}
+        files=runtime_files(temporary)
         lock={'suite_version':manifest['suite_version'],'manifest_sha256':sha256(temporary/'coop/variants.json'),'files':files}
         (temporary/'coop/runtime-lock.json').write_bytes(canonical(lock)+b'\n')
         provenance.assert_sources(ROOT,expected_graph)

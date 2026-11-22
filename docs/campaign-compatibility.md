@@ -1756,3 +1756,214 @@ native-prone Downed source, then restores them after native prone entry. The
 immediate Downed-before-native-prone save boundary is a separate untested case;
 queued genuine damage+save commands can target it, but actual saved non-prone
 flags must first be observed rather than inferred or forced by the fixture.
+
+### Immediate genuine Downed+save: non-prone source boundary not reproduced
+
+`qa_checkpoint_downed.py --mode guest-down --immediate-save` queues actual
+native commands together: `coopgod 1 0`, `coopkill 1 100000`, then `savegame`.
+Only genuine owner movement/look before damage establishes a non-default saved
+facing; no role/health/posture fields are written by the fixture. The QA-only
+read-only Core `f10d9f8658946ca1f77c218fdf2c025f316b406c8ffa490e0ae9706da1974133`
+(`run/save-boundary-observer`, effective State24 behavior) logs actual PS fields
+at native save file open AND close. The fixture requires both phases to record
+RoleDowned2/health1 with prone bit0 before it can claim this source boundary.
+A focused parser fixture rejects missing phases, wrong role/owner or a prone
+bit present at either phase.
+
+The actual CoD1 attempt does **not reproduce** that boundary. Genuine Downed
+entry occurs02:55:14.742; native save open and close both occur02:55:14.789,
+47ms later. Both source observations already contain role2, health1, flags1,
+view31.843872 and matching native prone direction31.843872. The scenario
+correctly fails its boundary prerequisite and does not proceed to load or claim
+acceptance. A UO repeat is not run because the required CoD1 source condition
+was not established. Exact native SVG, V2 sidecar, hashes, observer/runtime,
+producer and trace are retained in
+`run/qa-cod1-four/history/immediate-save-f10d-CoD1-queued-native-damage-save-sourceALREADYprone-NOTREPRODUCED-1795312530513939384`.
+This is a failed fixture reproduction, not evidence of a new checkpoint defect.
+The Downed-before-native-prone save boundary remains explicitly open unless a
+legitimate reproducible path and actual source-field proof are established.
+
+### Center-banner localization: native encoding identified, fix not yet applied
+
+The actual mixed-role UO images expose red `UNLOCALIZED(YOU ARE DOWN)`.
+Read-only native investigation confirms that both engines' `cp` command routes
+through native localize-message (CoD1cgame300207a9→3000f200→CGtrap0x3a→engine
+4027db→49f270; UOcgame30028046→30010b40→CGtrap0x3a→402c6e→4a3e50).
+The translator starts with key lookup enabled. Byte0x14 enables localized-key
+segments;0x15 marks following literal text;0x16 affects formatting. Raw English
+Core cp strings are therefore incorrectly treated as keys. Global warning
+suppression is neither needed nor proposed. A literal0x15 prefix alone would
+remove the wrapper while leaving English and does not satisfy the full DE/EN
+requirement.
+
+The read-only scope proposal and exact PE evidence are in
+`run/banner-localization-re/FINDINGS.md`. It recommends owned native CODCOOP
+string keys with deterministic, reviewed EN/DE local-resource variants, so
+language resolves on each client and no Host-language inheritance is introduced.
+The current German installation deliberately aliases German LANG_ENGLISH
+resources under localizedstrings/english (verified native training assets and
+installer contract); merely adding LANG_GERMAN is insufficient. A tiny generated
+Main/localized_english_codcoop_ui.pk3 with two explicitly approved locale hashes
+fits the existing known-localization fingerprint policy, provided normal
+ownership, installation, repair and rollback are integrated. It must not be
+misattributed to the original Ready archive. All four profiles inherit Main.
+
+No Core or resource-pack fix was applied during this investigation. Actual DE/EN
+mixed-client native rendering, warning-free missing-key checks, equal approved
+locale gameplay fingerprints and modified-file rejection remain acceptance
+work. The save-role/mechanics PASSs above do not imply localization acceptance.
+
+### Initial unpublished banner assets (superseded after native visual review)
+
+`tools/build_coop_localization.py` now deterministically generates the asset
+half only. English is the default. Both EN and DE write the same installed
+path `Main/localized_english_codcoop_ui.pk3`, containing exactly one owned
+`localizedstrings/english/codcoop.str`. It uses native VERSION1/LANG_ENGLISH,
+Latin1 bytes, CRLF, fixed2000 timestamps and ZIP_STORED; no stock assets are
+copied. Files are generated explicitly with `--language en|de --output PATH`.
+
+Reviewed generated package identities are:
+
+- EN:1034bytes, SHA256 `1ee330032dbf555f5aeeaf18d7fe0a0613e8ee2c3ed1a491ba7665c0b1796ab6`.
+- DE:1158bytes, SHA256 `5c3dfe67c21b0ce5bc1005529740ade44d762f7cff3dafaa73a2321222817982`.
+
+These initial hashes were registered at that stage; the current manifest now
+uses only the later line37-safe replacements below. Tests
+verify identical native key/template domains, deterministic bytes/metadata,
+English default, proper German single-byte glyphs, and only the expected STR
+entry. Equal reviewed EN/DE packages yield equal gameplay fingerprints across
+all four profiles; a modified PK3 containing an extra GSC is not exempt and
+yields different fingerprints.
+
+The exact CODCOOP keys are DOWNED_TITLE, DOWNED_HINT, OTHER_DOWNED,
+OTHER_DOWNED_HINT, REVIVED_SELF, REVIVED_OTHER, BEING_REVIVED, REVIVING_PLAYER,
+CATCHUP and DISCONNECTED. Only OTHER_DOWNED, REVIVED_OTHER, REVIVING_PLAYER and
+DISCONNECTED have one native `%s` argument, for a trusted decimal player1..4.
+Colors/newline/progress are separate literal segments. In particular, the
+player-number literal must end before a following newline/progress literal;
+otherwise native `%s` substitution can insert that suffix inside the sentence.
+An other-player-down wire message is the segment sequence:
+literal `^1`, key CODCOOP_OTHER_DOWNED, literal `3`, literal `^7\\n`, key
+CODCOOP_OTHER_DOWNED_HINT. Each key segment starts byte0x14; EACH literal
+segment, including consecutive literals, starts0x15. C++ hex escapes must be
+bounded by adjacent literals or explicit chars.
+
+No Core encoding, installer/backend/stager integration, full payload build or
+native-render acceptance is included in this asset milestone. The new file is
+not yet required/installed automatically and is not misattributed to Ready.zip.
+Generated manual QA banks live at `run/banner-localization-assets/{en,de}/Main/`.
+CoD1/UO actual key lookup and mixed-local-UI EN/DE rendering remain next steps
+with the parent's encoded Core candidate. Those manual asset checks must be
+labelled separately from real installer language-switch/repair acceptance.
+
+### Native UI language QA preparation and actual mixed-banner acceptance
+
+`qa_coop.py --ui-languages de,en` explicitly selects local banner banks in
+Host,join1,... folder order; the list must have exactly the actual player count
+of en/de entries. Raw QA defaults to all EN on every preparation, including
+reused copies. Generation occurs only inside marked owned QA clones after copy
+and before launch. The selected reviewed bank is kept if unchanged; changing a
+reviewed EN/DE bank archives its original bytes first. Unknown banks or symlink
+escapes fail. Provenance records language, bytes/hash and
+OWNED_GENERATED_QA_LOCALE_BANK_ONLY, explicitly not installer-language proof.
+The parent's pre-change motion-run producer was preserved before editing at
+`run/motion-scope-state24/executed_qa_coop_before_locale.py`, SHA256
+`12a4b1d41d179c00eaedbb53c33f92a70730a8c0ebe97cb9972c8e06c47d4243`.
+
+The first two actual CoD1 mixed-UI runs did resolve keys and `%s` arguments
+correctly, but native image review exposed **visual failure**: German hints
+were clipped. Native CoD1 cgame3000f3f7 and UO30010d37 cap each line buffer at
+40 raw bytes; the renderer then skips the remaining source line instead of
+wrapping it. Those initial archives retain their original narrow lookup PASS
+and an additional post-run-visual-review.json marking complete banner visual
+acceptance FAIL:
+`banner-eea-CoD1-DEHost-ENpeer-down-progress-revived-PASS-1795313783370651456`
+and `banner-eea-CoD1-ENHost-DEpeer-down-progress-revived-PASS-1795313925312350042`.
+No native line-limit patch or warning suppression was introduced.
+
+Owned EN/DE messages now validate each key and actual player1..4 substitution
+at **at most37 Latin1 bytes**, allowing the wire color-prefix budget below the
+native40-byte cap. German hints are now the complete native-safe
+"Mitspieler können dich wiederbeleben" and
+"Komm näher und halte Benutzen 3 s". Catch-up messages were shortened in both
+languages as well. The only CURRENT approved package identities are:
+
+- EN1029bytes, SHA256 `bea6ef3a24f586631569408f51efc3f9d857ee948951fd4a8b4ef3ef909c96c2`.
+- DE1107bytes, SHA256 `908ce0bdfdd78a95a736b23de87b56c19e72be5256f7db3fb269ec7618659741`.
+
+Old clipped bank hashes are not in the current manifest. Their exact owned QA
+bytes remain archived; only those exact historical generated banks were
+quarantined before the new tests. Unknown assets are never treated as retired
+owned locale banks. English default, deterministic single-entry stored PK3,
+matching key/format domains, native length bound and exact-hash localization
+fingerprint tests pass.
+
+With immutable encoded Core
+`eea592c7c55435f6df5fac8e2d72964bb2ea490da19cace42d28d50e850a8075`
+(`run/banner-native-state24`, loader85fc), all four final targeted native UI
+cases pass with the new assets. Full archives under `run/qa-cod1-four/history/`:
+
+- `banner-eea-line37-CoD1-DEHost-ENpeer-full-text-down-progress-revived-PASS-1795314179064262850`
+- `banner-eea-line37-CoD1-ENHost-DEpeer-full-text-down-progress-revived-PASS-1795314230670028872`
+- `banner-eea-line37-UO-YAP-LAA-DEHost-ENpeer-full-text-down-progress-revived-PASS-1795314276377667437`
+- `banner-eea-line37-UO-YAP-LAA-ENHost-DEpeer-full-text-down-progress-revived-PASS-1795314337179857616`
+
+`tools/qa_banner_localization.py` uses genuine native lethal damage and normal
+Host three-second Use revival. It checks actual translated center-print buffers
+on each own CGame instance, correct local language, decimal player2 substitution,
+no unresolved key/UNLOCALIZED or center-print translation warning, and the
+actual40-byte line budget. It captures both screens at downed, progress and
+revived stages, keeps the full raw native sidecar SHA-bound to a bounded
+scenario result, and retains normal clocks/logs/native exit0 checks for both
+processes. All24 final stage screenshots were inspected: complete German/English
+hints and progress labels, German glyphs, player numbers and revived messages
+are visible without clipping or UNLOCALIZED. Contact images are
+`run/campaign-investigation/banner-eea-line37-{CoD1,UO}-{DEHost-ENpeer,ENHost-DEpeer}.png`.
+
+Both UO copies use reviewed LAA executable SHA256
+`0a0c52e5aa3e15f4b7039bb22593b8b58f594db5061b4fd4e25a2b4ca3a10018`
+and YAP SHA256`9111847c9ed2f1afbdb513d22f2f87f60e23766ba48df60f813d22e1dcaaf431`;
+original raw-executable provenance is preserved. These256MiB raw QA cases select
+only CoDCoop UI language banks; the existing base-game text/voice language is
+unchanged. They do not replace full game-language mixed-installation or actual
+installer/stager/repair/rollback acceptance. The normal localization warning
+settings are not modified, no Core writes are made by the producer, and no
+mission/campaign completion is claimed. Native catch-up/disconnect banner
+execution and full console/UI translation remain outside these six-message
+rendering checks.
+
+### Exact exported feature63 Core: two targeted native consolidation PASSs
+
+The current capability-declaring binary is immutable
+`run/banner-feature63-state24/codcoop_core.dll`, SHA256
+`6c726d798f862361d0079f317185330d98c89648c8daa1ae497a3f295e139781`,
+loader85fc, protocol9/State24/features63. The parent reports only the exported
+localized-banner feature bit differs from the prior encoded prototype; these
+checks nevertheless execute this exact new DLL rather than treating old source
+proof as new binary acceptance.
+
+Two existing strict UO+YAP/LAA0a scenarios run separately and pass, each with
+both actual processes rendering, strict logs and native exit0:
+
+- `banner-feature63-UO-YAP-LAA-ENHost-DEpeer-full-text-down-progress-revived-PASS-1795314640300569815`
+- `role-feature63-UO-YAP-LAA-guestDOWN-nativeCP-strictpose-vitals-normalUseRevive-PASS-1795314733563607760`
+
+The first checks EN Host/DE peer native center text and all six screenshots at
+actual downed, normal three-second Use progress and revived stages. Correct
+local text, player2 formatting, complete40-byte-safe lines and no unresolved
+keys/UNLOCALIZED/translation warnings pass on the exactfeature63 DLL.
+
+The second uses explicit raw-QA default EN/EN banks in its recorded provenance.
+It genuinely downs guest1, writes the native SVG/V2 sidecar, loads it and
+rejoins while still downed. Both owners' pose/view deltas are0; the actual own
+CG current client1 camera agrees. Saved/restored guest Downed=true,
+PS/entity1, prone bit1, actor INELIGIBLE and personal inventory remain correct.
+Normal Host three-second Use then produces Alive300, prone0, actor ELIGIBLE.
+Exact SVG/sidecar, runtime, native input hashes and reviewed UI bank bytes are
+preserved with the complete archives under `run/qa-cod1-four/history/`.
+
+Inspected contacts are `run/campaign-investigation/banner-feature63-UO-ENHost-DEpeer.png`
+and `run/campaign-investigation/feature63-UO-down-checkpoint-revive.png`.
+These are two separate256MiB isolated native scopes, not one combined mixed-UI
+checkpoint session, installed payload acceptance, native Windows or campaign
+completion. No oracle was weakened and no Core writes were made by the tests.

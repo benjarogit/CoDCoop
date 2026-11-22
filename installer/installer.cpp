@@ -1597,6 +1597,53 @@ static bool PayloadDigest(const suite::Json& value) {
     auto hash=value.get<std::string>();
     return hash.size()==64 && std::all_of(hash.begin(),hash.end(),[](char c){return (c>='0'&&c<='9')||(c>='a'&&c<='f');});
 }
+static suite::Json CoopUiRequirement(const std::wstring& root) {
+    auto manifest=suite::Json::parse(suite::Read(root+L"\\coop\\variants.json"));
+    suite::Json item;
+    for (const auto& row:manifest.at("required")) if (row.value("kind",std::string())=="coop_localization") {
+        if (!item.is_null()) throw std::runtime_error("ambiguous CoDCoop UI localization requirement");
+        item=row;
+    }
+    if (item.is_null()) {
+        if ((manifest.value("core_features_required",0u)&32u)!=0) throw std::runtime_error("mandatory CoDCoop UI locale requirement missing");
+        return item;
+    }
+    const std::string path="Main/localized_english_codcoop_ui.pk3";
+    auto en=item.at("locales").at("en"),de=item.at("locales").at("de");
+    suite::Json allowed={en.at("sha256"),de.at("sha256")};
+    if (item.at("path")!=path || item.at("sha256_any")!=allowed || manifest.at("approved_localizations").at(path)!=allowed ||
+        !PayloadDigest(en.at("sha256")) || !PayloadDigest(de.at("sha256"))) throw std::runtime_error("invalid CoDCoop UI locale pins");
+    return item;
+}
+static void ValidateCoopUiFile(const std::wstring& path,const suite::Json& pin) {
+    const std::string data=suite::Read(path),name="localizedstrings/english/codcoop.str";
+    if (!pin.at("size").is_number_unsigned() || data.size()!=pin.at("size").get<size_t>() || data.size()>16384 || suite::Hash(path)!=pin.at("sha256"))
+        throw std::runtime_error("CoDCoop UI locale bank missing or changed: "+suite::Utf8(path));
+    auto word=[&](size_t at)->uint16_t {if(at>data.size() || data.size()-at<2)throw std::runtime_error("truncated CoDCoop locale ZIP");return uint8_t(data[at])|(uint16_t(uint8_t(data[at+1]))<<8);};
+    auto dword=[&](size_t at)->uint32_t {return uint32_t(word(at))|(uint32_t(word(at+2))<<16);};
+    if (data.size()<98 || dword(0)!=0x04034b50 || word(6)!=0 || word(8)!=0 || word(26)!=name.size() || word(28)!=0 ||
+        dword(18)!=dword(22) || dword(18)>data.size()-30-name.size() || data.substr(30,name.size())!=name) throw std::runtime_error("CoDCoop locale must contain one owned stored resource");
+    size_t central=30+name.size()+dword(18),end=central+46+name.size();
+    if (end+22!=data.size() || dword(central)!=0x02014b50 || word(central+8)!=0 || word(central+10)!=0 ||
+        dword(central+20)!=dword(18) || dword(central+24)!=dword(22) || word(central+28)!=name.size() || word(central+30)!=0 || word(central+32)!=0 ||
+        dword(central+42)!=0 || data.substr(central+46,name.size())!=name || dword(end)!=0x06054b50 || word(end+4)!=0 || word(end+6)!=0 ||
+        word(end+8)!=1 || word(end+10)!=1 || dword(end+12)!=46+name.size() || dword(end+16)!=central || word(end+20)!=0)
+        throw std::runtime_error("CoDCoop locale must contain exactly one owned stored resource");
+}
+static void PreflightCoopUiBanks(const std::wstring& root) {
+    auto item=CoopUiRequirement(root);if(item.is_null())return;
+    for (const std::string language:{"en","de"}) ValidateCoopUiFile(suite::Resolve(root,"coop/languages/"+language+"/Main/localized_english_codcoop_ui.pk3"),item.at("locales").at(language));
+    ValidateCoopUiFile(suite::Resolve(root,"Main/localized_english_codcoop_ui.pk3"),item.at("locales").at("en"));
+}
+static void ApplyCoopUiLanguage(const std::wstring& game,bool german) {
+    auto item=CoopUiRequirement(game);if(item.is_null())return;
+    std::string language=german?"de":"en";
+    auto source=suite::Resolve(game,"coop/languages/"+language+"/Main/localized_english_codcoop_ui.pk3");
+    const auto& pin=item.at("locales").at(language);ValidateCoopUiFile(source,pin);
+    auto destination=suite::Resolve(game,"Main/localized_english_codcoop_ui.pk3");RememberFile(destination);
+    if (!CopyFileW(source.c_str(),destination.c_str(),FALSE)) throw std::runtime_error("cannot install selected CoDCoop UI locale");
+    ValidateCoopUiFile(destination,pin);
+}
 static void PreflightRetiredTriggerOverlays(const std::wstring& game,const std::wstring& overlay) {
     const auto newPath=overlay+L"\\coop\\runtime-lock.json";
     if (!Exists(newPath)) return;
@@ -1683,6 +1730,7 @@ static bool RunInstall(std::wstring& err)
               "Verified English language files are needed to switch this German installation. Keep German or restore the English base first.");
         return false;
     }
+    PreflightCoopUiBanks(overlay);
     PreflightRetiredTriggerOverlays(dir,overlay); // before downloads or transaction mutation
     auto suiteManifest=suite::Json::parse(suite::Read(overlay+L"\\coop\\variants.json"));
     for (const auto& item:suiteManifest.at("required")) {
@@ -1796,6 +1844,7 @@ static bool RunInstall(std::wstring& err)
             if (g_job.german) {
                 if (!InstallGerman(dir,err)) return false;
             } else if (!RestoreCanonicalEnglish(dir,err)) return false;
+            ApplyCoopUiLanguage(dir,g_job.german);
             std::string why;
             RememberFile(dir+L"\\coop\\install.json");
             RememberFile(dir+L"\\coop\\profile.ini");

@@ -29,6 +29,58 @@ def zpath(path):
     return 'Z:' + str(Path(path).resolve()).replace('/', '\\')
 
 
+def parse_ui_languages(value, players):
+    """QA folder order is host, join1, join2, join3; default is explicitly EN."""
+    if isinstance(players, bool) or players not in (2, 4):
+        raise ValueError('UI languages require two or four actual QA players')
+    if value is None:
+        return ['en'] * players
+    if not isinstance(value, str):
+        raise ValueError('UI languages must be comma-separated en/de values')
+    languages = [part.strip() for part in value.split(',')]
+    if len(languages) != players or any(language not in ('en', 'de') for language in languages):
+        raise ValueError('--ui-languages needs exactly --players entries, each en or de')
+    return languages
+
+
+def prepare_qa_ui_locale(output, folder, language):
+    """Generate only in an owned isolated clone; never edit source/live assets."""
+    from build_coop_localization import build, package_bytes, INSTALLED_PATH
+    output, folder = Path(output).resolve(), Path(folder).resolve()
+    if (not (output / '.codcoop-qa-owned').is_file() or folder.parent != output
+            or folder.name not in ('host', 'join1', 'join2', 'join3')):
+        raise ValueError('UI locale generation requires an owned isolated QA clone')
+    expected = package_bytes(language)
+    known = {hashlib.sha256(package_bytes(locale)).hexdigest(): locale for locale in ('en', 'de')}
+    target = folder / INSTALLED_PATH
+    if (not target.parent.is_dir() or not target.resolve().is_relative_to(folder)
+            or target.is_symlink() or target.with_suffix('.pk3.part').is_symlink()):
+        raise ValueError('Unsafe or missing QA Main locale-bank destination')
+    record = {'scope': 'OWNED_GENERATED_QA_LOCALE_BANK_ONLY', 'language': language,
+              'folder': folder.name, 'installed_path': INSTALLED_PATH,
+              'sha256': hashlib.sha256(expected).hexdigest(), 'size': len(expected),
+              'installer_language_selection_verified': False}
+    if target.exists():
+        previous = hashlib.sha256(target.read_bytes()).hexdigest()
+        if previous not in known:
+            raise ValueError('Refusing to replace an unknown QA UI locale bank: ' + str(target))
+        record.update(previous_sha256=previous, previous_language=known[previous])
+        if target.read_bytes() == expected:
+            record['action'] = 'kept-reviewed-bank'
+            return record
+        archive = output / 'locale-bank-history' / str(time.time_ns()) / folder.name / INSTALLED_PATH
+        archive.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(target, archive)
+        record['previous_archived'] = str(archive)
+        record['action'] = 'replaced-reviewed-bank'
+    else:
+        record['action'] = 'generated-bank'
+    metadata = build(target, language)
+    if metadata['sha256'] != record['sha256']:
+        raise ValueError('QA locale-bank generation hash mismatch')
+    return record
+
+
 def read_state(folder):
     try:
         return json.loads((folder / 'qa-state.json').read_text())
@@ -176,6 +228,7 @@ def main(argv=None, *, scenario=None):
     parser.add_argument('--variant', choices=('cod1', 'uo', 'sp_improved', 'united_fronts'), default='cod1')
     parser.add_argument('--map', default='training')
     parser.add_argument('--players', type=int, choices=(2, 4), default=2)
+    parser.add_argument('--ui-languages', help='QA local banner banks in host,join1,... order: exactly --players en/de entries; default all en')
     parser.add_argument('--initial-expected-players', type=int, choices=range(1, 5),
                         help='launcher party estimate before real players join; defaults to --players')
     parser.add_argument('--timeout', type=int, default=120)
@@ -189,6 +242,10 @@ def main(argv=None, *, scenario=None):
     parser.add_argument('--chaos-profile', choices=('lan', 'good_wifi', 'bad_wifi', 'mobile_tether', 'transatlantic', 'hell'), default='bad_wifi')
     parser.add_argument('--chaos-seed', type=int, default=260621)
     args = parser.parse_args(argv)
+    try:
+        ui_languages = parse_ui_languages(args.ui_languages, args.players)
+    except ValueError as error:
+        parser.error(str(error))
     if scenario is not None and args.checkpoint_reloads:
         parser.error('targeted Python scenarios cannot request unrelated checkpoint reloads')
     runner_hash = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
@@ -230,6 +287,7 @@ def main(argv=None, *, scenario=None):
         for module in ('ddraw.dll', 'codcoop_core.dll'):
             shutil.copy2(peer_source / module, peer_runtime / module)
     folders = []
+    ui_locale_banks = []
     for n in range(args.players):
         folder = output / ('host' if n == 0 else 'join%d' % n)
         if not folder.exists():
@@ -244,8 +302,10 @@ def main(argv=None, *, scenario=None):
             for old in folder.glob(pattern):
                 if old.is_file(): old.unlink()
         folders.append(folder)
+        ui_locale_banks.append(prepare_qa_ui_locale(output, folder, ui_languages[n]))
     provenance = {'source': str(source), 'variant': args.variant, 'map': args.map, 'players': args.players,
                   'runner_sha256': runner_hash,
+                  'ui_languages': ui_languages, 'ui_locale_banks': ui_locale_banks,
                   'runtime_source': str(runtime_source),
                   'host_delay_seconds': args.host_delay, 'checkpoint_reloads': args.checkpoint_reloads,
                   'initial_expected_players': args.initial_expected_players or args.players,

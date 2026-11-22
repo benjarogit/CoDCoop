@@ -21,4 +21,15 @@ class ExplicitSavedRole(unittest.TestCase):
                 elif mutate=='pm_flags':r['host'][1]['pm_flags']=2
                 else:r['host'][1][mutate]=600
                 with self.subTest(role=role,mutation=mutate),self.assertRaises(RuntimeError):assert_saved_role(r,1,role)
+
+class ActualSaveBoundaryTrace(unittest.TestCase):
+    def trace(self,open_flags=0,close_flags=0,role=2):
+        return '\n'.join(f'save-observe: phase={phase} save=save/temp.svg slot=1 role={role} flags={flags} health=1 view=0,32,0 prone=0,0,0' for phase,flags in [('open',open_flags),('close',close_flags)])
+    def test_requires_actual_open_and_close_downed_but_not_prone(self):
+        from qa_checkpoint_downed import parse_nonprone_save_boundary
+        self.assertTrue(parse_nonprone_save_boundary(self.trace(),1)['valid_nonprone_downed_source'])
+        for text in (self.trace(1,1),self.trace(0,1),self.trace(role=1),self.trace().splitlines()[0]):
+            with self.subTest(trace=text):self.assertFalse(parse_nonprone_save_boundary(text,1)['valid_nonprone_downed_source'])
+        self.assertFalse(parse_nonprone_save_boundary(self.trace(),0)['valid_nonprone_downed_source'])
+
 if __name__=='__main__':unittest.main()

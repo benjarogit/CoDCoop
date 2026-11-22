@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "suite_version": "0.6.0-dev.5",
+  "suite_version": "0.6.0-dev.6",
   "protocol": 9,
   "complete_suite_required": true,
   "required": [
@@ -224,6 +224,39 @@
       "size": 28177,
       "kind": "visual_patch",
       "install_source": "suite"
+    },
+    {
+      "path": "Main/localized_english_codcoop_ui.pk3",
+      "kind": "coop_localization",
+      "install_source": "suite",
+      "sha256_any": [
+        "bea6ef3a24f586631569408f51efc3f9d857ee948951fd4a8b4ef3ef909c96c2",
+        "908ce0bdfdd78a95a736b23de87b56c19e72be5256f7db3fb269ec7618659741"
+      ],
+      "locales": {
+        "en": {
+          "sha256": "bea6ef3a24f586631569408f51efc3f9d857ee948951fd4a8b4ef3ef909c96c2",
+          "size": 1029
+        },
+        "de": {
+          "sha256": "908ce0bdfdd78a95a736b23de87b56c19e72be5256f7db3fb269ec7618659741",
+          "size": 1107
+        }
+      }
+    },
+    {
+      "path": "coop/languages/en/Main/localized_english_codcoop_ui.pk3",
+      "kind": "coop_locale_bank",
+      "install_source": "suite",
+      "sha256": "bea6ef3a24f586631569408f51efc3f9d857ee948951fd4a8b4ef3ef909c96c2",
+      "size": 1029
+    },
+    {
+      "path": "coop/languages/de/Main/localized_english_codcoop_ui.pk3",
+      "kind": "coop_locale_bank",
+      "install_source": "suite",
+      "sha256": "908ce0bdfdd78a95a736b23de87b56c19e72be5256f7db3fb269ec7618659741",
+      "size": 1107
     }
   ],
   "packages": {
@@ -364,7 +397,11 @@
     ],
     "uo/localized_english_pakuo09.pk3": [
       "6f21a4e4bdb9f22d3c4b852f1da14eae9df62f334677999a377afb018ad96c30"
+    ],
+    "Main/localized_english_codcoop_ui.pk3": [
+      "bea6ef3a24f586631569408f51efc3f9d857ee948951fd4a8b4ef3ef909c96c2",
+      "908ce0bdfdd78a95a736b23de87b56c19e72be5256f7db3fb269ec7618659741"
     ]
   },
-  "core_features_required": 31
+  "core_features_required": 63
 }

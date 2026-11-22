@@ -30,7 +30,7 @@ Die Fortschrittsanzeige zählt auch echte Autosave-Unterordner. Sie zeigt sicher
 relative Dateinamen und Änderungszeiten, folgt aber keinen Symlinks oder
 Windows-Reparse-Punkten. Daraus wird kein Kampagnenabschluss abgeleitet.
 
-Current `0.6.0-dev.5` candidates additionally require compiled Core API mask 31;
+Current `0.6.0-dev.6` candidates additionally require compiled Core API mask 63;
 see [runtime-protocol.md](runtime-protocol.md). A new compiled mask, native
 readiness and complete gameplay acceptance remain distinct checks. Historical
 AppImages, receipts and test records are not retroactively updated.
@@ -39,6 +39,30 @@ The added bit16 is native asset-bootstrap support, not individual UF kit readine
 Same-protocol API 15 runtimes (including preserved 602/bac candidates) are rejected
 before a new staging output is created. Historical artifacts remain unchanged.
 
-Der aktuelle Stand `0.6.0-dev.5` verlangt Maske 31. Bit 16 bestätigt kompilierten
+Der aktuelle Stand `0.6.0-dev.6` verlangt Maske 63. Bit 16 bestätigt kompilierten
 Ressourcen-Bootstrap, keine individuelle Ausrüstungsübernahme. Alte API 15-DLLs
 werden trotz gleichem Protokoll vor dem Paketaufbau abgewiesen.
+
+
+## Owned Coop UI banks / Eigene Coop-Sprachdateien
+
+Dev6 additionally requires Main/localized_english_codcoop_ui.pk3 with exactly
+one owned stored STR resource and two approved byte hashes. The immutable EN/DE
+copies under coop/languages are individually required and runtime-lock pinned.
+New payloads default to English. The English copy is generated from project-owned
+strings and added to the canonical English inventory; it is never sought in the
+old Ready ZIP. German selection copies the reviewed German bank after original
+language installation; English selection restores the English bank. Both paths
+use the existing transaction and preserve personal configuration and saves.
+Missing, changed or extra-resource banks abort before package installation.
+Bit32 LOCALIZED_BANNERS is compiled support, not a claim of full campaign or
+individual-equipment readiness. Old API31 DLLs cannot satisfy the new mask63.
+
+Dev6 benötigt die eigene Coop-Sprachdatei und beide unveränderlichen EN-/DE-
+Vorlagen. Das neue Paket enthält standardmäßig Englisch. Diese Texte werden
+unabhängig vom alten Ready-ZIP erzeugt und in den geprüften englischen Bestand
+aufgenommen. Deutsch wird nach dem eigentlichen Spielsprachpaket kopiert.
+Reparatur, Update und Rücknahme sichern die vorherige Auswahl; persönliche
+Einstellungen und Spielstände bleiben erhalten. Fehlende, veränderte oder um
+weitere Ressourcen ergänzte Dateien werden abgewiesen. Der neue Paketstand
+verlangt Core-Maske63; ältere API31-DLLs sind dafür unzureichend.

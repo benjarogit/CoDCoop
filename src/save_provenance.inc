@@ -3,6 +3,20 @@
 struct InventorySaveOpen { int handle; char relative[192]; save_provenance::Metadata metadata; };
 InventorySaveOpen g_inventoryOpen[8]{};
 
+void InventorySaveTrace(const char* phase,const InventorySaveOpen& entry)
+{
+    if(!suite::IsQA())return;
+    for(unsigned n=0;n<g::MAX_CLIENTS;++n) {
+        if(!entry.metadata.roles[n])continue;
+        const uint8_t* ps=g::PlayerState(n);if(!ps)continue;
+        const float* view=(const float*)(ps+g::A(0xb0,0xd8));
+        const float* prone=(const float*)(ps+g::A(0x350,0x58c));
+        Log("save-observe: phase=%s save=%s slot=%u role=%u flags=%u health=%d view=%.6f,%.6f,%.6f prone=%.6f,%.6f,%.6f",phase,
+            entry.relative,n,entry.metadata.roles[n],*(const uint32_t*)(ps+12),*(const int*)(ps+g::PS_HEALTH),
+            view[0],view[1],view[2],prone[0],prone[1],prone[2]);
+    }
+}
+
 bool InventoryFileHash(const std::string& path,char out[65])
 {
     HANDLE file=CreateFileA(path.c_str(),GENERIC_READ,FILE_SHARE_READ,nullptr,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,nullptr);
@@ -116,8 +130,10 @@ void InventoryFSObserver(const intptr_t* args,intptr_t result,bool after)
                 m.roles[n]=S->downed[n]?saved_role::Downed:saved_role::Alive;
             }
         }
+        InventorySaveTrace("open",*entry);
     } else if(args[0]==0x25) {
         for(auto& entry:g_inventoryOpen) if(entry.handle&&entry.handle==args[1]) {
+            InventorySaveTrace("close",entry);
             entry.handle=0;
             std::string path=InventorySavePath(entry.relative);if(path.empty()) break;
             if(!InventoryFileHash(path,entry.metadata.sha256)) {Log("inventory: could not hash completed save %s",entry.relative);break;}

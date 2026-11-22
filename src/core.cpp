@@ -2425,11 +2425,11 @@ void AnnounceDowned(int n, bool downed)
     char text[128];
     for (int m = 0; m < g::MAX_CLIENTS; ++m) {
         if (m == n) {
-            if (!downed) SendBanner(m, "^2You were revived", false);  // caido: el cartel fijo lo pone HostDownedFrame
+            if (!downed) SendBanner(m, "\x15" "^2" "\x14" "CODCOOP_REVIVED_SELF", false);
         } else if (!S->downed[m]) {
             snprintf(text, sizeof text,
-                     downed ? "^1Player %d is down^7\\nGet close and hold Use for 3 seconds"
-                            : "^2Player %d is back up",
+                     downed ? "\x15" "^1" "\x14" "CODCOOP_OTHER_DOWNED" "\x15" "%d" "\x15" "^7\\n" "\x14" "CODCOOP_OTHER_DOWNED_HINT"
+                            : "\x15" "^2" "\x14" "CODCOOP_REVIVED_OTHER" "\x15" "%d",
                      n + 1);
             SendBanner(m, text, false);
         }
@@ -2573,7 +2573,9 @@ void ProgressBanner(char* out, size_t size, const char* label, float t)
     constexpr int W = 20;
     int done = (int)(t / REVIVE_SECONDS * W);
     done = done < 0 ? 0 : done > W ? W : done;
-    snprintf(out, size, "%s\\n^2%.*s^7%.*s", label, done, "||||||||||||||||||||", W - done, "||||||||||||||||||||");
+    // This literal delimiter ends a preceding numeric template argument before
+    // appending the progress line. Otherwise Native substitutes the whole bar.
+    snprintf(out, size, "%s" "\x15" "\\n^2%.*s^7%.*s", label, done, "||||||||||||||||||||", W - done, "||||||||||||||||||||");
 }
 
 void HostDownedFrame(float dt)
@@ -2608,11 +2610,11 @@ void HostDownedFrame(float dt)
     for (int n = 0; n < g::MAX_CLIENTS; ++n) {
         char text[128] = "", label[64];
         if (S->downed[n] && S->reviveTime[n] > 0) {
-            ProgressBanner(text, sizeof text, "^2Being revived", S->reviveTime[n]);
+            ProgressBanner(text, sizeof text, "\x15" "^2" "\x14" "CODCOOP_BEING_REVIVED", S->reviveTime[n]);
         } else if (S->downed[n]) {
-            snprintf(text, sizeof text, "^1YOU ARE DOWN^7\\nWait for a teammate to revive you");
+            snprintf(text, sizeof text, "\x15" "^1" "\x14" "CODCOOP_DOWNED_TITLE" "\x15" "^7\\n" "\x14" "CODCOOP_DOWNED_HINT");
         } else if (reviving[n] >= 0) {
-            snprintf(label, sizeof label, "Reviving player %d", reviving[n] + 1);
+            snprintf(label, sizeof label, "\x15" "^2" "\x14" "CODCOOP_REVIVING_PLAYER" "\x15" "%d", reviving[n] + 1);
             ProgressBanner(text, sizeof text, label, S->reviveTime[reviving[n]]);
         }
         KeepBanner(n, text);
@@ -2684,12 +2686,42 @@ void HostCatchUp(float dt)
         memset(PlayerState(n) + 0x20, 0, 12);  // velocidad
         memcpy(g::Entity(n) + g::GE_ORIGIN, spot, 12);  // r.currentOrigin
         g_farTime[n] = 0;
-        SendBanner(n, "^3You fell behind: moved next to the host", false);
+        SendBanner(n, "\x15" "^3" "\x14" "CODCOOP_CATCHUP", false);
     }
 }
 
 uint8_t* g_linkFailed[g::MAX_CLIENTS];
 uint8_t* g_weaponTried[g::MAX_CLIENTS];
+void PrepareHostMotionScope()
+{
+    // These process-local caches contain native-world coordinates/pointers.
+    // A reused Game DLL address or a retained inventory lease is not a world
+    // identity. Reconnects also must not inherit another role's retry/timer.
+    static reload_delivery::Token world{};
+    static int nativeWorld;
+    static uintptr_t nativeGame;
+    static uint64_t leases[g::MAX_CLIENTS]{};
+    static uint32_t tickets[g::MAX_CLIENTS]{};
+    static bool active[g::MAX_CLIENTS]{};
+    int nextWorld=CvarInt("sv_serverid");
+    uintptr_t nextGame=(uintptr_t)g::gvm;
+    if(!reload_delivery::Same(world,S->reloadToken)||nativeWorld!=nextWorld||nativeGame!=nextGame) {
+        world=S->reloadToken;nativeWorld=nextWorld;nativeGame=nextGame;
+        g_trailCount=g_trailNext=0;
+        memset(g_trail,0,sizeof g_trail);
+        memset(g_farTime,0,sizeof g_farTime);
+        memset(g_linkFailed,0,sizeof g_linkFailed);
+        memset(g_weaponTried,0,sizeof g_weaponTried);
+        Log("movement: cleared trail and vehicle retries for world=%u native=%d",world.generation,nativeWorld);
+    }
+    for(int n=1;n<g::MAX_CLIENTS;++n) {
+        uint64_t lease=S->inventories.slots[n].lease;
+        if(leases[n]!=lease||tickets[n]!=S->spawnTicket[n]||active[n]!=S->remote[n].active) {
+            g_farTime[n]=0;g_linkFailed[n]=g_weaponTried[n]=nullptr;
+            leases[n]=lease;tickets[n]=S->spawnTicket[n];active[n]=S->remote[n].active;
+        }
+    }
+}
 
 void HostVehicles()
 {
@@ -3157,7 +3189,7 @@ void HostDropRemote(int n, bool explicitLeave = false)
     *(int*)(g::Client(n) + g::CL_STATE) = 0;
     g_lastSeen[n] = 0;
     char text[96];
-    snprintf(text, sizeof text, "^3Player %d disconnected", n + 1);
+    snprintf(text, sizeof text, "\x15" "^3" "\x14" "CODCOOP_DISCONNECTED" "\x15" "%d", n + 1);
     for (int m = 0; m < g::MAX_CLIENTS; ++m)
         if (m != n) SendBanner(m, text, false);
     g::Com_Printf("^3COOP: player %d disconnected\n", n + 1);
@@ -4768,6 +4800,7 @@ EXPORT void __cdecl Coop_HostFrame()
 {
     if (S->role != HOST) return;
     HostCheckReload();
+    PrepareHostMotionScope();
     HookCgame(true);
     HookDamage(true);
     HookSpawnServer(true);

@@ -17,6 +17,12 @@ static void name(HANDLE p,unsigned defs,unsigned id,char* out){
  if(s)read(p,s,out,127);out[127]=0;
 }
 static void weapon(HANDLE p,unsigned defs,unsigned id){char s[128]={};name(p,defs,id,s);std::printf("{\"id\":%u,\"name\":\"%s\"}",id,*s?s:"none");}
+static void jsonLatin1(const char* text){
+ std::putchar('"');for(const unsigned char* c=(const unsigned char*)text;*c;++c){
+  if(*c=='"'||*c=='\\')std::putchar('\\');
+  if(*c<32||*c>=127)std::printf("\\u%04x",(unsigned)*c);else std::putchar(*c);
+ }std::putchar('"');
+}
 int main(int argc,char** argv){
  if(argc!=4)return 2;bool uo=!std::strcmp(argv[3],"uo");if(!uo&&std::strcmp(argv[3],"cod1"))return 2;
  unsigned slot=std::strtoul(argv[2],nullptr,10);if(slot>3)return 2;
@@ -53,6 +59,11 @@ int main(int argc,char** argv){
    std::printf("%s\"%s\":{\"stock_index\":%u,\"clip_index\":%u,\"stock\":%u,\"clip\":%u}",i?",":"",labels[i],ai,ci,stock,clips);
   }std::printf("}");
   unsigned cdefs=u32(p,cg+(uo?0x13d478:0xceb8c)),snap=u32(p,cg+(uo?0x259548:0x10b8a8));
+  // cp handler copies native translated text to CoD1+125820/UO+275FAC.
+  // Read actual display text; Latin1 bytes become valid JSON Unicode escapes.
+  char centerPrint[1024]={};read(p,cg+(uo?0x275fac:0x125820),centerPrint,1023);
+  std::printf(",\"center_print_time\":%u,\"center_print\":",u32(p,cg+(uo?0x275fa0:0x125814)));
+  jsonLatin1(centerPrint);
   std::printf(",\"cgame\":{\"snapshot_client\":%u,\"snapshot_time\":%u,\"snapshot\":",snap?u32(p,snap+8+0x9c+off):999,snap?u32(p,snap+4):0);
   weapon(p,cdefs,snap?u32(p,snap+8+0xa0+off):0);
   std::printf(",\"desired\":");weapon(p,cdefs,u32(p,cg+(uo?0x24aecc:0xfe24c)));

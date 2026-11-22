@@ -4,7 +4,7 @@ Date / Datum: 2026-11-22. Development branch: `feat/0.6.0-coop-suite`.
 Starting point: `801dfd4` (published v0.5.4 assets are unchanged).
 Local source checkpoints: `4a6d36f`, `3288c23`, `7b1428f` (WIP, not pushed or released).
 
-## Latest state / Neuester Stand — protocol9, dev.5
+## Latest state / Neuester Stand — protocol9, dev.6
 
 This section supersedes the historical checkpoints below. / Dieser Abschnitt
 ersetzt die älteren Standangaben weiter unten. Development is unfinished;
@@ -17,7 +17,39 @@ published v0.5.4 binaries have not been replaced.
 This addendum supersedes pending statements below. Nothing has been published.
 / Diese Ergänzung ersetzt ältere Offen-Angaben unten. Nichts wurde veröffentlicht.
 
-- **Current suite contract / Aktueller Paketvertrag:** `0.6.0-dev.5`, protocol9,
+- **Current native candidate / Aktueller nativer Kandidat:** State24/protocol9,
+  compiled APIs63. `LOCALIZED_BANNERS=32` requires the owned EN/DE text bank;
+  it is not an individual-kit capability. Exact Core
+  `6c726d798f862361d0079f317185330d98c89648c8daa1ae497a3f295e139781`
+  at `run/banner-feature63-state24/` passes actual UO+YAP/LAA0a mixed EN/DE
+  down/progress/revived UI and a separate strict Downed checkpoint/pose/vitals/
+  native revival round. Both pairs quit0. Earlier Coreeea APIs31 passes all four
+  engine/language directions; its initial long German hints were visually
+  clipped despite native lookup success, so those old results have explicit
+  failed visual-review supplements. Current owned ENbank
+  `bea6ef3a24f586631569408f51efc3f9d857ee948951fd4a8b4ef3ef909c96c2`
+  and DEbank `908ce0bdfdd78a95a736b23de87b56c19e72be5256f7db3fb269ec7618659741`
+  respect the verified40-byte draw limit; both remain within37 text bytes after
+  substituting player digits. Native screenshots/buffers confirm full hints,
+  Latin1 glyphs, colors, progress and player numbers without UNLOCALIZED.
+  See latest exact archives in `docs/campaign-compatibility.md`. Dev.6 mandatory
+  locale installation/repair/rollback and mask63 validation pass separate source
+  and actual Wine checker/installer tests. Full frozen-package rebuilding is
+  pending; manual QA banks do not certify base-game mixed languages.
+- **Dev.6 verification / Prüfung:** complete build passes, ordinary build-path
+  Core `080d5f52aa7954400a8db5487b8535777327b3e6c8aacbe182d45638b4593d33`.
+  Exact native acceptance remains on6c726 above (output-path ImageBase differs).
+  Of346 discovered Python cases,312 pass and34 native opt-in cases are skipped:
+  `run/unit-dev6-feature63-full.log`. Pure native-party transactions also
+  pass ASan/UBSan. Locale installation has separate143 focused regressions,
+  eight final bounded-file checks, a real tiny offline backend install/repair/
+  public rollback, five actual feature63/legacy checker cases and Windows
+  installer locale/retirement groups under Wine. Exact handoff:
+  `run/dev6-locale-handoff.json`; manifest
+  `fc9b44ee12e67315b11df0ec0290ccfc77d697bf639877e7aeff2ea6ca9022d7`.
+  The GUI-worker source graph and crypto dependencies are pinned and tested in
+  isolation, but a fresh frozen-worker positive test is not yet claimed.
+- **Previous suite contract / Vorheriger Paketvertrag:** `0.6.0-dev.5`, protocol9,
   required feature mask31. Resource bootstrap is now mandatory. The unchanged
   native checker rejects protocol9 DLLs advertising only15; actual staging of
   the old602 and bac binaries fails before creating output.95 focused Python
@@ -55,7 +87,7 @@ This addendum supersedes pending statements below. Nothing has been published.
   Training is
   explicitly unarmed; this proof does not certify all four distinct weapons.
   Older failed samples remain retained; no relaxed view-angle oracle.
-- **Current source verification / Aktuelle Quellprüfung:**288 Python cases,
+- **State24/dev.5 source verification / Quellprüfung dieses Zwischenstands:**288 Python cases,
   264 passed and24 native opt-in skips, `run/unit-state24-dev5.log`.
   Focused inventory, pose, vitals, saved provenance, resource-bootstrap lifetime
   and native mapping-barrier C++ fixtures pass ASan/UBSan. The two new bootstrap
@@ -71,6 +103,34 @@ This addendum supersedes pending statements below. Nothing has been published.
   players with different addresses, while each exact socket challenge, local
   intent and source binding remains mandatory. Native producer/consumer and
   pre-mission kit binding are unfinished; actual kit launch remains disabled.
+- **Narrow save boundary / Enges Speicherzeitfenster:** a QA-only read-only
+  FS open/close observer was added after the State24 checkpoint commit. The
+  real queued damage+save experiment already had native prone flag1 at both
+  boundaries; it does not reproduce Downed-before-prone. No load acceptance
+  is inferred. Exact observer Core
+  `f10d9f8658946ca1f77c218fdf2c025f316b406c8ffa490e0ae9706da1974133`,
+  archive `run/qa-cod1-four/history/immediate-save-f10d-CoD1-queued-native-damage-save-sourceALREADYprone-NOTREPRODUCED-1795312530513939384`.
+- **World-scoped movement / Bewegung mit Weltbindung:** source inspection of
+  process-global catch-up trail/timers and vehicle retry pointers led to a real
+  reproduced defect: after Training→Brecourt, the stationary new-world Host was
+  near[2323,-2499,8], but the remote was caught up to old Training coordinates
+  [4259,-4450,-93]. Baseline observer Coref10d fails the strict stationary-world
+  oracle. Candidate Core `b8c40e6e3841232ec3421ff678964e01c2bfc1c95c03f8181b86315d12ffa5ae`
+  under `run/motion-scope-state24/` fences coordinates/retries by native server
+  ID/VM and Coop session/world, and clears per-peer timers/retries on lease,
+  spawn ticket or active-state changes. The unchanged no-stale oracle passes;
+  extended actual CoD1 AND UO+YAP checks also require real peer input, no catch-up
+  while the new Host is stationary, then normal current-world catch-up after
+  actual Host movement and further peer input. Both games quit cleanly.
+  Evidence: `run/qa-motion-epoch/` and its bounded `history/`; no mission
+  completion or vehicle-specific runtime acceptance is inferred. The initial
+  UO raw-copy attempt timed out at YAP's LAA prompt; only the reviewed owned-copy
+  LAA0a executable is used for the passing UO case. Live files are unchanged.
+- **Localization investigation resolved / Textfehler geklärt:** the actual UO
+  downed screenshot exposed `UNLOCALIZED(...)`. The newer namespace/bank and
+  native key/literal encoding proofs above close that targeted center-message
+  defect without suppressing global warnings. Other console/debug text and
+  full base-game language compatibility are separate scopes.
 
 - **Latest parent — State22 / sidecarV2:** Core
   `fc01f8d89702af7bbf47240a0f01b49e3001adcc9b3468b567214104509e1905`

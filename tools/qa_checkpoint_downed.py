@@ -17,13 +17,30 @@ def assert_saved_role(record, target, downed):
  if record['cvars'].get(f'coop_actor_{target}_state')!=expected:raise RuntimeError('Saved actor role eligibility differs')
 
 
+def parse_nonprone_save_boundary(text,slot):
+ pattern=r'save-observe: phase=(open|close) save=(\S+) slot=(\d+) role=(\d+) flags=(\d+) health=(-?\d+) view=([^ ]+) prone=([^\r\n]+)'
+ rows=[]
+ for match in re.finditer(pattern,text):
+  phase,save,actual,role,flags,health,view,prone=match.groups()
+  if int(actual)!=slot:continue
+  rows.append({'phase':phase,'save':save,'slot':slot,'role':int(role),'flags':int(flags),'health':int(health),
+               'view':[float(v) for v in view.split(',')],'prone':[float(v) for v in prone.split(',')]})
+ pairs=rows[-2:]
+ valid=(len(pairs)==2 and [r['phase'] for r in pairs]==['open','close'] and pairs[0]['save']==pairs[1]['save']
+        and all(r['role']==2 and r['health']==1 and not r['flags']&1 for r in pairs))
+ return {'valid_nonprone_downed_source':valid,'observations':rows}
+
+
 def main():
  p=argparse.ArgumentParser(description=__doc__)
  for flag in ('source','run','runtime-dir'):p.add_argument('--'+flag,type=Path,required=True)
  p.add_argument('--variant',choices=('cod1','uo'),default='cod1')
  p.add_argument('--mode',choices=('guest-down','host-down','standing-one-hp'),default='guest-down')
+ p.add_argument('--immediate-save',action='store_true',help='queue genuine damage and save together; requires native open/close Downed but not-prone trace')
  p.add_argument('--port',type=int,default=29950);p.add_argument('--timeout',type=int,default=180)
  a=p.parse_args();target=0 if a.mode=='host-down' else 1;reviver=1-target;downed=a.mode!='standing-one-hp';basename='qa_role_'+a.mode.replace('-','_');out=a.run.resolve();folders=[out/'host',out/'join1'];root='Main' if a.variant=='cod1' else 'uo'
+ if a.immediate_save and a.mode!='guest-down':p.error('--immediate-save is the bounded actual guest-down fixture')
+ basename+= '_immediate' if a.immediate_save else ''
  executed_source=Path(__file__).read_bytes()
  argv=['--source',str(a.source.resolve()),'--run',str(out),'--runtime-dir',str(a.runtime_dir.resolve()),'--variant',a.variant,'--map','training','--players','2','--port',str(a.port),'--timeout',str(a.timeout),'--duration','3']
  if qa.main(argv+['--prepare-only']):return 1
@@ -34,7 +51,7 @@ def main():
  helper=out/'qa-campaign-player.exe'
  subprocess.run(['i686-w64-mingw32-g++',str(source),'-o',str(helper),'-static','-O2','-std=c++17','-mwindows'],check=True)
  env=dict(os.environ,WINEPREFIX=str(out/'prefix'),WINEDEBUG='-all')
- report={'status':'FAIL','scope':__doc__,'variant':a.variant,'mode':a.mode,'target':target,'runner_sha256':hashlib.sha256(executed_source).hexdigest(),'setup':'Original training; actual native damage, other owner alive. Observer-only cooplook camera arrangement96units; target never teleported. No direct role flag/health setter.'}
+ report={'status':'FAIL','scope':__doc__,'variant':a.variant,'mode':a.mode,'immediate_save':a.immediate_save,'target':target,'runner_sha256':hashlib.sha256(executed_source).hexdigest(),'setup':'Original training; actual native damage, other owner alive. Observer-only cooplook camera arrangement96units; target never teleported. No direct role flag/health setter.'}
  def native(folder,slot):
   r=subprocess.run(['wine',str(helper),str(folder).replace('/','\\'),str(slot),a.variant],env=env,text=True,capture_output=True,check=True,timeout=15)
   return json.loads(r.stdout)
@@ -55,21 +72,41 @@ def main():
  def scenario(_folders,processes,states):
   wait(lambda:all(p['pm_type']==0 and not p['linked'] and not p['downed'] for p in qa.read_state(folders[0])['players'][:2]),'two actual ordinary live owners')
   report['initial']=observe()
-  if report['initial']['host'][target]['health']!=600:raise RuntimeError('Fixture requires actual native initial600 health')
-  damage=100000 if downed else 599
-  qa.command(folders[0],f'coopgod {target} 0\ncoopkill {target} {damage}')
-  wait(lambda:qa.read_state(folders[0])['players'][target]['downed']==downed and qa.read_state(folders[0])['players'][target]['health']==1,'genuine native damage enters expected explicit role')
-  wait(lambda:cvars().get(f'coop_actor_{target}_state')==('INELIGIBLE' if downed else 'ELIGIBLE'),'native eligibility for actual saved role')
-  qa.command(folders[0],f'cooplook {reviver} {target} 96');time.sleep(.5)
-  saved=observe();report['saved']=saved
-  assert_saved_role(saved,target,downed)
-  if saved['state']['players'][reviver]['health']<=1 or saved['state']['players'][reviver]['downed']:raise RuntimeError('Other real player must remain alive')
-  for i,f in enumerate(folders):qa.command(f,'screenshot',joiner=i!=0)
-  time.sleep(.5)
   save=folders[0]/root/'save'/(basename+'.svg');meta=Path(str(save)+'.coopowners')
   save.unlink(missing_ok=True);meta.unlink(missing_ok=True)
   generation=qa.read_state(folders[0])['world_wire']['generation']
-  qa.command(folders[0],'savegame '+basename)
+  if a.immediate_save:
+   # Genuine owned input makes the pre-save facing differ from map-entry yaw.
+   qa.command(folders[target],'+forward',joiner=True);time.sleep(.75);qa.command(folders[target],'-forward',joiner=True)
+   qa.command(folders[target],'set cl_yawspeed 90\n+left',joiner=True);time.sleep(1.25);qa.command(folders[target],'-left',joiner=True);time.sleep(.4)
+   report['before_inline_damage_save']=observe()
+  if report['initial']['host'][target]['health']!=600:raise RuntimeError('Fixture requires actual native initial600 health')
+  damage=100000 if downed else 599
+  text_before=(folders[0]/'codcoop.log').read_text(errors='replace')
+  qa.command(folders[0],f'coopgod {target} 0\ncoopkill {target} {damage}'+('\nsavegame '+basename if a.immediate_save else ''))
+  if a.immediate_save:
+   wait(lambda:save.exists() and save.stat().st_size>1024 and meta.exists(),'inline genuine damage/save completed')
+   for source in (save,meta):shutil.copy2(source,out/source.name)
+   report['saved_files']={source.name:hashlib.sha256(source.read_bytes()).hexdigest() for source in (save,meta)}
+   native_log=(folders[0]/'codcoop.log').read_text(errors='replace')[len(text_before):]
+   report['source_boundary']=parse_nonprone_save_boundary(native_log,target)
+   if not report['source_boundary']['valid_nonprone_downed_source']:raise RuntimeError('Immediate Downed-before-native-prone source boundary not reproduced')
+  wait(lambda:qa.read_state(folders[0])['players'][target]['downed']==downed and qa.read_state(folders[0])['players'][target]['health']==1,'genuine native damage enters expected explicit role')
+  wait(lambda:cvars().get(f'coop_actor_{target}_state')==('INELIGIBLE' if downed else 'ELIGIBLE'),'native eligibility for actual saved role')
+  # The immediate save already exists: arranging a camera now would corrupt
+  # the expected saved observer pose. Normal delayed cases arrange before save.
+  if not a.immediate_save:qa.command(folders[0],f'cooplook {reviver} {target} 96');time.sleep(.5)
+  saved=observe();report['saved']=saved
+  assert_saved_role(saved,target,downed)
+  if a.immediate_save:
+   source_view=report['source_boundary']['observations'][-1]['view']
+   if any(abs((a-b+180)%360-180)>.01 for a,b in zip(source_view,saved['host'][target]['viewangles'])):raise RuntimeError('Post-save observer view differs from actual native save source')
+   before=report['before_inline_damage_save']['host'][target]
+   if sum((a-b)**2 for a,b in zip(before['position'],saved['host'][target]['position']))>.01:raise RuntimeError('Inline damage-save position moved before native proof')
+  if saved['state']['players'][reviver]['health']<=1 or saved['state']['players'][reviver]['downed']:raise RuntimeError('Other real player must remain alive')
+  for i,f in enumerate(folders):qa.command(f,'screenshot',joiner=i!=0)
+  time.sleep(.5)
+  if not a.immediate_save:qa.command(folders[0],'savegame '+basename)
   wait(lambda:save.exists() and save.stat().st_size>1024 and meta.exists(),'actual native downed checkpoint completed')
   for source in (save,meta):shutil.copy2(source,out/source.name)
   report['saved_files']={source.name:hashlib.sha256(source.read_bytes()).hexdigest() for source in (save,meta)}

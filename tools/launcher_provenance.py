@@ -18,7 +18,7 @@ FILES=('tools/build-launcher.py','tools/launcher_provenance.py','tools/stage_sui
        'tools/launch-gui.py','tools/coop_suite.py','tools/coop_session.py','tools/frozen_runtime.py','tools/runtime_protocol.py',
        'tools/coop_party.py','tools/party_gui.py','tools/party_binding.py','tools/party_native_bridge.py',
        'tools/uf_equipment_catalog.py','tools/uf_equipment_preferences.py','tools/uf_equipment_roster.py','tools/uf_equipment_roster_view.py',
-       'tools/campaign_inventory.py','tools/build_campaign_patch.py','campaign_patches/uf_equipment_catalog.json','content/variants.json',
+       'tools/campaign_inventory.py','tools/build_campaign_patch.py','tools/coop_localization.py','tools/build_coop_localization.py','campaign_patches/uf_equipment_catalog.json','content/variants.json',
        'tools/requirements-launcher.txt','tools/requirements-launcher-linux.lock','tools/portable-linux/party-dependencies.lock',
        'tools/portable-linux/Dockerfile','tools/portable-linux/apt-packages.lock','tools/build-portable-linux.sh','tools/check-linux-abi.py')
 

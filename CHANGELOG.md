@@ -6,8 +6,8 @@
 
 **Unreleased. No full-campaign or native-Windows certification yet.**
 
-- Source `0.6.0-dev.5` requires compiled Core feature mask 31, including native
-  asset bootstrap. Reject historical API 15 DLLs before new staging; individual
+- Source `0.6.0-dev.6` requires compiled Core feature mask 63, including native
+  asset bootstrap and localized Coop banners. Reject historical API15/API31 DLLs before new staging; individual
   UF kit application remains gated pending native owner/plan binding.
 - Transfer and verify the native model/weapon resource contract before loading
   a joiner's target world. Detach stale native client model mappings before
@@ -98,8 +98,8 @@ mechanics remain acceptance gates. See [handoff](docs/HANDOFF-0.6.md).
 
 **Noch nicht veröffentlicht. Keine Bestätigung vollständiger Kampagnen oder nativer Windows-Läufe.**
 
-- Quellenstand `0.6.0-dev.5` verlangt Core-Maske 31 einschließlich nativer
-  Ressourcenübertragung. Alte API 15-DLLs werden vor neuem Staging abgewiesen;
+- Quellenstand `0.6.0-dev.6` verlangt Core-Maske 63 einschließlich nativer
+  Ressourcenübertragung und lokalisierter Coop-Hinweise. Alte API 15-DLLs werden vor neuem Staging abgewiesen;
   individuelle UF-Ausrüstung wartet weiter auf die native Spieler-/Planbindung.
 - Nativen Modell-/Waffenbestand vor dem Laden der Zielwelt des Mitspielers
   übertragen und prüfen. Alte clientseitige Modellzuordnungen vor Übernahme der

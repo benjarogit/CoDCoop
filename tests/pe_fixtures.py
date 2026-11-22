@@ -2,7 +2,7 @@
 import struct
 
 
-def core_pe(protocol=9, features=31):
+def core_pe(protocol=9, features=63):
     data=bytearray(0x600)
     data[:2]=b'MZ';struct.pack_into('<I',data,0x3c,0x80);data[0x80:0x84]=b'PE\0\0'
     struct.pack_into('<HHIIIHH',data,0x84,0x14c,1,0,0,0,224,0x2102)
@@ -46,6 +46,6 @@ def malformed_feature(kind, protocol=9):
         second=section+40;data[second:second+8]=b'.data\0\0\0'
         struct.pack_into('<IIII',data,second+8,0x200,0x2000,0x200,0x600)
         struct.pack_into('<I',data,second+36,0xc0000040 if kind=='writable' else 0x60000040)
-        struct.pack_into('<I',data,0x244,0x2000);struct.pack_into('<I',data,0x600,31)
+        struct.pack_into('<I',data,0x244,0x2000);struct.pack_into('<I',data,0x600,63)
     else:raise ValueError(kind)
     return bytes(data)

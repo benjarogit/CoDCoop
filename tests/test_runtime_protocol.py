@@ -60,6 +60,13 @@ class RuntimeProtocol(unittest.TestCase):
                 core.write_bytes(core_pe(9,bits))
                 with self.subTest(bits=bits),self.assertRaises(ValueError):runtime.require_core_features(core,31)
 
+    def test_dev6_mask63_rejects_same_protocol_bootstrap_only31(self):
+        with tempfile.TemporaryDirectory() as folder:
+            core=Path(folder)/'codcoop_core.dll'
+            core.write_bytes(core_pe(9,63));self.assertEqual(runtime.require_core_features(core,63),63)
+            core.write_bytes(core_pe(9,31))
+            with self.assertRaises(ValueError):runtime.require_core_features(core,63)
+
     def test_stager_rejects_protocol9_checker_without_feature_validation_support(self):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder);(root/'codcoop_core.dll').write_bytes(core_pe(9,15))
@@ -100,7 +107,7 @@ class RuntimeProtocol(unittest.TestCase):
         stage=importlib.util.module_from_spec(spec);spec.loader.exec_module(stage)
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder);game=root/'game';game.mkdir();runtime_root=root/'runtime';runtime_root.mkdir()
-            (runtime_root/'codcoop_core.dll').write_bytes(core_pe(9,15));output=root/'payload'
+            (runtime_root/'codcoop_core.dll').write_bytes(core_pe(9,31));output=root/'payload'
             with mock.patch.object(stage,'sha256',side_effect=[stage.YAP_ZIP_SHA,stage.YAP_EXTRAS_SHA]), \
                  mock.patch.object(runtime,'checker_capabilities',return_value={'protocol':9,'core_features_validation':True}), \
                  mock.patch.object(stage.tempfile,'mkdtemp') as temporary:
