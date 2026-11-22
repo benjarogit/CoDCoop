@@ -50,6 +50,23 @@ This addendum supersedes pending statements below. Nothing has been published.
   15 Definitions, Export bleibt 347/119, alle drei Joiner bestehen das strikte
   Mapping, vier frische Kits bestehen, kein `MT_AllocIndex`-Fehler. QA-only,
   keine Produktionslösung und keine Windows/Steam-Abnahme.
+- **M2 watch negative / M2-Watch-Negativ:** local commit `9e39e60` adds
+  `--duration` so the departure fits the watchpoint cap. In
+  `run/qa-noville-m1-watch3` all three joiners attach and arm on the shared
+  988-node definition (`definition+4`, expected 988), the four-player scenario
+  PASSes, and every watcher reports `hit:false` with a clean detach after the
+  process exits. No game thread writes that field during a clean departure in
+  the borrow configuration. The earlier `0xff000000` corruption
+  (`run/qa-cod1-four/history/1795329148842541172/453995-native-crash-stop.json`,
+  entity341, 988 nodes) therefore predates or bypasses the borrowed-tree path;
+  it remains an own-free/ownership defect, not a native write. This is a
+  negative observation, not a safety proof for other leave paths (reload,
+  disconnect/rejoin) and not a production fix.
+  / Lokaler Commit `9e39e60`; Watch `watch3` meldet für alle drei Joiner
+  `hit:false` auf `definition+4` (988 Nodes) bei sauberem PASS. Kein nativer
+  Schreibzugriff; die frühere Korruption bleibt ein Defekt des eigenen
+  Free-/Ownership-Pfads. Kein Beweis für Reload/Disconnect und keine
+  Produktionslösung.
 - **Latest worker checkpoint / Neuester Worker-Stand:** local source `277fc47`
   fixes actual Windows/Wine atomic-replace sharing failures and physical-link
   rejection. Fresh immutable worker source graph
