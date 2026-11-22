@@ -58,6 +58,7 @@ jobs:
       - run: g++ -std=c++17 -Wall -Wextra -fsanitize=address,undefined tests/test_resource_bootstrap_state.cpp -o build/test_resource_bootstrap_state && ./build/test_resource_bootstrap_state
       - run: g++ -std=c++17 -Wall -Wextra -fsanitize=address,undefined tests/test_resource_mapping_barrier.cpp -o build/test_resource_mapping_barrier && ./build/test_resource_mapping_barrier
       - run: g++ -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined tests/test_resource_model_shadow.cpp -o build/test_resource_model_shadow && ./build/test_resource_model_shadow
+      - run: g++ -std=c++17 -Wall -Wextra -Wpedantic -Werror -fsanitize=address,undefined tests/test_first_use_resources.cpp -o build/test_first_use_resources && ./build/test_first_use_resources
       - run: g++ -std=c++17 -Wall -Wextra -fsanitize=address,undefined tests/test_inventory_preservation.cpp -o build/test_inventory_preservation && ./build/test_inventory_preservation
       - run: g++ -std=c++17 -Wall -Wextra -fsanitize=address,undefined tests/test_saved_remote_patch.cpp -o build/test_saved_remote_patch && ./build/test_saved_remote_patch
       - run: g++ -std=c++17 -Wall -Wextra -fsanitize=address,undefined tests/test_actor_eligibility.cpp -o build/test_actor_eligibility && ./build/test_actor_eligibility
