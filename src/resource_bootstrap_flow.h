@@ -9,10 +9,11 @@ inline bool Same(Key a,Key b){return Valid(a)&&Valid(b)&&a.session==b.session&&a
 struct Progress {
     Key key;bool transferred,ready;
     void Reset(Key next){key=next;transferred=ready=false;}
-    bool Ack(Key incoming,uint8_t phase,bool digestMatches){
+    bool Ack(Key incoming,uint8_t phase,bool digestMatches,bool* advanced=nullptr){
+        if(advanced)*advanced=false;
         if(!Same(key,incoming)||!digestMatches||phase<1||phase>2)return false;
-        if(phase==1)transferred=true;
-        else {if(!transferred)return false;ready=true;}
+        if(phase==1){if(advanced)*advanced=!transferred;transferred=true;}
+        else {if(!transferred)return false;if(advanced)*advanced=!ready;ready=true;}
         return true;
     }
     bool Allocate(Key current)const{return ready&&transferred&&Same(key,current);}

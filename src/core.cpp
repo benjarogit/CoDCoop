@@ -250,10 +250,15 @@ void DObjCreate(const ModelEntry* models, int num, void* tree, int ent, int u12)
     for (int k = 0; k < num && k < 8; ++k) memcpy(packed[k], &models[k], 12);
     g::Com_ServerDObjCreate(packed, num, tree, ent, u12);
 }
+uint8_t* g_traceFreeTree;int g_traceFreeEntity=-1;
+void QATreeTrace(const char*,int,uint8_t*,int=-1);
 void ReleaseInfo(uint8_t* tree, uint16_t* slot)
 {
-    g::XAnimFreeInfo(tree, *slot);
+    uint16_t index=*slot;
+    if(g_traceFreeTree==tree)QATreeTrace("before-info",g_traceFreeEntity,tree,index);
+    g::XAnimFreeInfo(tree, index);
     *slot = 0;
+    if(g_traceFreeTree==tree)QATreeTrace("after-info",g_traceFreeEntity,tree,index);
 }
 
 int BrokenPathLists(int* lists = nullptr);
@@ -1691,14 +1696,44 @@ void ForgetMovieWorld()
     g_oldTreeCount = 0; // native movie/map cleanup invalidates these allocator indices
 }
 
+bool QATreeTraceEnabled()
+{
+    char flag[8]{};
+    return suite::IsQA()&&GetEnvironmentVariableA("CODCOOP_QA_TREE_FREE_TRACE",flag,sizeof flag)==1&&flag[0]=='1';
+}
+void QATreeTrace(const char* phase,int e,uint8_t* tree,int info)
+{
+    if(!QATreeTraceEnabled())return;
+    uint8_t* definition=nullptr;int nodes=0,refs=0,mark=0,notify=-1;
+    bool readable=tree&&!IsBadReadPtr(tree,12),definitionReadable=false,loaded=false;
+    if(readable){definition=*(uint8_t**)tree;refs=*(int*)(tree+4);mark=*(int*)(tree+8);}
+    definitionReadable=definition&&!IsBadReadPtr(definition,8);
+    if(definitionReadable)nodes=*(int*)(definition+4);
+    if(definition)for(int k=0;k<256;++k)loaded|=g::xanimTable[k]==definition;
+    if(info>0&&info<65536) {
+        auto node=g::xanimInfo+(uintptr_t)info*0x44;
+        if(!IsBadReadPtr(node,0x18))notify=*(uint16_t*)(node+0x14); // native node begins16 bytes after pool header
+    }
+    Log("QA tree trace phase=%s entity=%d tree=%p definition=%p nodes=%d treeReadable=%d defReadable=%d loaded=%d refs=%d mark=%d info=%d notify=%d nativeEpoch=%u init=%u world=%u",phase,e,tree,definition,nodes,readable,definitionReadable,loaded,refs,mark,info,notify,S?S->memoryEpoch:0,S?S->preservation.init.serial:0,S?S->reloadToken.generation:0);
+}
+struct QATreeTraceGuard {
+    uint8_t* previous;int entity;
+    QATreeTraceGuard(int e,uint8_t* tree):previous(g_traceFreeTree),entity(g_traceFreeEntity) {
+        if(QATreeTraceEnabled()){g_traceFreeTree=tree;g_traceFreeEntity=e;QATreeTrace("free-entry",e,tree);}
+    }
+    ~QATreeTraceGuard(){g_traceFreeTree=previous;g_traceFreeEntity=entity;}
+};
 void JoinerFreeDObj(int e)
 {
     uint8_t* tree = S->ownTree[e];
+    QATreeTraceGuard trace(e,tree);
     auto borrowed = g_qaBorrowed[e];
     g_qaBorrowed[e] = {}; // native Game ownership never enters the Core free path
     S->ownTree[e] = nullptr;
     if (g::serverObjMap[e]) g::Com_ServerDObjFree(e, true);
+    QATreeTrace("after-server-free",e,tree);
     g::Com_SyncClientDObjs();
+    QATreeTrace("after-client-sync",e,tree);
     // un arbol hecho con un XAnim que ya no esta en la tabla (el juego recargo los assets al volver a entrar tras un
     // checkpoint) vive en memoria ya liberada: liberarlo de nuevo rompia el juego (0x45b8f0). Se olvida.
     if (tree && (IsBadReadPtr(tree, 4) || !XAnimLoaded(*(uint8_t**)tree))) {
@@ -1715,8 +1750,12 @@ void JoinerFreeDObj(int e)
         return;
     }
     if (tree) {
+        QATreeTrace("before-free-infos",e,tree);
         FreeTreeInfos(tree);
+        QATreeTrace("after-free-infos",e,tree);
+        QATreeTrace("before-native-tree-free",e,tree);
         g::XAnimFreeTree(tree);
+        QATreeTrace("after-native-tree-free",e,tree);
     }
 }
 
@@ -1884,7 +1923,7 @@ void JoinerApplyDObj(Reader r)
             g_qaBorrowed[e] = {(uintptr_t)tree, g_qaInitCount, tree_owner::Owner::Native};
             ++g_qaBorrowCount;
             Log("QA native tree borrowed entity=%d ptr=%p generation=%u", e, tree, g_qaInitCount);
-        } else S->ownTree[e] = tree;
+        } else {S->ownTree[e] = tree;QATreeTrace("create-owned",e,tree);}
         DObjCreate(models, nm, tree, e, u12);
         d = g::ServerDObj(e);
         if (!d) return;
@@ -3644,6 +3683,7 @@ void JoinerControl(uint8_t type, Reader r)
     case M_MAP: {  // el host esta en otro mapa: cargarlo y volver a pedir lugar
         const char* map = MapName(r);
         if (S->joined || S->role != JOINER || !*map) return;
+        if(BootEnabled()&&g_bootFailed)return; // keep the concrete failure visible, rather than replacing it with "loading"
         // Same-name checkpoints still need the new resource contract applied
         // before native GAME_INIT. BootInterceptMap separately recognizes a
         // genuinely ready retransmission in the current session/world.

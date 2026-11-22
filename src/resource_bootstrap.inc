@@ -239,10 +239,14 @@ bool BootControl(uint8_t type,Reader r,const sockaddr_in& from) {
         } else if(type==B_ACK&&peer&&reload_delivery::Same(peer->token,S->reloadToken)) {
             uint32_t serial=r.Get<uint32_t>(),nonce=r.Get<uint32_t>();uint8_t phase=r.Get<uint8_t>();
             auto incoming=BootKey(*peer);incoming.serial=serial;incoming.nonce=nonce;
-            if(!r.Ok()||r.end-r.p!=32||!peer->progress.Ack(incoming,phase,!memcmp(r.p,peer->description.sha256,32)))return true;
+            bool advanced=false;
+            if(!r.Ok()||r.end-r.p!=32||!peer->progress.Ack(incoming,phase,!memcmp(r.p,peer->description.sha256,32),&advanced))return true;
             peer->last=now;
-            if(phase==1)BootSendHost(*peer);
-            else Log("Resource bootstrap: native ready ACK serial=%u; slot now permitted",serial);
+            // Repeated descriptions elicit repeated ACKs. Only an actual
+            // phase transition may trigger an immediate response; retries
+            // continue on the bounded timer instead of creating a feedback loop.
+            if(advanced&&phase==1)BootSendHost(*peer);
+            else if(advanced)Log("Resource bootstrap: native ready ACK serial=%u; slot now permitted",serial);
         }
     } else if(S->role==JOINER) {
         if(!reload_delivery::Same(g_bootCapability,S->reloadToken))return true;
@@ -256,12 +260,12 @@ bool BootControl(uint8_t type,Reader r,const sockaddr_in& from) {
             auto prior=g_bootReceiver.Header().serial;
             if(g_bootReceiver.Start(d)){
                 if(prior!=d.serial){g_bootResources={};g_bootParsedSerial=0;g_bootTransferred=g_bootLoading=g_bootItemDone=g_bootEndDone=g_bootNativeReady=g_bootFailed=false;resource_bootstrap_state::Next(S->bootstrap.epoch);}
-                else if(g_bootTransferred)BootSendAck(g_bootNativeReady?2:1);
+                else if(g_bootTransferred&&!g_bootFailed)BootSendAck(g_bootNativeReady?2:1);
             }
         } else if(type==B_PART) {
             auto serial=r.Get<uint32_t>();auto part=r.Get<uint16_t>();if(!r.Ok())return true;
             if(!g_bootReceiver.Add(serial,part,r.p,(unsigned)(r.end-r.p)))return true;
-            if(g_bootTransferred) {BootSendAck(g_bootNativeReady?2:1);return true;}
+            if(g_bootTransferred) {if(!g_bootFailed)BootSendAck(g_bootNativeReady?2:1);return true;}
             bool complete=g_bootReceiver.Ready();
             if(g_bootReceiver.FinishResources(g_bootResources,[](const uint8_t* data,unsigned n,const uint8_t* expected){uint8_t hash[32];return suite::Sha256(data,n,hash)&&!memcmp(hash,expected,32);})) {
                 g_bootParsedSerial=serial;g_bootTransferred=true;g_bootFailed=false;

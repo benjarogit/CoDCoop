@@ -19,6 +19,17 @@ int main(){
  wrong=key;wrong.world=6;assert(!progress.Ack(wrong,1,true));
  assert(!progress.Ack(key,1,false)&&!progress.Ack(key,3,true));
  assert(progress.Ack(key,1,true)&&!progress.Allocate(key));assert(progress.Ack(key,2,true)&&progress.Allocate(key));
+ // Duplicate receipt ACKs are accepted but must never create an immediate
+ // description->ACK->description feedback loop or downgrade native readiness.
+ bool advanced=true;
+ for(unsigned repeat=0;repeat<10000;++repeat) {
+  assert(progress.Ack(key,1,true,&advanced)&&!advanced&&progress.Allocate(key));
+  assert(progress.Ack(key,2,true,&advanced)&&!advanced&&progress.Allocate(key));
+ }
+ progress.Reset(key);
+ assert(!progress.Ack(wrong,1,true,&advanced)&&!advanced);
+ assert(progress.Ack(key,1,true,&advanced)&&advanced&&!progress.Allocate(key));
+ assert(progress.Ack(key,2,true,&advanced)&&advanced&&progress.Allocate(key));
  progress.Reset(wrong);assert(!progress.Allocate(key)&&!progress.Ack(key,2,true));
  Receiver r{};asset_bootstrap::Resources resources{{"xmodel/gear_us_carbinebelt"},{{1,"m1garand",true}}};std::string body;uint16_t count=0;
  assert(asset_bootstrap::EncodeResources(resources,body,count));asset_bootstrap::Description d{};d.serial=1;d.bytes=body.size();d.parts=1;d.names=count;d.sha256[0]=1;std::strcpy(d.map,"training");
