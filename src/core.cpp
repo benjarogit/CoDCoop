@@ -1757,6 +1757,22 @@ bool QASyncModelShadow(unsigned id,const char* name)
             g::SV_SetConfigstring(32+index,full);*(int*)(g_qaGameBase+0x307f2c)=1;
             Log("QA live model shadow binding id=%u name=%s",index,full);return true;
         });
+    if(result!=resource_model_shadow::Result::Ready&&id>0&&id<256) {
+        static uint64_t session;static uint32_t serial,world,seen[256];
+        if(session!=S->reloadToken.session||world!=S->reloadToken.generation||serial!=S->preservation.init.serial) {
+            session=S->reloadToken.session;world=S->reloadToken.generation;serial=S->preservation.init.serial;memset(seen,0,sizeof seen);
+        }
+        auto client=QAModelConfigString(32+id);auto shadow=g::ConfigString(32+id);
+        std::string cached;
+        if(pointer&&!IsBadReadPtr(pointer,4))cached=BootString(*(char**)pointer);
+        uint32_t reason=!scope?1:!entry?2:!BootContains(g_bootResources,name)?4:
+            !resource_model_shadow::Same(client,name)?8:!pointer?16:!resource_model_shadow::Same(cached.c_str(),name+7)?32:!BootRendererCached(name)?64:
+            *shadow&&!resource_model_shadow::Same(shadow,name)?128:256;
+        if(!(seen[id]&reason)) {
+            seen[id]|=reason;
+            Log("QA live model shadow WAIT reason=%u id=%u name=%s client=%s shadow=%s cached=%s result=%u",reason,id,name,client,shadow,cached.c_str(),(unsigned)result);
+        }
+    }
     if(result==resource_model_shadow::Result::Conflict||result==resource_model_shadow::Result::Failed)
         CoopStatus("Resource WAIT: live model mapping conflicts with the current native world.");
     return result==resource_model_shadow::Result::Ready;

@@ -22,4 +22,10 @@ int main(){
     shadow.clear();bound=false;partial=true;
     assert(run()==R::Failed&&writes==3);
     actual="xmodel/other";assert(run()==R::Wait&&writes==3);
+    // Native model names preserve mixed case; asset identity follows the
+    // engine's ASCII case-insensitive lookup, including weapon_M1Garand.
+    actual="xmodel/WEAPON_BAR";shadow="xmodel/Weapon_Bar";bound=true;partial=false;
+    assert(run()==R::Ready&&writes==3);
+    assert(resource_model_shadow::Same("weapon_M1Garand","weapon_m1garand"));
+    assert(!resource_model_shadow::Same("weapon_bar","weapon_bar2"));
 }
