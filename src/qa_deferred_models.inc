@@ -124,6 +124,7 @@ extern "C" void __cdecl QABeforeVM(void* vm, const int* args)
     if (vm != g::gvm || args[0] != 0) return;
     if(suite::IsQA())Log("QA native GAME_INIT engine=%s arg1=%d arg2=%d save_intent=%d level_time=%d",g::uo?"uo":"cod1",args[1],args[2],args[3],args[4]);
     PreservationBeforeInit(args[3]);
+    QUFWorldBeforeInit(args[3]);
     // Cold map loads replace gamex86 before entering GAME_INIT. Install the
     // existing saved-remote compatibility patch before native deserialization,
     // rather than waiting until SpawnServer returns after the load has failed.

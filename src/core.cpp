@@ -14,8 +14,10 @@
 #include "api.h"
 #include "actor_eligibility.h"
 #include "core_features.h"
+#include "party_native_bridge_json.h"
 #include "resource_bootstrap_state.h"
 #include "resource_mapping_barrier.h"
+#include "resource_model_shadow.h"
 #include "input_frame_clock.h"
 #include "saved_ghost_cleanup.h"
 #include "near_body_draw.h"
@@ -193,6 +195,8 @@ void BootPreInit();void BootBeforeEnd();void BootTick();void BootShutdown();void
 void BootWriteReady(Writer&);bool BootAcceptReady(Reader);
 void BootForgetEndpoint(const sockaddr_in&);void BootCancelPeer();void BootInvalidatePeer();
 void Cmd_CoopLeave();void JoinerSendJoin();void HostDropRemote(int,bool);
+void SetCoopCvarChanged(const char*,const char*);
+void QUFWorldBeforeInit(int);void QUFWorldStop();void QUFWorldTick();
 peer_inventory::Endpoint InventoryEndpoint(const sockaddr_in& peer);
 void QueueWeaponSelection(int n,int weapon,bool seed);
 void PublishActorEligibility(int only=-1);
@@ -961,6 +965,8 @@ void PublishSpawnTickets()
     for(int n=0;n<g::MAX_CLIENTS;++n) {snprintf(key,sizeof key,"coop_spawn_ticket_%d",n);snprintf(value,sizeof value,"%u",S->spawnTicket[n]);SetCoopCvarChanged(key,value);}
     snprintf(value,sizeof value,"%u",S->reloadToken.generation);SetCoopCvarChanged("coop_spawn_world",value);
 }
+
+#include "qa_uf_world_observer.inc"
 
 bool FreshSpawnTicket(int n)
 {
@@ -1731,6 +1737,30 @@ const char* QAModelConfigString(int index)
     }
     return g::ConfigString(index);
 }
+bool QASyncModelShadow(unsigned id,const char* name)
+{
+    // Separate experimental adapter for the independently reproduced live-CS
+    // versus frozen-SV mismatch. Never publish a new resource approval here.
+    bool scope=g_qaDeferredEnabled&&g::uo&&S->role==JOINER&&S->joined&&S->frozen&&
+        BootStageCurrent()&&g_bootNativeReady&&g_qaGameBase==(uintptr_t)GetModuleHandleA(g::GameDll());
+    const auto* entry=scope?g_qaLedger.Find(name):nullptr;
+    auto pointer=entry?entry->cached:nullptr;
+    auto result=resource_model_shadow::Sync(scope&&entry&&BootContains(g_bootResources,name),id,name,
+        [](unsigned index){return QAModelConfigString(32+index);},
+        [](unsigned index){return g::ConfigString(32+index);},
+        [&](unsigned index,const char* full,bool slot){
+            if(!pointer||IsBadReadPtr(pointer,4)||_stricmp(SafeStr(*(char**)pointer),full+7)||!BootRendererCached(full))return false;
+            return !slot||*(void**)(g_qaGameBase+0xd2e70+4*index)==pointer;
+        },
+        [&](unsigned index,const char* full){
+            *(void**)(g_qaGameBase+0xd2e70+4*index)=pointer;
+            g::SV_SetConfigstring(32+index,full);*(int*)(g_qaGameBase+0x307f2c)=1;
+            Log("QA live model shadow binding id=%u name=%s",index,full);return true;
+        });
+    if(result==resource_model_shadow::Result::Conflict||result==resource_model_shadow::Result::Failed)
+        CoopStatus("Resource WAIT: live model mapping conflicts with the current native world.");
+    return result==resource_model_shadow::Result::Ready;
+}
 void QACaptureNativeTrees()
 {
     for (auto& owner : g_qaNativeOwners) owner = {};
@@ -1808,7 +1838,7 @@ void JoinerApplyDObj(Reader r)
         if (g_qaDeferredEnabled) {
             int id = -(int16_t)models[k].flags;
             char full[264]; snprintf(full, sizeof full, "xmodel/%s", name);
-            if (id <= 0 || id >= 256 || _stricmp(QAModelConfigString(32 + id), full)) return;
+            if (id <= 0 || id >= 256 || !QASyncModelShadow(id,full)) return;
             // Native reliable CS can lag this UDP packet; host retries DObjs.
         }
         models[k].model = g::XModelPrecache(name);  // si no estaba cargado lo carga
@@ -1914,11 +1944,34 @@ int ModelIndex(const char* name)
     return 0;
 }
 
+int VisibleBodyModelIndex(const char* name)
+{
+    int present=ModelIndex(name);
+    if(present||!g_qaDeferredEnabled||!g::uo||!S||S->role!=HOST||!g_qaIndexTrampoline||
+        g_qaGameBase!=(uintptr_t)GetModuleHandleA(g::GameDll()))return present;
+    // Experimental first-use diagnostics only. A Core-owned visible body/gun
+    // is a REAL consumer, unlike the six audited native discard callers.
+    // Looking only in CS would otherwise silently omit a cached gun/skin.
+    char full[128];snprintf(full,sizeof full,"xmodel/%s",name);
+    const auto* entry=g_qaLedger.Find(full);
+    if(!entry||!entry->cached)return 0;
+    bool empty=false;for(int i=1;i<MAX_MODELS;++i)if(!*g::ConfigString(CS_MODELS+i)){empty=true;break;}
+    if(!empty){CoopStatus("Resource WAIT: no native model slot for a visible player model.");return 0;}
+    auto previousVM=g::currentVM;int previousCall=g::inGameCall;
+    g::currentVM=g::gvm;g::inGameCall=1;
+    int bound=QADeferredIndex(full,(uintptr_t)VisibleBodyModelIndex);
+    g::currentVM=previousVM;g::inGameCall=previousCall;
+    if(bound>0&&bound<MAX_MODELS&&ModelIndex(name)==bound) {
+        Log("QA visible body first-use binding id=%d name=%s",bound,full);return bound;
+    }
+    Log("QA visible body binding failed name=%s returned=%d",full,bound);return 0;
+}
+
 // Indice del preferido si el nivel lo cargo; si no, del primer modelo cargado que empiece con alguno de los
 // prefijos (lista terminada en nullptr) y no contenga `exclude`. 0 si no hay.
 int LoadedModel(const char* preferred, const char* const* prefixes, const char* exclude = nullptr)
 {
-    if (int i = ModelIndex(preferred)) return i;
+    if (int i = VisibleBodyModelIndex(preferred)) return i;
     for (; *prefixes; ++prefixes)
         for (int i = 1; i < MAX_MODELS; ++i) {
             const char* s = g::ConfigString(CS_MODELS + i);
@@ -1941,7 +1994,7 @@ const char* WeaponModelName(int n)
     const char* name = *(const char**)(defs[weapon] + g::WD_WORLDMODEL);
     if (!name || IsBadReadPtr(name, 8)) return "";
     name = _strnicmp(name, "xmodel/", 7) == 0 ? name + 7 : name;
-    return ModelIndex(name) ? name : "";  // sin cargar no se puede poner en el cuerpo
+    return VisibleBodyModelIndex(name) ? name : "";
 }
 
 int g_bodyAnim[g::MAX_CLIENTS] = {-1, -1, -1, -1};  // animacion puesta (-1 = ninguna; tras recargar se vuelve a poner)
@@ -4475,6 +4528,7 @@ EXPORT void Coop_Init(const CoreApi* api, void* state, int fresh)
 
 EXPORT void Coop_Shutdown()
 {
+    QUFWorldStop();
     BootStop();
     SetCoopCvarChanged("coop_select_api","0");
     SetCoopCvarChanged("coop_select_pathfinder_api","0");
@@ -4595,6 +4649,7 @@ EXPORT int __cdecl Coop_GetPacket(int sock, msg_t* msg, netadr_t* from)
     HostRulesTick();
     WeaponSelectionTick();
     QATick();
+    QUFWorldTick();
     SwitchTick();
     WriteSupervisorState();
     HostMissileOwners();
