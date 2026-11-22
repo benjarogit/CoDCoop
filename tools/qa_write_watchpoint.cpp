@@ -49,11 +49,20 @@ static void capture(FILE*f,HANDLE process,DWORD pid,DWORD tid,uintptr_t address)
  for(auto b:code){std::fprintf(f,"%02x",b);}std::fprintf(f,"\"}\n");std::fflush(f);
 }
 int main(int argc,char**argv){
- if(argc!=13){std::fprintf(stderr,"--pid N --exe EXACT_PATH --address HEX --expected N --timeout-ms N --output PATH\n");return 2;}
- const char*expectedPath=nullptr,*output=nullptr;DWORD pid=0,expectedValue=0,timeout=0;uintptr_t address=0;
- for(int i=1;i<argc;i+=2){char*end=nullptr;const char*key=argv[i];const char*value=argv[i+1];if(!std::strcmp(key,"--exe")){expectedPath=value;continue;}if(!std::strcmp(key,"--output")){output=value;continue;}unsigned long n=std::strtoul(value,&end,!std::strcmp(key,"--address")?16:10);if(!*value||!end||*end)return 2;if(!std::strcmp(key,"--pid"))pid=n;else if(!std::strcmp(key,"--address"))address=n;else if(!std::strcmp(key,"--expected"))expectedValue=n;else if(!std::strcmp(key,"--timeout-ms"))timeout=n;else return 2;}
- if(!pid||pid==GetCurrentProcessId()||!expectedPath||!output||address<0x10000||(address&3)||!timeout||timeout>120000)return 2;
+ if(argc<3||argc%2==0){std::fprintf(stderr,"--pid N --exe EXACT_PATH (--address HEX | --module NAME --rva HEX) --expected N --timeout-ms N --output PATH\n");return 2;}
+ const char*expectedPath=nullptr,*output=nullptr,*moduleName=nullptr;DWORD pid=0,expectedValue=0,timeout=0;uintptr_t address=0,rva=0;bool hasAddress=false,hasRva=false;
+ for(int i=1;i<argc;i+=2){char*end=nullptr;const char*key=argv[i];const char*value=argv[i+1];if(!std::strcmp(key,"--exe")){expectedPath=value;continue;}if(!std::strcmp(key,"--output")){output=value;continue;}if(!std::strcmp(key,"--module")){moduleName=value;continue;}unsigned long n=std::strtoul(value,&end,!std::strcmp(key,"--address")||!std::strcmp(key,"--rva")?16:10);if(!*value||!end||*end)return 2;if(!std::strcmp(key,"--pid"))pid=n;else if(!std::strcmp(key,"--address")){address=n;hasAddress=true;}else if(!std::strcmp(key,"--rva")){rva=n;hasRva=true;}else if(!std::strcmp(key,"--expected"))expectedValue=n;else if(!std::strcmp(key,"--timeout-ms"))timeout=n;else return 2;}
+ if(!pid||pid==GetCurrentProcessId()||!expectedPath||!output||hasAddress==hasRva||!timeout||timeout>120000)return 2;
+ if(hasRva&&(!moduleName||!*moduleName||(rva&3)))return 2;
  FILE*f=std::fopen(output,"wb");if(!f)return 2;SetConsoleCtrlHandler(Interrupt,TRUE);
+ if(hasRva){
+  HANDLE modules=CreateToolhelp32Snapshot(TH32CS_SNAPMODULE|TH32CS_SNAPMODULE32,pid);MODULEENTRY32 m{};m.dwSize=sizeof m;uintptr_t base=0;DWORD size=0;
+  if(modules!=INVALID_HANDLE_VALUE){for(BOOL more=Module32First(modules,&m);more;more=Module32Next(modules,&m))if(!_stricmp(m.szModule,moduleName)){base=(uintptr_t)m.modBaseAddr;size=m.modBaseSize;break;}CloseHandle(modules);}
+  if(!base||rva+4>size){event(f,"REJECTED","module/rva resolution failed");std::fclose(f);return 3;}
+  address=base+rva;
+  std::fprintf(f,"{\"status\":\"RESOLVED\",\"module\":\"%s\",\"module_base\":%lu,\"module_rva\":%lu,\"address\":%lu}\n",escaped(moduleName).c_str(),(DWORD)base,(DWORD)rva,(DWORD)address);std::fflush(f);
+ }
+ if(address<0x10000||(address&3)){event(f,"REJECTED","address invalid");std::fclose(f);return 2;}
  HANDLE process=OpenProcess(PROCESS_QUERY_INFORMATION|PROCESS_VM_READ|SYNCHRONIZE,FALSE,pid);BOOL debugged=FALSE;uint32_t initial=0;MEMORY_BASIC_INFORMATION mbi{};
  bool valid=process&&identity(process,expectedPath)&&CheckRemoteDebuggerPresent(process,&debugged)&&!debugged&&VirtualQueryEx(process,(void*)address,&mbi,sizeof mbi)==sizeof mbi&&mbi.State==MEM_COMMIT&&!(mbi.Protect&(PAGE_GUARD|PAGE_NOACCESS))&&read(process,address,&initial,4)&&initial==expectedValue;
  if(!valid){event(f,"REJECTED","PID/path/debugger/address/initial-value verification failed");if(process)CloseHandle(process);std::fclose(f);return 3;}

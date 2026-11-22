@@ -7,8 +7,11 @@ The actual corrupted-definition writer is **not identified** until a real game
 watchpoint hit is captured.
 
 Required explicit inputs: **Windows** PID, exact full executable path returned
-by QueryFullProcessImageName, aligned 4-byte address, expected current u32 value,
-time budget1..120000ms and an owned output filename. It verifies PID/path,
+by QueryFullProcessImageName, one aligned 4-byte target given either as an
+absolute address or as module name plus RVA, expected current u32 value, time
+budget1..120000ms and an owned output filename. Module+RVA is resolved through a
+read-only module snapshot and logged with its base before any attach, so a
+relocated image does not require a guessed address. It verifies PID/path,
 no debugger, committed/readable address and exact initial value before attach.
 It repeats identity/initial checks at the initial debug breakpoint, rejects any
 existing DR0..DR3 or enabled hardware breakpoints on any target thread, then
@@ -49,8 +52,9 @@ python3 tools/qa_write_watchpoint_fixture.py --output run/write-watchpoint-final
 ```
 
 The fixture covers main-thread and newly-created-thread write988→0xff000000,
-no-write timeout plus clean reattach, wrong executable/process path, wrong PID,
-wrong initial value, pre-existing hardware breakpoint and existing debugger.
+module+RVA resolution of the same field, no-write timeout plus clean reattach,
+wrong executable/process path, wrong PID, wrong initial value, pre-existing
+hardware breakpoint and existing debugger.
 All process launching in that fixture is limited to its own `fixture.exe`.
 
 An actual game attach must use the coordinated existing owned game/prefix and
@@ -60,9 +64,12 @@ its measured Windows PID/address. Example argument shape (placeholders are
 ```sh
 WINEPREFIX=/owned/game-prefix WINEDEBUG=-all wine /owned/watch.exe \
  --pid WINDOWS_PID --exe 'Z:\owned\game\CoDUOSP.exe' \
- --address MEASURED_DEFINITION_PLUS_4_HEX --expected 988 \
- --timeout-ms 90000 --output 'Z:\owned\evidence\watch.jsonl'
+ --module uo_gamex86.dll --rva MEASURED_FIELD_RVA \
+ --expected 988 --timeout-ms 90000 --output 'Z:\owned\evidence\watch.jsonl'
 ```
+
+The absolute-address form remains available for the standalone fixture and for
+fields outside a module. Never pass both forms.
 
 Do not attach merely because a similarly named game is open. Preserve exact
 module/source hashes and the original failure evidence separately. This helper

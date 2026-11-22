@@ -14,7 +14,7 @@ def run(output: Path, prefix: Path):
     env = dict(os.environ, WINEPREFIX=str(prefix.resolve()), WINEDEBUG='-all')
     win = lambda path: 'Z:' + str(path.resolve()).replace('/', '\\')
     results = []
-    for label, mode in [('positive', 1), ('new-thread', 2), ('timeout-reattach', 0),
+    for label, mode in [('positive', 1), ('module-rva', 1), ('new-thread', 2), ('timeout-reattach', 0),
                         ('wrong-process-path', 1), ('wrong-pid', 1), ('wrong-initial', 1),
                         ('existing-hardware', 3), ('existing-debugger', 0)]:
         desc = output / (label + '.txt')
@@ -27,11 +27,16 @@ def run(output: Path, prefix: Path):
             assert desc.exists(), (label, 'fixture did not publish identity', target.poll())
             pid, address = desc.read_text().splitlines()[0].split()
             path = desc.read_text().splitlines()[1]
+            base = int(desc.read_text().splitlines()[2], 16)
             timeout = 500 if label == 'timeout-reattach' else 4000
             expected = '989' if label == 'wrong-initial' else '988'
             claimed_path = win(output / 'watch.exe') if label == 'wrong-process-path' else path
             claimed_pid = '2147483646' if label == 'wrong-pid' else pid
             def command(log, timeout_ms=timeout):
+                if label == 'module-rva':
+                    return ['wine', str(output / 'watch.exe'), '--pid', claimed_pid, '--exe', claimed_path,
+                            '--module', 'fixture.exe', '--rva', '%x' % (int(address, 16) - base),
+                            '--expected', expected, '--timeout-ms', str(timeout_ms), '--output', win(log)]
                 return ['wine', str(output / 'watch.exe'), '--pid', claimed_pid, '--exe', claimed_path, '--address', address, '--expected', expected, '--timeout-ms', str(timeout_ms), '--output', win(log)]
             log = output / (label + '.jsonl')
             if label == 'existing-debugger':
@@ -54,13 +59,17 @@ def run(output: Path, prefix: Path):
                 assert second_events[-1]['restored'] and second_events[-1]['detached']
                 assert any(event['status'] == 'ARMED' for event in second_events), 'original hardware registers were not restored'
             target_exit = target.wait(timeout=15)
-        expected_exit = 0 if mode in (1, 2) and label in ('positive', 'new-thread') else 4 if label == 'timeout-reattach' else 3
+        expected_exit = 0 if mode in (1, 2) and label in ('positive', 'module-rva', 'new-thread') else 4 if label == 'timeout-reattach' else 3
         assert result.returncode == expected_exit, (label, result.returncode, events)
         assert target_exit == 0 and Path(str(desc) + '.done').exists(), (label, 'target did not continue/exit cleanly')
         if expected_exit == 0:
             hit = next(event for event in events if event['status'] == 'WRITE')
             assert hit['new_value'] == 0xff000000 and hit['context_read'] and hit['code_read'] and hit['stack_read']
             assert hit['module'].lower() == path.lower()
+        if label == 'module-rva':
+            resolved = next(event for event in events if event['status'] == 'RESOLVED')
+            assert resolved['module'].lower() == 'fixture.exe'
+            assert resolved['address'] == int(address, 16) and resolved['module_rva'] == int(address, 16) - base
         if expected_exit in (0, 4) or label == 'existing-hardware':
             assert events[-1]['restored'] and events[-1]['detached'], events
         results.append(dict(case=label, watcher_exit=result.returncode, target_exit=target_exit, events=events))
