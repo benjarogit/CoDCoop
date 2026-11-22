@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""EXPERIMENTAL four real fresh UF roles/body/fire; no save, GUID-kit or production-registry acceptance."""
+"""EXPERIMENTAL four real fresh UF roles/body/fire; optional native checkpoint reload; no GUID-kit or production-registry acceptance."""
 import argparse,hashlib,json,os,re,shutil,subprocess,time
 from pathlib import Path
 import qa_coop as qa
@@ -89,7 +89,7 @@ def argument_parser():
  p=argparse.ArgumentParser(description=__doc__)
  for name in ('source','run','runtime-dir'):p.add_argument('--'+name,type=Path,required=True)
  p.add_argument('--map',choices=('brecourt','noville','foy'),default='brecourt');p.add_argument('--port',type=int,default=29966)
- p.add_argument('--timeout',type=int,default=180);p.add_argument('--duration',type=int,default=2);p.add_argument('--world-policy',choices=('universal','selected'),default='universal')
+ p.add_argument('--timeout',type=int,default=180);p.add_argument('--duration',type=int,default=2);p.add_argument('--checkpoint-reloads',type=int,default=0,choices=range(0,4));p.add_argument('--world-policy',choices=('universal','selected'),default='universal')
  p.add_argument('--experimental-borrow-trees',action='store_true',help='Explicit additional legacy QA native-tree ownership experiment, only after a preserved allocator negative')
  p.add_argument('--experimental-gmi-loader',action='store_true',help='QA-only pinned UO/GMI loader startup; leave disabled for original crash-payload causal traces')
  p.add_argument('--trace-tree-free',action='store_true',help='QA-only read-only native tree ownership/free-path trace; changes no free semantics')
@@ -213,8 +213,42 @@ def main():
    markers=['Resource bootstrap: SHA verified','QA native GAME_INIT','Resource bootstrap: native item/alt registration completed','Resource bootstrap: completed native Game/CG mapping verified','joiner: conectado']
    positions=[text.find(marker) for marker in markers]
    if min(positions)<0 or positions!=sorted(positions):raise RuntimeError('Real resource-bootstrap v2 before native slot attach not proved')
+  # Optional real save/load roundtrip: the host restores an earlier world and
+  # every joiner leaves and rejoins the native session. This exercises the
+  # tree ownership/free path that a clean quit does not cover.
+  for iteration in range(a.checkpoint_reloads):
+   save=folders[0]/'UnitedFronts/save/coop_qa_checkpoint.svg'
+   save.unlink(missing_ok=True)
+   qa.command(folders[0],'savegame coop_qa_checkpoint')
+   qa.wait_for(lambda: save.exists() and save.stat().st_size>1024,processes,a.timeout,'native host checkpoint written')
+   saved_time=qa.read_state(folders[0])['server_time']
+   qa.wait_for(lambda: qa.read_state(folders[0])['server_time']>saved_time+5000,processes,a.timeout,'world advances beyond saved checkpoint')
+   old_time=qa.read_state(folders[0])['server_time']
+   qa.command(folders[0],'loadgame coop_qa_checkpoint')
+   qa.wait_for(lambda: qa.read_state(folders[0])['server_time']<old_time-1000,processes,a.timeout,'native checkpoint restores earlier world time')
+   def checkpoint_connected():
+    for folder in folders:
+     errors=qa.process_log_errors(folder)
+     if errors:raise RuntimeError('checkpoint engine error: '+errors[0])
+    states=[qa.read_state(folder) for folder in folders]
+    if not all(states):return None
+    host=states[0]
+    if host['role']!=1 or not all(p['active'] and p['state']==1 for p in host['players'][1:4]):return None
+    if not all(s['joined'] and s['compatible'] and s['role']==2 and s['snapshot_num']>0 and
+               s['snapshot_time']>0 and s['map']==host['map'] for s in states[1:]):return None
+    return states
+   reloaded=qa.wait_for(checkpoint_connected,processes,a.timeout,'all players rejoin restored checkpoint')
+   time.sleep(2)
+   recovered=checkpoint_connected()
+   if not recovered:raise RuntimeError('remote disconnected during checkpoint recovery')
+   qa.assess_liveness(reloaded[0],recovered[0],4)
+   for peer_number,folder in enumerate(folders[1:]):
+    slot=qa.read_state(folder)['slot']
+    action=('+forward','+back','+moveleft')[peer_number]
+    distance=qa.move_remote(folders[0],folder,slot,processes,a.timeout,action)
+    report.setdefault('checkpoint_reloads',[]).append({'iteration':iteration+1,'peer':folder.name,'slot':slot,'moved':distance})
   report['status']='PASS'
-  return {'scope':__doc__,'checks':['four actual fresh independent kits/current CG owners','normal resource-bootstrap v2; no offline plan/media on peers','all remotes moved via genuine owner input','all four consumed own firearm ammo','Host authoritative all4 server bodies and every observer other3 client/shadow bodies match native worldModel+negative actualclient/SV CS IDs; own first-person body presence recorded separately','MG/bazooka and pistol/binocular selection through actual weaponslot input; no firing/deployment claim for special weapons'], 'evidence':{'proof':'uf-fresh-roles-proof.json','map':a.map,'no_explicit_QA_save_or_load':True}}
+  return {'scope':__doc__,'checks':['four actual fresh independent kits/current CG owners','normal resource-bootstrap v2; no offline plan/media on peers','all remotes moved via genuine owner input','all four consumed own firearm ammo','Host authoritative all4 server bodies and every observer other3 client/shadow bodies match native worldModel+negative actualclient/SV CS IDs; own first-person body presence recorded separately','MG/bazooka and pistol/binocular selection through actual weaponslot input; no firing/deployment claim for special weapons']+(['native checkpoint reload restored the world and every joiner rejoined'] if a.checkpoint_reloads else []), 'evidence':{'proof':'uf-fresh-roles-proof.json','map':a.map,'no_explicit_QA_save_or_load':not a.checkpoint_reloads}}
  subprocess.Popen=launch
  code=1
  try:code=qa.main(base,scenario=scenario)

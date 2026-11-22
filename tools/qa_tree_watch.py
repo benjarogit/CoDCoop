@@ -19,6 +19,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 CREATE = re.compile(r'QA tree trace phase=create-owned pid=(\d+) entity=(-?\d+) tree=([0-9a-fA-F]+) definition=([0-9a-fA-F]+) nodes=(-?\d+)')
+TAIL = re.compile(r'init=(\d+) world=(\d+)')
 
 
 def winpath(path):
@@ -32,7 +33,10 @@ def parse_created(line):
     pid, entity, tree, definition, nodes = match.groups()
     if int(definition, 16) == 0 or int(nodes) <= 0:
         return None
-    return dict(pid=int(pid), entity=int(entity), tree=tree, definition=definition, nodes=int(nodes))
+    tail = TAIL.search(line)
+    init, world = (int(tail.group(1)), int(tail.group(2))) if tail else (0, 0)
+    return dict(pid=int(pid), entity=int(entity), tree=tree, definition=definition, nodes=int(nodes),
+                init=init, world=world)
 
 
 def main():
@@ -54,14 +58,13 @@ def main():
     runner = [sys.executable, str(ROOT / 'tools/qa_uf_fresh_roles.py'), '--run', str(run)] + extra
     print('runner:', ' '.join(runner), flush=True)
     process = subprocess.Popen(runner, cwd=ROOT)
-    watches = {}
+    watches = []
+    seen = set()
     results = []
     env = dict(os.environ, WINEPREFIX=str(prefix), WINEDEBUG='-all')
     try:
         while process.poll() is None:
             for name in ('join1', 'join2', 'join3'):
-                if name in watches:
-                    continue
                 log = run / name / 'codcoop_join.log'
                 try:
                     text = log.read_text(errors='replace')
@@ -71,25 +74,30 @@ def main():
                     created = parse_created(line)
                     if not created or created['nodes'] < args.min_nodes:
                         continue
-                    output = run / ('watch-%s.jsonl' % name)
+                    key = (name, created['pid'], created['definition'], created['init'], created['world'])
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    generation = sum(1 for entry in watches if entry['peer'] == name) + 1
+                    output = run / ('watch-%s-%d.jsonl' % (name, generation))
                     command = ['wine', str(args.watch), '--pid', str(created['pid']),
                                '--exe', winpath(run / name / 'CoDUOSP.exe'),
                                '--address', '%x' % (int(created['definition'], 16) + 4),
                                '--expected', str(created['nodes']),
                                '--timeout-ms', str(args.timeout_ms),
                                '--output', winpath(output)]
-                    print('attach %s pid=%d definition=%s nodes=%d' %
-                          (name, created['pid'], created['definition'], created['nodes']), flush=True)
-                    watches[name] = dict(process=subprocess.Popen(command, env=env),
-                                         target=created, output=output)
-                    break
+                    print('attach %s generation=%d pid=%d definition=%s nodes=%d init=%d world=%d' %
+                          (name, generation, created['pid'], created['definition'], created['nodes'],
+                           created['init'], created['world']), flush=True)
+                    watches.append(dict(peer=name, process=subprocess.Popen(command, env=env),
+                                        target=created, output=output))
             time.sleep(.2)
         code = process.wait()
     finally:
-        for entry in watches.values():
+        for entry in watches:
             if entry['process'].poll() is None:
                 entry['process'].terminate()
-    for name, entry in sorted(watches.items()):
+    for entry in watches:
         try:
             exit_code = entry['process'].wait(timeout=10)
         except subprocess.TimeoutExpired:
@@ -100,7 +108,7 @@ def main():
             events = [json.loads(line) for line in entry['output'].read_text().splitlines()]
         except (OSError, ValueError):
             pass
-        results.append(dict(peer=name, target=entry['target'], watcher_exit=exit_code, events=events))
+        results.append(dict(peer=entry['peer'], target=entry['target'], watcher_exit=exit_code, events=events))
     summary = dict(scope='QA-only owned scenario; one 4-byte definition field per joiner',
                    runner_exit=code, runner=runner, watches=results)
     (run / 'tree-watch.json').write_text(json.dumps(summary, indent=2) + '\n')

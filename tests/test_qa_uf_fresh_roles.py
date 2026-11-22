@@ -24,6 +24,8 @@ class FreshRoleBodyOracle(unittest.TestCase):
   self.assertFalse(default.experimental_plan_union_media);self.assertTrue(explicit.experimental_plan_union_media)
   self.assertEqual(default.duration,2)
   self.assertEqual(argument_parser().parse_args(required+['--duration','1']).duration,1)
+  self.assertEqual(default.checkpoint_reloads,0)
+  self.assertEqual(argument_parser().parse_args(required+['--checkpoint-reloads','1']).checkpoint_reloads,1)
   inherited={'WINEPREFIX':'owned','CODCOOP_QA':'1'}
   baseline=owned_game_environment(inherited)
   changed=owned_game_environment(inherited,plan_union_media=explicit.experimental_plan_union_media)
