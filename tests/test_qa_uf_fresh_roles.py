@@ -1,7 +1,7 @@
 import copy,sys,unittest
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).parents[1]/'tools'))
-from qa_uf_fresh_roles import require_body_models,host_plan_receipts_match,argument_parser,owned_game_environment
+from qa_uf_fresh_roles import require_body_models,host_plan_receipts_match,argument_parser,owned_game_environment,planned_weapon_cvars,union_extra_cvars
 
 class FreshRoleBodyOracle(unittest.TestCase):
  def test_cli_all_weapon_media_is_opt_in_and_changes_only_one_native_flag(self):
@@ -17,6 +17,33 @@ class FreshRoleBodyOracle(unittest.TestCase):
   self.assertNotIn('CODCOOP_QA_ALL_WEAPON_MEDIA',baseline);self.assertNotIn('CODCOOP_QA_BORROW_TREES',baseline)
   self.assertEqual(inherited,old)
   self.assertEqual(baseline,{'WINEPREFIX':'owned','CODCOOP_QA':'1','CODCOOP_QA_NO_STEAM':'1','CODCOOP_QA_DEFER_MODELS':'1'})
+ def test_cli_plan_union_media_is_opt_in_and_sets_one_flag(self):
+  required=['--source','/not-accessed','--run','/not-created','--runtime-dir','/not-loaded']
+  default=argument_parser().parse_args(required)
+  explicit=argument_parser().parse_args(required+['--experimental-plan-union-media'])
+  self.assertFalse(default.experimental_plan_union_media);self.assertTrue(explicit.experimental_plan_union_media)
+  inherited={'WINEPREFIX':'owned','CODCOOP_QA':'1'}
+  baseline=owned_game_environment(inherited)
+  changed=owned_game_environment(inherited,plan_union_media=explicit.experimental_plan_union_media)
+  self.assertEqual(changed,{**baseline,'CODCOOP_QA_PLAN_UNION_MEDIA':'1'})
+  self.assertNotIn('CODCOOP_QA_PLAN_UNION_MEDIA',baseline)
+ def test_plan_union_uses_native_weapon_names_not_catalog_enums(self):
+  import json
+  from pathlib import Path
+  catalog=json.loads((Path(__file__).parents[1]/'campaign_patches/uf_equipment_catalog.json').read_text())
+  kits=[dict(primary=5,secondary=1,pistol=21,grenade=33)]
+  values=planned_weapon_cvars(catalog,kits)
+  self.assertEqual(values,{'coop_qa_kit_0_primary_weapon':'springfield',
+      'coop_qa_kit_0_secondary_weapon':'carbinem1s','coop_qa_kit_0_pistol_weapon':'colt',
+      'coop_qa_kit_0_grenade_weapon':'land_mine'})
+  self.assertTrue(all(isinstance(value,str) and not value.isdigit() for value in values.values()))
+  self.assertEqual(planned_weapon_cvars(catalog,[dict(primary=0)]),{})
+  two=planned_weapon_cvars(catalog,[dict(primary=5),dict(primary=9)])
+  self.assertEqual(two,{'coop_qa_kit_0_primary_weapon':'springfield','coop_qa_kit_1_primary_weapon':'mg30cal'})
+ def test_map_script_union_extras_are_explicit_and_map_scoped(self):
+  self.assertEqual(union_extra_cvars('noville'),{'coop_qa_union_extra_0':'thompson28'})
+  self.assertEqual(union_extra_cvars('brecourt'),{})
+  self.assertEqual(union_extra_cvars('foy'),{})
  def test_all_four_plan_receipts_require_current_native_identity(self):
   submitted={'coop_qa_kit_catalog':'hash','coop_qa_kit_epoch':'epoch'}
   native=dict(submitted,coop_qa_kit_status='PLAN_VALIDATED',coop_qa_kit_verified_catalog='hash',coop_qa_kit_verified_epoch='epoch',coop_spawn_session_a='10',coop_spawn_session_b='20',coop_spawn_session_c='1',coop_spawn_world='3')

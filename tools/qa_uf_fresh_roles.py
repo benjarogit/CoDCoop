@@ -11,7 +11,7 @@ from stage_suite import laa_bytes,UOSP_LAA
 
 def normalized(name):return name.lower().removeprefix('xmodel/')
 
-def owned_game_environment(inherited, *, trace_tree_free=False, borrow_trees=False, all_weapon_media=False):
+def owned_game_environment(inherited, *, trace_tree_free=False, borrow_trees=False, all_weapon_media=False, plan_union_media=False):
  env=dict(inherited)
  for key in tuple(env):
   if key.startswith('CODCOOP_QA_') and key!='CODCOOP_QA_NO_STEAM':env.pop(key)
@@ -19,7 +19,25 @@ def owned_game_environment(inherited, *, trace_tree_free=False, borrow_trees=Fal
  if trace_tree_free:env['CODCOOP_QA_TREE_FREE_TRACE']='1'
  if borrow_trees:env['CODCOOP_QA_BORROW_TREES']='1'
  if all_weapon_media:env['CODCOOP_QA_ALL_WEAPON_MEDIA']='1'
+ if plan_union_media:env['CODCOOP_QA_PLAN_UNION_MEDIA']='1'
  return env
+
+def planned_weapon_cvars(catalog,kits,family='american'):
+ values={}
+ enum=catalog['families'][family]['enum']
+ for slot,kit in enumerate(kits):
+  for key,value in kit.items():
+   weapon=enum.get(str(value))
+   if weapon:values['coop_qa_kit_%d_%s_weapon'%(slot,key)]=weapon
+ return values
+
+# Map scripts can register an item after the host export. Noville join3
+# evidence (run/qa-noville-m1-union4) shows index 111 thompson28 registered
+# only on the peer, so the host must include it before exporting.
+MAP_UNION_EXTRAS={'noville':['thompson28']}
+
+def union_extra_cvars(map_name):
+ return {'coop_qa_union_extra_%d'%index:name for index,name in enumerate(MAP_UNION_EXTRAS.get(map_name,[]))}
 
 def host_plan_receipts_match(native,submitted):
  if native.get('coop_qa_kit_status')!='PLAN_VALIDATED':return False
@@ -76,6 +94,7 @@ def argument_parser():
  p.add_argument('--experimental-gmi-loader',action='store_true',help='QA-only pinned UO/GMI loader startup; leave disabled for original crash-payload causal traces')
  p.add_argument('--trace-tree-free',action='store_true',help='QA-only read-only native tree ownership/free-path trace; changes no free semantics')
  p.add_argument('--experimental-all-weapon-media',action='store_true',help='QA-only existing native item/media registration; no inventory grant or native acceptance proof')
+ p.add_argument('--experimental-plan-union-media',action='store_true',help='QA-only host union of the four planned kits plus the same planned indices on peers before the mapping check')
  return p
 
 def main():
@@ -87,6 +106,9 @@ def main():
  for slot,kit in enumerate(kits):
   values.update({'coop_qa_kit_%d_mode'%slot:'manual','coop_qa_kit_%d_family'%slot:'american'})
   values.update({'coop_qa_kit_%d_%s'%(slot,key):str(value) for key,value in kit.items()})
+ # Native registration needs the planned weapon names, not catalog enums.
+ values.update(planned_weapon_cvars(catalog,kits))
+ values.update(union_extra_cvars(a.map))
  inputs={}
  for folder in folders:
   archive=out/'fresh-role-input-history'/str(time.time_ns())/folder.name;archive.mkdir(parents=True)
@@ -109,6 +131,8 @@ def main():
  report['readonly_tree_free_trace']=a.trace_tree_free
  report['experimental_all_weapon_media']={'enabled':a.experimental_all_weapon_media,
      'scope':'QA-only original native item/media registration for existing definitions; no inventory grant or native proof from this option'}
+ report['experimental_plan_union_media']={'enabled':a.experimental_plan_union_media,
+     'scope':'QA-only host union of the four planned kits plus the same planned indices on peers before the mapping check; no inventory grant'}
  frozen=out/'runtime/fresh-role-source'
  for name in ('tools/qa_uf_fresh_roles.py','tools/qa_coop.py','tools/build_campaign_patch.py','campaign_patches/uf_starting_kits.gsc','campaign_patches/qa_uf_player_state.cpp','campaign_patches/uf_equipment_catalog.json'):
   target=frozen/name;target.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(qa.ROOT/name,target)
@@ -120,7 +144,8 @@ def main():
   if isinstance(command,list) and any(str(item).endswith('CoDUOSP.exe') for item in command):
    command=list(command)
    kwargs['env']=owned_game_environment(kwargs['env'],trace_tree_free=a.trace_tree_free,
-       borrow_trees=a.experimental_borrow_trees,all_weapon_media=a.experimental_all_weapon_media)
+       borrow_trees=a.experimental_borrow_trees,all_weapon_media=a.experimental_all_weapon_media,
+       plan_union_media=a.experimental_plan_union_media)
    index=command.index('+devmap')
    if '+coopjoin' in command:del command[index:index+2]
    else:command[index:index]=['+exec','coop_qa_fresh_roles.cfg']

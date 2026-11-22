@@ -96,6 +96,8 @@ bool BootHostObjectAllowed(int slot,const uint8_t* object){
  }
  return false;
 }
+bool BootQAPlanUnionMedia();
+bool BootRegisterIndices(const int* indices,unsigned count);
 bool BootExport(asset_bootstrap::Resources& resources) {
     if(g::sv_state!=2||g::cls_state!=2||!g::cgvm||g::currentVM==g::gvm)return false;
     const auto& init=S->preservation.init;
@@ -116,13 +118,49 @@ bool BootExport(asset_bootstrap::Resources& resources) {
     auto definitions=*(uint8_t***)(game+g::G_WEAPONDEFS);
     auto flags=(int*)(game+g::G_ITEMREGISTERED);
     if(count<0||count>=g::MAX_WEAPONS||!definitions||IsBadReadPtr(definitions,(count+1)*4))return false;
+    int planIndices[20];unsigned planCount=0;
+    if(BootQAPlanUnionMedia()&&S->role==HOST) {
+        // Plan cvars carry catalog enum numbers; resolve the planned weapon
+        // names to native definition indices before exporting the plan. The
+        // host must not register late: the engine rejects items registered
+        // after initialization. Declaring them in the plan is enough; peers
+        // register the plan set inside their own item stage.
+        auto find=[&](const char* planned)->int {
+            if(!planned||!*planned||!strcmp(planned,"none"))return 0;
+            for(int w=1;w<=count;++w)if(!strcmp(BootString(*(char**)(definitions[w]+4)).c_str(),planned))return w;
+            return 0;
+        };
+        auto add=[&](const char* planned) {
+            int index=find(planned);
+            if(!index){if(planned&&*planned)Log("QA plan union: no native definition for planned weapon %s",planned);return;}
+            bool seen=false;for(unsigned k=0;k<planCount;++k)seen|=planIndices[k]==index;
+            if(!seen&&planCount<20)planIndices[planCount++]=index;
+        };
+        for(int slot=0;slot<4;++slot)for(const char* field:{"grenade","pistol","primary","secondary"}) {
+            char key[64];snprintf(key,sizeof key,"coop_qa_kit_%d_%s_weapon",slot,field);
+            add(g::CvarString(key));
+        }
+        // Map scripts can register items after the host export (observed on
+        // Noville: index 111 thompson28). The runner names those explicitly.
+        for(int extra=0;extra<4;++extra) {
+            char key[48];snprintf(key,sizeof key,"coop_qa_union_extra_%d",extra);
+            add(g::CvarString(key));
+        }
+        std::sort(planIndices,planIndices+planCount);
+        if(planCount)Log("QA plan union: plan declares %u definitions before export",planCount);
+    }
     for(int w=1;w<=count;++w) {
         if(!definitions[w]||IsBadReadPtr(definitions[w],g::uo?0x388:0x320))return false;
         auto name=BootString(*(char**)(definitions[w]+4));
         if(!asset_bootstrap::ValidWeaponName(name))return false;
-        result.weapons.push_back({(uint8_t)w,name,flags[w]!=0});
+        bool nativeRegistered=flags[w]!=0,planned=false;
+        for(unsigned k=0;k<planCount;++k)planned|=planIndices[k]==w;
+        result.weapons.push_back({(uint8_t)w,name,nativeRegistered||planned});
+        // Only natively registered definitions have loaded media at export
+        // time. Map-registered plan extras (Noville thompson28) are precached
+        // by GSC on both sides, so exporting their media here would fail.
         const std::vector<int> fields=g::uo?std::vector<int>{0x10,0x14,0x1c8,0x1cc,0x384}:std::vector<int>{0x10,0x14,0x188,0x31c};
-        if(flags[w])for(int offset:fields) {
+        if(nativeRegistered)for(int offset:fields) {
             const char* raw=*(char**)(definitions[w]+offset);
             if(raw) {auto text=BootString(raw);if(!text.empty()&&!add(text.c_str()))return false;}
         }
@@ -283,6 +321,29 @@ bool BootQAAllWeaponMedia() {
     return suite::IsQA()&&g_qaDeferredEnabled&&g::uo&&S&&g_identity.variant==4&&
         GetEnvironmentVariableA("CODCOOP_QA_ALL_WEAPON_MEDIA",flag,sizeof flag)==1&&flag[0]=='1';
 }
+bool BootQAPlanUnionMedia() {
+    char flag[8]{};
+    return suite::IsQA()&&g_qaDeferredEnabled&&g::uo&&S&&g_identity.variant==4&&
+        GetEnvironmentVariableA("CODCOOP_QA_PLAN_UNION_MEDIA",flag,sizeof flag)==1&&flag[0]=='1';
+}
+bool BootRegisterIndices(const int* indices,unsigned count) {
+    auto live=(uintptr_t)GetModuleHandleA(g::GameDll());
+    auto game=(uint8_t*)live;
+    if(!live||!game)return false;
+    int weapons=*(int*)(game+g::G_NUMWEAPONS);
+    auto definitions=*(uint8_t***)(game+g::G_WEAPONDEFS);
+    if(weapons<1||weapons>=g::MAX_WEAPONS||!definitions||IsBadReadPtr(definitions,(weapons+1)*4))return false;
+    void* native=game+g::A(0x1c490,0x1e700);
+    for(unsigned i=0;i<count;++i) {
+        int index=indices[i];
+        if(index<1||index>weapons||!definitions[index]||IsBadReadPtr(definitions[index],g::uo?0x388:0x320)||
+            !asset_bootstrap::ValidWeaponName(BootString(*(char**)(definitions[index]+4))))return false;
+        if(*(int*)(game+g::G_ITEMREGISTERED+index*4))continue;
+        asm volatile("push $1; call *%1; add $4,%%esp":"+D"(index):"r"(native):"eax","ecx","edx","memory","cc");
+        if(!*(int*)(game+g::G_ITEMREGISTERED+index*4))return false;
+    }
+    return true;
+}
 void BootNativeItems() {
     auto live=(uintptr_t)GetModuleHandleA(g::GameDll());
     const uint8_t nativeStage[]={0x51,0x53,0x55,0x56,0x57,0x83,0xcb,0xff};
@@ -308,6 +369,15 @@ void BootNativeItems() {
             BootFailure("QA full native weapon registration did not complete");return;
         }
         Log("QA full native weapon media: registered all %d existing definitions before GSC; no inventory granted",count);
+    }
+    if(BootQAPlanUnionMedia()&&S->role==JOINER&&BootStageCurrent()&&!g_bootResources.weapons.empty()) {
+        std::vector<int> indices;
+        for(const auto& weapon:g_bootResources.weapons)if(weapon.registered)indices.push_back(weapon.index);
+        std::sort(indices.begin(),indices.end());
+        if(!indices.empty()&&!BootRegisterIndices(indices.data(),(unsigned)indices.size())) {
+            BootFailure("QA plan union registration failed");return;
+        }
+        Log("QA plan union: peer registered %u planned definitions before mapping check",(unsigned)indices.size());
     }
     if(!g_api||!BootStageCurrent()||!g_bootLoading||!g_bootTransferred||g_bootFailed)return;
     uint8_t* game=(uint8_t*)GetModuleHandleA(g::GameDll());
