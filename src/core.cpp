@@ -4475,7 +4475,7 @@ EXPORT int __cdecl Coop_GetPacket(int sock, msg_t* msg, netadr_t* from)
                     Writer ready(suite::READY); SendTo(a, ready.buf, ready.len);
                     continue; // a join must echo the current negotiated world
                 }
-            } else if (S->role == HOST && peerSlot < 1 && type != M_RELOAD_ACK) continue;
+            } else if (S->role == HOST && peerSlot < 1 && type != M_RELOAD_ACK && type != M_BYE) continue;
             if (type != suite::REJECT && mismatch) continue;
             if (!hasHeader) continue;
             Reader r{buf + CONTROL_HEADER, buf + n};
@@ -4521,6 +4521,21 @@ EXPORT int __cdecl Coop_GetPacket(int sock, msg_t* msg, netadr_t* from)
                 }
             } else if (type != suite::REJECT && !world_wire::Current(token, S->reloadToken)) {
                 StaleWorldPacket(type); continue;
+            }
+            if(S->role==HOST&&type==M_BYE&&peerSlot<1) {
+                for(int slot=1;slot<g::MAX_CLIENTS;++slot) {
+                    auto& seat=S->inventories.slots[slot];
+                    if(S->remote[slot].active||!peer_inventory::ReservedDeparture(seat,slot,token,
+                        InventoryEndpoint(a),r.p,(unsigned)(r.end-r.p)))continue;
+                    seat={};S->preservation.slots[slot]={};S->reloadPending[slot]={};
+                    S->selection.host[slot]={};S->selection.producer[slot]={};
+                    char expected[8];snprintf(expected,sizeof expected,"%d",
+                        patch_owner::ExpectedAfterDeparture(CvarInt("coop_expected_players"),true));
+                    g::Cvar_Set("coop_expected_players",expected);PublishActorEligibility(slot);
+                    Log("party: inactive owner slot=%d explicitly left current world; expected=%s",slot,expected);
+                    break;
+                }
+                continue;
             }
             if (type == world_wire::ENGINE) {
                 if (!((S->role == HOST && peerSlot > 0) ||

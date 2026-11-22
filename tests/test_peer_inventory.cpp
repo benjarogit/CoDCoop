@@ -20,6 +20,16 @@ int main() {
     assert(weapon==-1 && view==-1 && !r.installed);
     // Arrival order cannot give Bob Alice's seat or numeric data.
     assert(Owner(r,2,a.session,alice) && !Owner(r,2,a.session,bob));
+    const uint8_t leave[]{1},temporary[]{0},extra[]{1,1};
+    assert(ReservedDeparture(r,2,a,alice,leave,1));
+    assert(!ReservedDeparture(r,2,newer,alice,leave,1));
+    assert(!ReservedDeparture(r,2,stranger,alice,leave,1));
+    assert(!ReservedDeparture(r,2,a,bob,leave,1));
+    assert(!ReservedDeparture(r,1,a,alice,leave,1));
+    assert(!ReservedDeparture(r,2,a,alice,nullptr,0));
+    assert(!ReservedDeparture(r,2,a,alice,temporary,1));
+    assert(!ReservedDeparture(r,2,a,alice,extra,2));
+    auto unleased=r;unleased.lease=0;assert(!ReservedDeparture(unleased,2,a,alice,leave,1));
     assert(Restore(r,2,a,alice,"brecourt",restored,BYTES,weapon,view));
     assert(!std::memcmp(native,restored,BYTES) && weapon==31 && view==45 && r.installed);
     Store reloaded; std::memcpy(&reloaded,&store,sizeof store);

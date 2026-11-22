@@ -17,6 +17,44 @@ published v0.5.4 binaries have not been replaced.
 This addendum supersedes pending statements below. Nothing has been published.
 / Diese Ergänzung ersetzt ältere Offen-Angaben unten. Nichts wurde veröffentlicht.
 
+- **Inactive-owner departure:** frozen Core
+  `23d6cb34b3dfcfd3a86cd1440efeb454401b7bf25b2f3a6a73979ab8a995dfcf`
+  now passes actual CoD1 and UO+YAP timeout→Leave→fresh-rejoin checks. Temporary
+  timeout retains the seat and expected party2; intentional Leave clears only
+  its current-world owner lease and reduces expected party to1 exactly once.
+  The host keeps running; a separately requested fresh join acquires lease2
+  instead of the old lease1, restores party2 and passes normal all-player clock,
+  observation and clean-shutdown checks. No inactive native player is disconnected
+  a second time. Evidence:
+  `run/reserved-departure-23d6-COD1-PASS-1795305822476913237/` and
+  `run/reserved-departure-23d6-UO-YAP-PASS-1795305936022075076/`.
+  Old602 fails this same departure predicate; that negative is preserved. Earlier
+  functional positives rejected by terminal-party/log oracles remain FAIL records.
+  The scenario now explicitly rejoins before common liveness checks and declares
+  exactly one localized native disconnect banner, requiring its preceding Leave
+  marker; crashes, other errors, missing/extra banners and exit failures still fail.
+  Reproduce with `tools/qa_reserved_departure.py --source OWNED_GAME --run NEW_QA
+  --runtime-dir FROZEN_RUNTIME --variant cod1|uo --port UNUSED_PORT`.
+  UO requires the pinned YAP plugin/extras and reviewed LAA executable in the
+  isolated copies; the initial missing-plugin preflight correctly failed.
+- **New private installer artifacts:** exact602/98de830 Linux AppImage
+  `run/Install-CoD-Coop-0.6.0-dev.4-combined602-Linux-x86_64.AppImage`, SHA256
+  `ced5af3d1baef31d5b9b3c0479f6669e3792c404bce4c9b430f1905d9be14b53`;
+  Windows folder `run/combined602-windows-private-98de830/`, EXE SHA256
+  `0230005558a00f725aa72fc99647f21456fdae6413d05f568ea42a0ee08d7b88`.
+  The Windows EXE requires its complete sibling suite directory; it is not a
+  standalone3MB suite download. Actual AppImage GUI and both backend entry paths,
+  all embedded bytes, old-Core rejection and GLIBC≤2.35 checks pass. Windows
+  resources/sidecar bytes pass; no native Windows GUI/hardware test is claimed.
+  `run/combined602-packages-handoff.json` records exact frozen source and limits.
+  These artifacts predate23d6 and the ongoing bootstrap/party work below.
+- **Active integration, not accepted runtime:** production-bootstrap private
+  work starts from98de830 under `run/production-bootstrap-private/`, aiming at
+  durable State19/resource-capability-v2 ownership. Launcher party transport,
+  stable installation identities and individual signed equipment choices are
+  being implemented separately; native per-member roster/plan ACK and actual
+  pre-mission kit application remain required before enabling that launch path.
+
 - **Brecourt:** seven targeted native checks now pass across CoD1, UO,
   SP Improved and United Fronts. An eligible real joiner triggers the original
   post-goal Moody handoff while the host remains outside its distance gate.

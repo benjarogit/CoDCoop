@@ -29,6 +29,13 @@ inline bool Owner(const Record& r, unsigned slot, uint64_t session, Endpoint pee
 inline bool Current(const Record& r, unsigned slot, reload_delivery::Token world, Endpoint peer, const char* map) {
     return Owner(r,slot,world.session,peer) && reload_delivery::Same(r.world,world) && map && !std::strcmp(r.map,map);
 }
+inline bool ReservedDeparture(const Record& r,unsigned slot,reload_delivery::Token world,Endpoint peer,
+                              const uint8_t* payload,unsigned bytes) {
+    // A temporary map/reload disconnect retains its owner. Only an exact,
+    // current-world intentional departure can release that inactive seat.
+    return Owner(r,slot,world.session,peer)&&reload_delivery::Same(r.world,world)&&
+           r.lease&&payload&&bytes==1&&payload[0]==1;
+}
 inline void Reserve(Record& r, unsigned slot, reload_delivery::Token world, Endpoint peer, const char* map, uint64_t lease=1) {
     r = {};
     if (!slot || slot >= SLOTS || !lease || !reload_delivery::Valid(world) || !peer.port || !map || std::strlen(map) >= sizeof r.map) return;

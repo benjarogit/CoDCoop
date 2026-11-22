@@ -1,6 +1,7 @@
 import inspect
 import sys
 import unittest
+import tempfile
 from unittest.mock import patch
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).parents[1]/'tools'))
@@ -28,5 +29,23 @@ class ScenarioContractTests(unittest.TestCase):
             qa_coop.main(['--source','unused','--run','unused',
                           '--checkpoint-reloads','1'], scenario=lambda *_: None)
         self.assertEqual(error.exception.code,2)
+
+    def test_only_explicit_joiner_departure_indices_are_allowed(self):
+        report={'scope':'leave then real rejoin','checks':['fresh lease'],'evidence':{},'intentional_departures':[1]}
+        self.assertIs(qa_coop.validate_scenario_result(report),report)
+        for indices in ([0],[True],[4],[1,1],'1'):
+            with self.subTest(indices=indices),self.assertRaises(ValueError):
+                qa_coop.validate_scenario_result({**report,'intentional_departures':indices})
+
+    def test_native_departure_banner_needs_marker_exact_count_and_explicit_scope(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);(root/'Main').mkdir();log=root/'Main/console.log'
+            event='^3COOP: You left the co-op game.\n********************\nERROR: Getrennt\n'
+            log.write_text(event)
+            self.assertTrue(qa_coop.process_log_errors(root))
+            self.assertEqual(qa_coop.process_log_errors(root,1),[])
+            for bad in ('ERROR: Getrennt\n',event+event,event+'CRASH native fault\n',event+'ERROR: other\n',''):
+                log.write_text(bad)
+                with self.subTest(text=bad):self.assertTrue(qa_coop.process_log_errors(root,1))
 
 if __name__=='__main__':unittest.main()

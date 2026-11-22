@@ -96,17 +96,30 @@ def move_remote(host, peer, slot, processes, timeout, action='+forward'):
     return distance
 
 
-def process_log_errors(folder):
+def process_log_errors(folder, intentional_departures=0):
     errors = []
+    departures=0
     paths = list(folder.glob('codcoop*.log'))
     paths += [folder / root / 'console.log' for root in ('Main', 'main', 'uo', 'sp_improved', 'UnitedFronts')
               if (folder / root / 'console.log').exists()]
     for path in paths:
-        for line in path.read_text(errors='replace').splitlines():
+        lines=path.read_text(errors='replace').splitlines()
+        for index,line in enumerate(lines):
+            # The native disconnect command prints a localized ERROR banner
+            # even for a deliberate menu departure. Only an explicitly scoped
+            # scenario can expect exactly one such event, with our own preceding
+            # successful Leave marker. Other errors and ordinary smokes stay strict.
+            if (intentional_departures and line.strip() in ('ERROR: Getrennt','ERROR: Disconnected') and
+                    any(previous.strip()=='^3COOP: You left the co-op game.'
+                        for previous in lines[max(0,index-8):index])):
+                departures+=1
+                continue
             if ('CRASH ' in line or 'MT_AllocIndex: failed' in line or
                     'script runtime error' in line.lower() or 'Server time went backwards' in line or
                     line.strip().startswith('ERROR:')):
                 errors.append(line)
+    if departures != intentional_departures:
+        errors.append('Expected %d intentional native departure banners; observed %d' % (intentional_departures,departures))
     return errors
 
 
@@ -133,8 +146,13 @@ def archive_previous(output):
 
 def validate_scenario_result(value):
     """Bound a trusted Python-only scenario report; never grant cleanup success."""
-    if not isinstance(value, dict) or set(value) != {'scope', 'checks', 'evidence'}:
-        raise ValueError('Native scenario must return exactly scope/checks/evidence')
+    required={'scope','checks','evidence'}
+    if not isinstance(value, dict) or not required <= set(value) or not set(value) <= required|{'intentional_departures'}:
+        raise ValueError('Native scenario needs scope/checks/evidence and only declared lifecycle expectations')
+    departures=value.get('intentional_departures',[])
+    if (not isinstance(departures,list) or any(type(n) is not int or n not in (1,2,3) for n in departures)
+            or len(set(departures))!=len(departures)):
+        raise ValueError('Intentional departures must identify unique joiner folders')
     scope=value['scope'];checks=value['checks'];evidence=value['evidence']
     if not isinstance(scope,str) or not scope.strip() or len(scope)>160 or '\n' in scope:
         raise ValueError('Native scenario needs bounded explicit scope')
@@ -349,8 +367,13 @@ def main(argv=None, *, scenario=None):
         assess_liveness(before, connected()[0], args.players)
         results['checks'].append('host and every remote user-command clock advance')
         (output / 'before.json').write_text(json.dumps(states, indent=2))
+        intentional_departures=[]
         if scenario is not None:
             result=validate_scenario_result(scenario(folders,processes,states))
+            intentional_departures=result.get('intentional_departures',[])
+            if any(n>=len(folders) for n in intentional_departures):
+                raise ValueError('Intentional departure folder is outside the actual party')
+            results['expected_intentional_departures']=intentional_departures
             results['scope']='targeted-native-scenario'
             results['coverage']=result['scope']
             results['scenario_evidence']=result['evidence']
@@ -414,8 +437,9 @@ def main(argv=None, *, scenario=None):
         final = connected()
         if not final: raise RuntimeError('a joiner was lost during observation')
         assess_liveness(baseline, final[0], args.players)
-        for folder in folders:
-            if process_log_errors(folder): raise RuntimeError(str(process_log_errors(folder)))
+        for index,folder in enumerate(folders):
+            errors=process_log_errors(folder,1 if index in intentional_departures else 0)
+            if errors: raise RuntimeError(str(errors))
         (output / 'after.json').write_text(json.dumps(final, indent=2))
         results['checks'].append('stable observation with unallocated packet rejected')
         for n, folder in enumerate(folders):
