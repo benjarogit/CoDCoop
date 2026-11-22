@@ -17,6 +17,22 @@ published v0.5.4 binaries have not been replaced.
 This addendum supersedes pending statements below. Nothing has been published.
 / Diese Ergänzung ersetzt ältere Offen-Angaben unten. Nichts wurde veröffentlicht.
 
+- **M0 Noville diagnosis checkpoint / M0-Diagnose Noville:** local commits
+  `3cd492e` (owned-process write watchpoint), `bf2dbb8` (QA all-weapon-media
+  path and four-receipt gate) and `67fe3f3` (module+RVA resolution). Nothing
+  pushed or published. The watchpoint fixture passes 9/9 under Wine
+  (`watch.exe` sha256
+  `7ddc8a2baaa37f4d3526f43f8de2d204734eeb007b92f647084cc17a7de9d71c`,
+  `fixture.exe` sha256
+  `04b80b011d0d07563a65d9903c19fb3d99fa403f0197c8ffd8e88a222c191c5e`) and
+  never selects a game. `./build.sh` passes; `python3 -m unittest discover -s
+  tests` reports 378 tests OK with 46 environment skips (`run/unit-m0.log`).
+  `CODCOOP_QA_ALL_WEAPON_MEDIA` registers every existing native definition
+  before GSC on both sides; it requires QA, deferral, UO and the United Fronts
+  variant and grants no inventory. The Noville experiment with that flag is
+  kept in `run/qa-noville-m1-awm1*`; no result is claimed before it completes.
+  / Drei lokale Commits, nichts veröffentlicht; Fixture 9/9, Build und
+  Regressionstests grün.
 - **Latest worker checkpoint / Neuester Worker-Stand:** local source `277fc47`
   fixes actual Windows/Wine atomic-replace sharing failures and physical-link
   rejection. Fresh immutable worker source graph
