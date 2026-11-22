@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "suite_version": "0.6.0-dev.4",
+  "suite_version": "0.6.0-dev.5",
   "protocol": 9,
   "complete_suite_required": true,
   "required": [
@@ -366,5 +366,5 @@
       "6f21a4e4bdb9f22d3c4b852f1da14eae9df62f334677999a377afb018ad96c30"
     ]
   },
-  "core_features_required": 15
+  "core_features_required": 31
 }

@@ -6,6 +6,16 @@
 
 **Unreleased. No full-campaign or native-Windows certification yet.**
 
+- Source `0.6.0-dev.5` requires compiled Core feature mask 31, including native
+  asset bootstrap. Reject historical API 15 DLLs before new staging; individual
+  UF kit application remains gated pending native owner/plan binding.
+- Transfer and verify the native model/weapon resource contract before loading
+  a joiner's target world. Detach stale native client model mappings before
+  publishing the Host's IDs; retain native allocation ownership.
+- Preserve the saved prone direction and terrain pitches after reconnect.
+  Strict mixed-role four-player checkpoint tests pass in CoD1 and UO+YAP,
+  followed by normal teammate revival and four clean game exits.
+
 - Require a complete, pinned set: CoD, UO, SP Improved, United Fronts and YAP.
 - Make the recommended CoD→UO mainline use SP Improved's AI/gameplay improvements
   throughout. Preserve the original CoD ending and credits before continuing into
@@ -87,6 +97,17 @@ mechanics remain acceptance gates. See [handoff](docs/HANDOFF-0.6.md).
 ## 0.6.0 Entwicklung — Deutsch
 
 **Noch nicht veröffentlicht. Keine Bestätigung vollständiger Kampagnen oder nativer Windows-Läufe.**
+
+- Quellenstand `0.6.0-dev.5` verlangt Core-Maske 31 einschließlich nativer
+  Ressourcenübertragung. Alte API 15-DLLs werden vor neuem Staging abgewiesen;
+  individuelle UF-Ausrüstung wartet weiter auf die native Spieler-/Planbindung.
+- Nativen Modell-/Waffenbestand vor dem Laden der Zielwelt des Mitspielers
+  übertragen und prüfen. Alte clientseitige Modellzuordnungen vor Übernahme der
+  Host-IDs lösen; die native Speicherzuständigkeit erhalten.
+- Gespeicherte Liegerichtung und Geländeneigung nach dem Wiederbeitritt
+  wiederherstellen. Strenge Vier-Spieler-Checkpoint-Tests mit unterschiedlichen
+  Zuständen bestehen in CoD1 und UO+YAP, einschließlich normaler Wiederbelebung
+  durch Mitspieler und vier sauberer Spielenden.
 
 - Vollständiger festgelegter Paketstand: CoD, UO, SP Improved, United Fronts und YAP.
 - Empfohlene CoD→UO-Hauptkampagne durchgehend mit KI-/Gameplay-Verbesserungen von

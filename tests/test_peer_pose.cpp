@@ -17,9 +17,14 @@ int main(){
     }
     assert(!Capture(saved,origin,angles,false)&&!saved.valid&&!saved.pending);
     assert(!Capture(saved,nullptr,angles,true));
+    float prone[3]={31.39343f,359.98242f,-.09338f};
+    assert(Capture(saved,origin,angles,true,prone)&&saved.hasProneBasis);
+    assert(!std::memcmp(saved.proneBasis,prone,12)&&saved.proneBasis[0]!=saved.angles[1]);
+    assert(Capture(saved,origin,angles,true)&&!saved.hasProneBasis);
     for(float bad:{std::numeric_limits<float>::quiet_NaN(),std::numeric_limits<float>::infinity()}) {
         float invalid[3]={0,bad,0};
         assert(!Capture(saved,invalid,angles,true)&&!saved.valid);
         assert(!Capture(saved,origin,invalid,true)&&!saved.valid);
+        assert(!Capture(saved,origin,angles,true,invalid)&&!saved.valid&&!saved.hasProneBasis);
     }
 }

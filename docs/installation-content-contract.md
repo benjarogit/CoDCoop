@@ -30,7 +30,15 @@ Die Fortschrittsanzeige zählt auch echte Autosave-Unterordner. Sie zeigt sicher
 relative Dateinamen und Änderungszeiten, folgt aber keinen Symlinks oder
 Windows-Reparse-Punkten. Daraus wird kein Kampagnenabschluss abgeleitet.
 
-Current coherent candidates additionally require compiled Core API mask15;
+Current `0.6.0-dev.5` candidates additionally require compiled Core API mask 31;
 see [runtime-protocol.md](runtime-protocol.md). A new compiled mask, native
 readiness and complete gameplay acceptance remain distinct checks. Historical
 AppImages, receipts and test records are not retroactively updated.
+
+The added bit16 is native asset-bootstrap support, not individual UF kit readiness.
+Same-protocol API 15 runtimes (including preserved 602/bac candidates) are rejected
+before a new staging output is created. Historical artifacts remain unchanged.
+
+Der aktuelle Stand `0.6.0-dev.5` verlangt Maske 31. Bit 16 bestätigt kompilierten
+Ressourcen-Bootstrap, keine individuelle Ausrüstungsübernahme. Alte API 15-DLLs
+werden trotz gleichem Protokoll vor dem Paketaufbau abgewiesen.

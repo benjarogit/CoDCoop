@@ -122,7 +122,7 @@ def main(argv=None):
                "--name", name, "--distpath", str(destination),
                "--workpath", str(root / ("build/launcher-work-" + sys.platform)),
                "--specpath", str(root / "build/launcher-spec"),
-               "--paths", str(root / "tools"), "--hidden-import", "coop_suite", "--hidden-import", "coop_session", "--hidden-import", "coop_party",
+               "--paths", str(root / "tools"), "--hidden-import", "coop_suite", "--hidden-import", "coop_session", "--hidden-import", "coop_party", "--hidden-import", "party_native_bridge",
                "--add-data", str(catalog) + os.pathsep + ".",
                str(root / "tools/launch-gui.py")]
     result = subprocess.run(command, cwd=root, check=False)

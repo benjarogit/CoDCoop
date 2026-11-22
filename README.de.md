@@ -4,7 +4,7 @@
 
 **Die ursprünglichen Kampagnen. Ein gemeinsamer Trupp.**
 
-[![Entwicklung](https://img.shields.io/badge/0.6.0-Entwicklung-orange)](#entwicklungsstand)
+[![Entwicklung](https://img.shields.io/badge/0.6.0--dev.5-Entwicklung-orange)](#entwicklungsstand)
 ![Spieler](https://img.shields.io/badge/Spieler-2%E2%80%934-blue)
 ![Windows-Ziel](https://img.shields.io/badge/Ziel-Windows%2010%20%2F%2011-0078D4)
 ![Linux](https://img.shields.io/badge/Linux-Wine%20%2F%20Proton-FCC624)
@@ -16,12 +16,16 @@
 
 </div>
 
-> **0.6 ist in Entwicklung.** Dieser Branch setzt die vollständige Coop-Suite um;
+> **0.6.0-dev.5 ist in Entwicklung.** Dieser Branch setzt die vollständige Coop-Suite um;
 > er ist noch keine durchgehend geprüfte Kampagnenveröffentlichung. Das bestehende
 > [Release v0.5.4](https://github.com/benjarogit/CoDCoop/releases/tag/v0.5.4)
 > entstand vorher und bietet **keinen Coop für SP Improved oder United Fronts**.
 > Eine erfolgreiche Installation oder ein kurzer Verbindungstest bestätigt noch
 > keine vollständige Kampagne.
+
+Der aktuelle Paketvertrag verlangt die Core-API-Maske 31 einschließlich
+des nativen Ressourcen-Bootstraps. Das aktiviert noch keine individuelle
+UF-Ausrüstungsübernahme; deren Gruppen-/Spielanbindung bleibt gesperrt.
 
 ## Kampagnen
 

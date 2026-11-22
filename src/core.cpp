@@ -14,6 +14,8 @@
 #include "api.h"
 #include "actor_eligibility.h"
 #include "core_features.h"
+#include "resource_bootstrap_state.h"
+#include "resource_mapping_barrier.h"
 #include "input_frame_clock.h"
 #include "saved_ghost_cleanup.h"
 #include "near_body_draw.h"
@@ -134,8 +136,9 @@ struct PendingReload {
     char map[64];
     uint32_t movieCutoff;
 };
-constexpr uint32_t STATE_VERSION = 22; // explicit saved Coop role; private bootstrap uses separate State19
+constexpr uint32_t STATE_VERSION = 24; // saved native prone basis plus durable initial resource contract
 struct State {
+    resource_bootstrap_state::Store bootstrap;
     int role;
     host_body_owner::Store hostBodies;
     peer_inventory::Store inventories;
@@ -183,6 +186,13 @@ struct State {
     uint64_t steamPeer[steam::MAX_PEERS];  // amigos de Steam detras de las direcciones falsas (steam::Addr)
 };
 State* S;
+struct Reader;struct Writer;
+bool BootEnabled();bool BootType(uint8_t);bool BootPeerJoinAllowed();bool BootHostJoinAllowed(const sockaddr_in&);
+bool BootInterceptMap(const char*);bool BootControl(uint8_t,Reader,const sockaddr_in&);
+void BootPreInit();void BootBeforeEnd();void BootTick();void BootShutdown();void BootStop();
+void BootWriteReady(Writer&);bool BootAcceptReady(Reader);
+void BootForgetEndpoint(const sockaddr_in&);void BootCancelPeer();void BootInvalidatePeer();
+void Cmd_CoopLeave();void JoinerSendJoin();void HostDropRemote(int,bool);
 peer_inventory::Endpoint InventoryEndpoint(const sockaddr_in& peer);
 void QueueWeaponSelection(int n,int weapon,bool seed);
 void PublishActorEligibility(int only=-1);
@@ -705,7 +715,7 @@ int QAModelCount()
     }
     if (g::sv_state == 0) return 0;
     int count = 0;
-    for (int i = 1; i < 256; ++i) if (*g::ConfigString(32 + i)) ++count;
+    for (int i = 1; i < 256; ++i) if (*g::ConfigString((int)g::A(31,32) + i)) ++count;
     return count;
 }
 std::string QASafeModel(const char* pointer)
@@ -766,7 +776,8 @@ void QAExportModels()
 }
 void __cdecl Hook_QAEndRegistration()
 {
-    if (g_qaEndEnabled && g_api && suite::IsQA()) {
+    BootBeforeEnd();
+    if (g_qaEndEnabled && g_api && suite::IsQA() && g::uo) {
         const auto base = suite::GameDir();
         if (g_qaDeferredEnabled) {
             // Observe native baseline/restore reservations too; never rewrite them.
@@ -842,15 +853,14 @@ void __cdecl Hook_QAEndRegistration()
 }
 void HookQAEndRegistration(bool on)
 {
-    if (!g::uo || (!suite::IsQA() && on)) return;
-    constexpr uintptr_t entry = 0x4fdc10;
-    const uint8_t expected[] = {0xe8, 0x6b, 0x7d, 0xfd, 0xff}; // call 0x4d5980; relocated in trampoline
+    const uintptr_t entry = g::A(0x4f8a70,0x4fdc10), originalCall=g::A(0x4e52b0,0x4d5980);
+    uint8_t expected[] = {0xe8,0,0,0,0};*(int32_t*)(expected+1)=(int32_t)(originalCall-entry-5);
     if (on) {
         if (patch_owner::JumpTargets((uint8_t*)entry, (uintptr_t)Hook_QAEndRegistration)) { g_qaEndEnabled = true; return; }
         if (memcmp((void*)entry, expected, sizeof expected)) { Log("QA preload: EndRegistration signature mismatch"); return; }
         uint8_t* trampoline = (uint8_t*)VirtualAlloc(nullptr, 10, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
         if (!trampoline) return;
-        trampoline[0] = 0xe8; *(int32_t*)(trampoline + 1) = (int32_t)(0x4d5980 - ((uintptr_t)trampoline + 5));
+        trampoline[0] = 0xe8; *(int32_t*)(trampoline + 1) = (int32_t)(originalCall - ((uintptr_t)trampoline + 5));
         trampoline[5] = 0xe9; *(int32_t*)(trampoline + 6) = (int32_t)(entry + 5 - ((uintptr_t)trampoline + 10));
         uint8_t patch[5] = {0xe9}; *(int32_t*)(patch + 1) = (int32_t)((uintptr_t)Hook_QAEndRegistration - entry - 5);
         g_qaEndOriginal = (QAEndRegistration)trampoline;
@@ -870,6 +880,9 @@ void HookQAEndRegistration(bool on)
         }
     }
 }
+
+
+#include "resource_bootstrap.inc"
 
 // ---------- host ----------
 
@@ -1009,7 +1022,8 @@ void CapturePeerInventory(int n, const char* reason, bool restoredCheckpoint=fal
             (downed?(*(int*)(ps+g::PS_HEALTH)==1&&*(int*)(g::Entity(n)+g::GE_HEALTH)==1):(!S->downed[n]&&!(*(int*)(ps+12)&3)))&&
             !*(uint8_t**)(g::Entity(n)+g::GE_LINK)&&
             !*(int*)(ps+g::A(0x35c,0x5a0))&&!S->movieWorldSuspended;
-        if(peer_pose::Capture(record.pose,(const float*)(ps+0x14),(const float*)(ps+g::A(0xb0,0xd8)),plain))
+        const float* prone=downed&&(*(int*)(ps+12)&1)?(const float*)(ps+g::A(0x350,0x58c)):nullptr;
+        if(peer_pose::Capture(record.pose,(const float*)(ps+0x14),(const float*)(ps+g::A(0xb0,0xd8)),plain,prone))
             Log("pose: captured own slot=%d origin=%.6f,%.6f,%.6f view=%.6f,%.6f,%.6f",n,
                 record.pose.origin[0],record.pose.origin[1],record.pose.origin[2],record.pose.angles[0],record.pose.angles[1],record.pose.angles[2]);
         if(peer_vitals::Capture(record.vitals,*(int*)(ps+g::PS_HEALTH),
@@ -1037,17 +1051,32 @@ void RestorePeerPoseView(int n,const uint8_t* cmd)
     if(!cmd||!S->remote[n].active||!S->remote[n].worldReady||!OwnInventoryInstalled(n))return;
     auto& pose=S->inventories.slots[n].pose;
     if(!peer_pose::CommandReady(pose,*(const uint32_t*)cmd))return;
+    // WORLD_READY can precede CGame's first own-player snapshot transition,
+    // which may still reset the client's raw look basis. The owned seed ACK
+    // is emitted from native CGame usercmd prediction after that transition.
+    const auto& selection=S->selection.host[n];
+    if(!selection.ack||!selection.commandSeen||selection.request.ticket!=S->spawnTicket[n]||
+        !(selection.request.flags&weapon_selection::SEED))return;
     uint8_t* ps=g::PlayerState(n);
     if(!ps)return;
     if(*(int*)(ps+4)!=0||(S->downed[n]&&S->inventories.slots[n].savedRole!=saved_role::Downed)||S->movieWorldSuspended||
         *(uint8_t**)(g::Entity(n)+g::GE_LINK)||*(int*)(ps+g::A(0x35c,0x5a0))) {
         pose.pending=false;Log("pose: cancelled saved view for changed scripted/downed role slot=%d",n);return;
     }
+    if(pose.hasProneBasis) {
+        // Native prone-entry initializes this basis from the spawn view. Wait
+        // until it has run, then restore all three independently saved fields.
+        if(!(*(int*)(ps+12)&1))return;
+        memcpy(ps+g::A(0x350,0x58c),pose.proneBasis,12);
+        Log("pose: restored native prone basis slot=%d direction=%.6f pitch=%.6f torso=%.6f",n,
+            pose.proneBasis[0],pose.proneBasis[1],pose.proneBasis[2]);
+    }
     for(unsigned k=0;k<3;++k)
         *(uint32_t*)(ps+g::PS_DELTA_ANGLES+k*4)=peer_pose::Delta(pose.angles[k],*(const uint32_t*)(cmd+8+k*4));
     memcpy(ps+g::A(0xb0,0xd8),pose.angles,12);
     pose.pending=false;
-    Log("pose: restored own view slot=%d command=%u view=%.6f,%.6f,%.6f",n,*(const uint32_t*)cmd,pose.angles[0],pose.angles[1],pose.angles[2]);
+    Log("pose: restored own view slot=%d command=%u view=%.6f,%.6f,%.6f raw=%u,%u,%u seed=%u",n,*(const uint32_t*)cmd,
+        pose.angles[0],pose.angles[1],pose.angles[2],*(const uint32_t*)(cmd+8),*(const uint32_t*)(cmd+12),*(const uint32_t*)(cmd+16),selection.request.serial);
 }
 
 void RestorePeerInventory(int n)
@@ -1266,6 +1295,7 @@ bool HostDropGhosts()
 
 void HostJoin(const sockaddr_in& from, Reader r)
 {
+    if(!BootHostJoinAllowed(from))return;
     RefreshHostRules();
     if (!host_rules::Valid(S->rules.host)) {
         Writer reject(suite::REJECT);
@@ -1486,6 +1516,7 @@ void SendDObjs(int n)
         int e = g::snap_entities[i];
         if (e < 0 || e >= g::MAX_GENTITIES) continue;
         uint8_t* d = g::ServerDObj(e);
+        if(!BootHostObjectAllowed(n,d))continue;
         uint32_t sig = d ? DObjSig(d) : 0;
         if (sig != rm->dobjSig[e] || (sig && now - rm->dobjSent[e] > 2000)) {
             Writer w(M_DOBJ);
@@ -1771,6 +1802,7 @@ void JoinerApplyDObj(Reader r)
     if (e >= g::MAX_GENTITIES || nm > 8 || !GetStr(r, animName, sizeof animName)) return;
     for (int k = 0; k < nm; ++k) {
         if (!GetStr(r, name, sizeof name)) return;
+        if(!BootPeerModelAllowed(name))return;
         parents[k] = r.Get<uint8_t>();
         models[k].flags = r.Get<uint16_t>();
         if (g_qaDeferredEnabled) {
@@ -3106,6 +3138,7 @@ DWORD g_hostSeen;                  // remoto: ultimo paquete del host
 
 void HostDropRemote(int n, bool explicitLeave = false)
 {
+    if(explicitLeave&&S&&n>0&&n<g::MAX_CLIENTS)BootForgetEndpoint(S->remote[n].addr);
     S->selection.host[n]={};S->selection.producer[n]={};
     Log("host: se libera el lugar del jugador %d (ultimo paquete hace %lu ms)", n, GetTickCount() - g_lastSeen[n]);
     if (S->bodyTree[n]) HostFreeBody(n);
@@ -3217,6 +3250,7 @@ void HostDropRemotes(const char* map, bool freeBodies)
         if (server) *(int*)(g::Client(n) + g::CL_STATE) = 0;
         S->remote[n].active = false;
     }
+    BootTick();
     HostReloadTick();
 }
 
@@ -3290,6 +3324,7 @@ void HookSpawnServer(bool on)
 
 void JoinerSendJoin()
 {
+    if(S->compatible&&!BootPeerJoinAllowed())return;
     if (!g_profileReady) return;
     if (!S->compatible) {
         if (suite::HandshakeExpired(GetTickCount(), S->joinStarted, S->lastJoinTry)) {
@@ -3322,6 +3357,7 @@ void JoinerSendJoin()
 
 void QueueJoinerMap(const char* map)
 {
+    if(BootInterceptMap(map))return;
     S->selection.peer={};S->selection.acceptedTicket=0;
     // All reload entry paths, including timeout recovery, hand ownership to
     // normal native world loading in the same way as an explicit host reload.
@@ -3355,8 +3391,21 @@ void JoinerHijack()
     SetHostRules(S->rules.accepted); // exact accepted rules immediately before native prediction attaches
     FreeOldTrees();
     QACaptureNativeTrees();
+    // Bootstrap item registration can reorder the peer's local CS dictionary.
+    // Publish no host model ID while an old local DObj still refers to it.
+    bool resourceBarrier=BootStageCurrent()&&g_bootNativeReady;
+    if(resourceBarrier){
+        bool validNative=g::sv_state!=0&&g::sv_gentities&&g::cgvm&&
+            resource_mapping_barrier::Signature(g::uo,(const uint8_t*)g::A(0x4310f0,0x432f20),(const uint8_t*)g::Com_SyncClientDObjs);
+        auto result=resource_mapping_barrier::Run(validNative,g::MAX_GENTITIES,
+            [](unsigned e){return g::serverObjMap[e]!=0;},
+            [](unsigned e,bool clear){g::Com_ServerDObjFree((int)e,clear);},
+            []{g::Com_SyncClientDObjs();});
+        if(!result.ran){BootFailure("native model-mapping barrier unavailable");return;}
+        Log("Resource bootstrap: detached %u native DObjs before host model IDs; native owners retained",result.detached);
+    }
     char barrierOption[8]{};
-    bool barrierEnabled = g_qaDeferredEnabled && g_qaBorrowEnabled &&
+    bool barrierEnabled = !resourceBarrier && g_qaDeferredEnabled && g_qaBorrowEnabled &&
         GetEnvironmentVariableA("CODCOOP_QA_DOBJ_BARRIER", barrierOption, sizeof barrierOption) && !strcmp(barrierOption, "1");
     auto barrier = qa_dobj_barrier::Run(barrierEnabled,
         g::uo && g::sv_state != 0 && g::sv_gentities && g::sv_gentitySize == 0x2d0 && g::cgvm,
@@ -3419,6 +3468,7 @@ void JoinerControl(uint8_t type, Reader r)
         SelectionPeerMessage(r);
         break;
     case suite::READY:
+        if(!BootAcceptReady(r))break;
         if (!S->compatible && !S->joined) {
             S->compatible = true;
             Log("suite: host compatibility verified, requesting player slot");
@@ -3493,7 +3543,10 @@ void JoinerControl(uint8_t type, Reader r)
     case M_MAP: {  // el host esta en otro mapa: cargarlo y volver a pedir lugar
         const char* map = MapName(r);
         if (S->joined || S->role != JOINER || !*map) return;
-        if (!_stricmp(map, g::CvarString("mapname"))) return;  // respuesta vieja (pedidos en cola mientras el host cargaba)
+        // Same-name checkpoints still need the new resource contract applied
+        // before native GAME_INIT. BootInterceptMap separately recognizes a
+        // genuinely ready retransmission in the current session/world.
+        if (!BootEnabled() && !_stricmp(map, g::CvarString("mapname"))) return;
         snprintf(S->hostMap, sizeof S->hostMap, "%s", map);
         Log("joiner: el host esta en %s, lo cargo y vuelvo a entrar", map);
         g::Com_Printf("^3COOP: the host is on %s, loading...\n", map);
@@ -3633,6 +3686,7 @@ void JoinerKeepAlive()
 // "disconnect" lo cierra y le pediria al motor los que se liberaran.
 void JoinerLeave(const char* why)
 {
+    BootCancelPeer();BootInvalidatePeer();
     S->selection={};
     S->reloadToken = {};
     S->recoveringConnection = false;
@@ -3840,6 +3894,7 @@ void Cmd_CoopHost()
 // coopjoin <ip>[:puerto]; sin argumento usa la IP escrita en el menu Cooperativo (cvar coop_ip)
 void Cmd_CoopJoin()
 {
+    BootCancelPeer();BootInvalidatePeer();
     S->selection={};
     S->reloadToken = {};
     S->recoveringConnection = false;
@@ -4374,6 +4429,7 @@ EXPORT void Coop_Init(const CoreApi* api, void* state, int fresh)
         S->role = NONE; S->joined = S->frozen = false;
     }
     HookArchiveVariables(true);
+    resource_bootstrap_state::Clear(S->bootstrap);g_bootResources={};
     HookQAEndRegistration(true);
     suite::Identity preparedIdentity{};std::string preparedError;
     bool prepared=g::uo&&(!suite::IsQA()||suite::PreparedQA())&&
@@ -4387,6 +4443,7 @@ EXPORT void Coop_Init(const CoreApi* api, void* state, int fresh)
 
 EXPORT void Coop_Shutdown()
 {
+    BootStop();
     SetCoopCvarChanged("coop_select_api","0");
     SetCoopCvarChanged("coop_select_pathfinder_api","0");
     SetCoopCvarChanged("coop_actor_api","0");
@@ -4407,6 +4464,7 @@ EXPORT void Coop_Shutdown()
         Log("QA MT epoch: retained later wrapper PIN=%d",pinned);
     }
     HookQADeferred(false);
+    BootShutdown();
     HookQAEndRegistration(false);
     if (!campaign_cinematics::Sync(g::gvm, false, nullptr)) {
         // A later plugin retained our syscall wrapper. Its forwarding code
@@ -4499,6 +4557,7 @@ EXPORT int __cdecl Coop_GetPacket(int sock, msg_t* msg, netadr_t* from)
     PreservationTick();
     PublishActorEligibility();
     JoinerMapTick();
+    BootTick();
     HostReloadTick();
     MovieTick();
     HostRulesTick();
@@ -4555,7 +4614,7 @@ EXPORT int __cdecl Coop_GetPacket(int sock, msg_t* msg, netadr_t* from)
                 JoinerControl(type, legacy);
                 continue;
             }
-            if (S->role == HOST && (type == suite::HELLO || type == M_JOIN)) {
+            if (S->role == HOST && (type == suite::HELLO || type == M_JOIN || type==B_REQUEST)) {
                 if (!g_profileReady || mismatch || !hasHeader) {
                     if (hasIdentity && SwitchAllowsPending(peer.variant)) continue;
                     Writer reject(suite::REJECT, hasIdentity && peer.protocol == suite::PROTOCOL);
@@ -4566,10 +4625,10 @@ EXPORT int __cdecl Coop_GetPacket(int sock, msg_t* msg, netadr_t* from)
                     continue;
                 }
                 if (type == suite::HELLO || !world_wire::Current(token, S->reloadToken)) {
-                    Writer ready(suite::READY); SendTo(a, ready.buf, ready.len);
+                    Writer ready(suite::READY);BootWriteReady(ready); SendTo(a, ready.buf, ready.len);
                     continue; // a join must echo the current negotiated world
                 }
-            } else if (S->role == HOST && peerSlot < 1 && type != M_RELOAD_ACK && type != M_BYE) continue;
+            } else if (S->role == HOST && peerSlot < 1 && type != M_RELOAD_ACK && type != M_BYE && !BootType(type)) continue;
             if (type != suite::REJECT && mismatch) continue;
             if (!hasHeader) continue;
             Reader r{buf + CONTROL_HEADER, buf + n};
@@ -4621,7 +4680,7 @@ EXPORT int __cdecl Coop_GetPacket(int sock, msg_t* msg, netadr_t* from)
                     auto& seat=S->inventories.slots[slot];
                     if(S->remote[slot].active||!peer_inventory::ReservedDeparture(seat,slot,token,
                         InventoryEndpoint(a),r.p,(unsigned)(r.end-r.p)))continue;
-                    seat={};S->preservation.slots[slot]={};S->reloadPending[slot]={};
+                    BootForgetEndpoint(a);seat={};S->preservation.slots[slot]={};S->reloadPending[slot]={};
                     S->selection.host[slot]={};S->selection.producer[slot]={};
                     char expected[8];snprintf(expected,sizeof expected,"%d",
                         patch_owner::ExpectedAfterDeparture(CvarInt("coop_expected_players"),true));
@@ -4631,6 +4690,7 @@ EXPORT int __cdecl Coop_GetPacket(int sock, msg_t* msg, netadr_t* from)
                 }
                 continue;
             }
+            if(BootControl(type,r,a))continue;
             if (type == world_wire::ENGINE) {
                 if (!((S->role == HOST && peerSlot > 0) ||
                       (S->role == JOINER && S->joined && !S->movieWorldSuspended))) continue;

@@ -4,7 +4,7 @@ Date / Datum: 2026-11-22. Development branch: `feat/0.6.0-coop-suite`.
 Starting point: `801dfd4` (published v0.5.4 assets are unchanged).
 Local source checkpoints: `4a6d36f`, `3288c23`, `7b1428f` (WIP, not pushed or released).
 
-## Latest state / Neuester Stand — protocol9, dev.4
+## Latest state / Neuester Stand — protocol9, dev.5
 
 This section supersedes the historical checkpoints below. / Dieser Abschnitt
 ersetzt die älteren Standangaben weiter unten. Development is unfinished;
@@ -16,6 +16,61 @@ published v0.5.4 binaries have not been replaced.
 
 This addendum supersedes pending statements below. Nothing has been published.
 / Diese Ergänzung ersetzt ältere Offen-Angaben unten. Nichts wurde veröffentlicht.
+
+- **Current suite contract / Aktueller Paketvertrag:** `0.6.0-dev.5`, protocol9,
+  required feature mask31. Resource bootstrap is now mandatory. The unchanged
+  native checker rejects protocol9 DLLs advertising only15; actual staging of
+  the old602 and bac binaries fails before creating output.95 focused Python
+  checks and17 opted-in Wine checker cases pass (one historical case skipped).
+  Exact handoff: `run/dev5-mask31-handoff.json`. Existing private dev.4
+  installers are historical artifacts and have not been rebuilt or published.
+- **Merged bootstrap / Zusammengeführte Ressourcenübertragung:** State23 Core
+  `6c42a85fd4e56fd9d19fcb896b1363f22b19a377399dc2397ddf6ee2ae671212`
+  retains State22 explicit save roles and transfers the hash-checked resource
+  contract before the first target GAME_INIT. Both actual CoD1 and UO+YAP
+  guest-Downed checkpoint/rejoin/normal revival cases pass. Evidence:
+  `run/merged-bootstrap-state23/evidence/`. A native DObj detach/sync barrier
+  fixes the independently reproduced model-ID mapping mismatch; Game-owned
+  allocation ownership remains intact. Full UF future-resource closure remains
+  open; these are targeted proofs, not campaign completion.
+- **Four-owner prone regression / Liegerichtungsfehler mit vier Spielern:**
+  the strict mixed Alive/Alive1HP/Downed/Alive checkpoint test exposed native
+  prone direction and pitch values overwritten during reconnect. Native Game
+  and CGame cap view yaw at85 degrees from that separate direction, explaining
+  the measured post-load error. Read-only RE: `run/prone-direction-re/FINDINGS.md`.
+  State24 candidate `6bac8ba85474835f26790a7154ec5efb23fd9d8b7dce4588b4ee8aa2bf3c2e7c`
+  in `run/prone-basis-state24/` preserves precisely those three finite native
+  fields and restores them after native prone-entry. Six focused C++ fixtures
+  pass ASan/UBSan. Strict CoD1 mixed-four-owner acceptance passes: all saved
+  position/view deltas0, PS/entity health600/1/1/450, explicit roles[1,1,2,1],
+  all three native prone fields equal in HostPS/current own CG snapshot and
+  prediction. Actual peer3 revives downed peer2 through the normal3-second Use
+  action with Host beyond revive range. All four then move and quit0. Archive:
+  `run/qa-cod1-four/history/mixed-four-role-State24-CoD1-proneBasis-strictsavedPose-thirdPeerRevive-PASS-1795312133933698964`.
+  The equivalent UO+YAP four-instance test also passes with all view/position
+  deltas0, native prone basis[34.18396,0,0] identical across Host and own CG,
+  peer3's normal revival, all four subsequent real inputs and clean exits0:
+  `run/qa-cod1-four/history/mixed-four-role-State24-UO-YAP-proneBasis-strictsavedPose-thirdPeerRevive-PASS-1795312273472664884`.
+  Saving in the narrow downed-before-native-prone-entry interval is not covered.
+  Training is
+  explicitly unarmed; this proof does not certify all four distinct weapons.
+  Older failed samples remain retained; no relaxed view-angle oracle.
+- **Current source verification / Aktuelle Quellprüfung:**288 Python cases,
+  264 passed and24 native opt-in skips, `run/unit-state24-dev5.log`.
+  Focused inventory, pose, vitals, saved provenance, resource-bootstrap lifetime
+  and native mapping-barrier C++ fixtures pass ASan/UBSan. The two new bootstrap
+  fixtures are now included in the engine-build CI job.
+  The complete `./build.sh` also passes, with ordinary `build/` Core
+  `e790895ad738280e549b6ad86dc4146a894b4e62c7e890f7dea081d893075e98`.
+  Its source is identical to the tested6bac snapshot; MinGW's output-path-derived
+  automatic ImageBase differs (0x6d000000 versus0x66980000), so these binary
+  hashes are deliberately not conflated. The native evidence uses exact6bac.
+- **Individual party equipment / Individuelle Gruppenausrüstung:** signed real
+  UDP lobby transport and the bounded local Python bridge have their own
+  positive/rejection tests. A shared Host-ready context supports parallel
+  players with different addresses, while each exact socket challenge, local
+  intent and source binding remains mandatory. Native producer/consumer and
+  pre-mission kit binding are unfinished; actual kit launch remains disabled.
 
 - **Latest parent — State22 / sidecarV2:** Core
   `fc01f8d89702af7bbf47240a0f01b49e3001adcc9b3468b567214104509e1905`
@@ -309,7 +364,7 @@ Older checkpoints follow for traceability. / Ältere Zwischenstände zur Nachver
   does not mean choosing another player's kit. Only this Linux machine is
   available; native Windows10/11, mixed systems and separate-account Steam are
   still external acceptance gates.
-- **Wire format:** source is `0.6.0-dev.4`, protocol9. All ordinary engine and
+- **Wire format:** source is `0.6.0-dev.5`, protocol9. All ordinary engine and
   Coop packets carry a session/world generation. Genuine old-world replay was
   rejected by type in both directions, followed by real current-world input:
   `run/qa-world-replay/history/1795285718014202522/`, core

@@ -1635,3 +1635,124 @@ executed producer snapshot. No Core edits or health/role-memory setters are
 performed by these fixtures. This closes the shown ordinary-Alive and genuine
 Host/guest-Downed distinction in training; exclusive linked/vehicle/cinematic
 roles, complete missions/campaigns and native Windows remain separate gates.
+
+### Mixed four-owner Alive1HP/Downed1HP checkpoint: new look negative
+
+The `--mixed-roles` mode of `tools/qa_checkpoint_group.py` uses immutablefc01,
+four real CoD1 training instances and256MiB. Initial actual input separates four
+positions and look directions. Native damage produces HostAlive600,
+guest1Alive1 (599damage), guest2Downed1 (genuine lethal damage) and guest3Alive450.
+The actual native ownership sidecar is read-only decoded using the pinned
+Win32 C++ layout (224bytes, roles offset216, Owner stride16), not a proposed
+wire serialization. It binds the SVG SHA and saved slots0..3 roles[1,1,2,1],
+remote leases[1,2,3]. Focused fixtures reject V1/wrong size, wrong SVG hash,
+missing leases and swapped Alive1HP/Downed1HP state/eligibility.
+
+After the actual SVG save, healthy owners move and every owner looks elsewhere;
+guest3 takes another10damage to440. The real load/rejoin correctly restores
+all four saved positions and health[600,1,1,450], including the explicit
+Alive/Downed distinction at identical1HP. However the strict complete scenario
+**FAILS** on guest2 look: saved yaw32.74475, changed live yaw10.24475,
+after-load own Game/own current CG yaw2.99927 (29.74548degrees off). Native
+log `02:30:31.419 pose: restored own view slot=2 command=37250 view=0.000000,32.744751,0.000000`
+shows the initial restoration, followed by the later discrepancy. The other
+three owners' position and look deltas are0. Recorded final slot2 raw command
+angles and local CL angles are[0,0,0], with no left/strafe held; earlier saved
+CL yaw is114.74998 and changed-after-save CL yaw92.24998.
+
+Full four-process evidence, producer/helper, logs, runtime, exact native SVG and
+V2 sidecar are preserved in
+`run/qa-cod1-four/history/mixed-four-role-fc01-training-rolefile-1121-PASS-downedYaw29deg-FAIL-1795311078160280035`.
+The suffix's role-file PASS is only that narrow field-mapping observation;
+overall scenario result is FAIL. Root cause of the later view change remains
+open. The proposed third-peer3 normal Use revival with Host outside80units is
+not attempted after this failure, and no four-role mixed acceptance is claimed.
+The producer preserves the failure rather than re-aiming the guest or waiving
+the saved-look requirement. No Core edits are included in this investigation.
+
+The identical mixed fixture remains an overall **FAIL** on merged State23 Core
+`9c2e888156ceac4c7db95d89d88e4abac22e114ceacba133ec7ef2aa9e2ddff5`
+(exact `run/view-basis-prototype`, loader85fc). The new current-owned-selection
+ACK/raw-command barrier does execute: native log02:36:15.603 reports saved
+slot2 view32.744751 restored with raw[0,0,0], seed1, after its own native CGame
+weapon command acknowledgment. Yet final authoritative and ownCG yaw is again
+2.99927,29.74548degrees from saved32.74475. The other three saved views,
+all four positions and actual mixed health/role mapping are correct. Full
+four-process runtime/source/helper/native SVG/V2 evidence is archived as
+`run/qa-cod1-four/history/mixed-four-role-9c2e-ACKbasisguard-proneYaw29deg-FAIL-1795311435403367076`.
+Third-peer revival remains unattempted after the strict pose failure.
+
+The repeated final angle is approximately the initial native map facing
+−82.00195 plus85degrees, even with the final raw/CL basis0. This is a concrete
+numerical lead toward a native prone-facing clamp, **not a proven cause or
+implemented fix**. Existing field notes list the bounded numeric proneDirection,
+proneDirectionPitch and proneTorsoPitch at CoD1 PS+0x350/+0x354/+0x358 and UO
++0x58c/+0x590/+0x594. They require native call-path verification and actual
+before/after observation before any restoration change. No field restoration,
+extra re-aim or timing waiver is added by the QA producer.
+
+A read-only exact9c2e mixed-four repeat now directly observes the three mapped
+prone fields on authoritative Host PSslot2 and the actual owner's CURRENT CG
+snapshot/predicted PS. Saved host triplet is[31.39343,359.98242,359.98242],
+view yaw31.39343. After live post-save look it is
+[31.39343,359.98242,-0.09338], view9.16260. After load/rejoin it becomes
+[-76.94196,-0.18677,-0.10986], view2.99927. The actual guest current snapshot
+and predicted triplets agree with the Host PS in each phase. The observer's
+host ownCGclient0 or remote frozen localGamePS0 fields are not mistaken for
+actual owner2; only HostPS2 and owner2's current/predicted CG are compared.
+Saved HostPS delta yaw50608 becomes66082; final actual raw command and local
+CL yaw are0. This demonstrates a lost saved numeric prone basis, without
+asserting the exact clamp call-path or restoring any fields.
+
+The full expected failed trace is preserved as
+`run/qa-cod1-four/history/mixed-four-role-9c2e-READONLY-pronebasis-saved32-to-Beginminus82-FAIL-1795311603484718866`.
+The informal filename is approximate; exact saved31.39343 and restored
+−76.94196 are in the native JSON. Observer changes only read the mapped triplets
+and raw delta angles; no Core, GSC, gameplay branch or assertion was changed.
+The strict saved-look failure still prevents third-peer revival acceptance.
+
+### Mixed four-owner saved prone basis and third-peer revive: native PASS
+
+Immutable State24 Core
+`6bac8ba85474835f26790a7154ec5efb23fd9d8b7dce4588b4ee8aa2bf3c2e7c`
+(`run/prone-basis-state24`, loader85fc) passes the unchanged strict mixed-four
+counterfactual for both CoD1 and UO+YAP. Run
+`tools/qa_checkpoint_group.py --source run/campaign-host --run run/qa-cod1-four
+--runtime-dir run/prone-basis-state24 --variant cod1 --mixed-roles --port 29950
+--timeout 180`, changing variant to `uo` for the second case. The UO addition is
+only engine/folder selection; all per-owner assertions remain identical.
+
+Full four-process archives under `run/qa-cod1-four/history/` are:
+
+- `mixed-four-role-State24-CoD1-proneBasis-strictsavedPose-thirdPeerRevive-PASS-1795312133933698964`
+- `mixed-four-role-State24-UO-YAP-proneBasis-strictsavedPose-thirdPeerRevive-PASS-1795312273472664884`
+
+Both native RoleV2 files bind the actual SVG and map slots0..3 to[1,1,2,1].
+Health[600,1,1,450] restores exactly after post-save changes (guest3 had reached
+440). The two1HP guests retain distinct Alive/Downed state and actor
+ELIGIBLE/INELIGIBLE. Every saved position and all view angles have measured
+restore deltas0, with real own current CG clients0..3, saved snapshot/predicted
+positions and camera angles correct. Saved/restored downed guest2 basis agrees
+on HostPS and actual own CURRENT/predictedCG: CoD1
+[31.66260,359.98334,359.98334], UO[34.18396,0,0]. Old9c2e/fc01 negatives remain
+preserved; no re-aim or saved-look tolerance waiver replaces the failed check.
+
+Only after these strict gates, an explicit post-load observer arrangement puts
+Host1000units from downed guest2 and peer3at64. The measured UO Host distance
+is1014.01, still outside the native80unit revive radius. Actual peer3 Use
+progresses through native one/two/three-second logs and revives guest2to300.
+All four then move through actual input. Training is naturally unarmed; there
+is no armed-fire claim. All four command clocks/snapshots remain live, strict
+logs pass, screenshots render and all four actual processes quit0 per test.
+
+Inspected restored-before-revive contacts are
+`run/campaign-investigation/mixed-four-State24-CoD1-restored-before-revive.png`
+and `run/campaign-investigation/mixed-four-State24-UO-restored-before-revive.png`.
+They show the standing Alive1HP guest separately from the prone Downed1HP body
+and low downed camera. These are256MiB isolated raw-copy Wine tests in original
+training, not mission/campaign completion or native Windows acceptance.
+State24 captures the three bounded numeric prone fields only from an already
+native-prone Downed source, then restores them after native prone entry. The
+immediate Downed-before-native-prone save boundary is a separate untested case;
+queued genuine damage+save commands can target it, but actual saved non-prone
+flags must first be observed rather than inferred or forced by the fixture.

@@ -62,6 +62,15 @@ int main(int argc,char** argv){
   read(p,cg+(uo?0x26d9e4:0x11e0b4)+0x14,predictedPosition,12);
   if(snap)read(p,snap+8+0x14,snapshotPosition,12);
   std::printf(",\"predicted_angles\":[%.5f,%.5f,%.5f],\"predicted_position\":[%.5f,%.5f,%.5f],\"snapshot_position\":[%.5f,%.5f,%.5f]}",predictedAngles[0],predictedAngles[1],predictedAngles[2],predictedPosition[0],predictedPosition[1],predictedPosition[2],snapshotPosition[0],snapshotPosition[1],snapshotPosition[2]);
+  // Read-only field mapping in notes/uo_playerstate.txt: proneDirection,
+  // proneDirectionPitch, proneTorsoPitch. No clamp or restore assumption.
+  float nativeProne[3]={},snapshotProne[3]={},predictedProne[3]={};
+  unsigned proneOffset=uo?0x58c:0x350;
+  read(p,ps+proneOffset,nativeProne,12);
+  if(snap)read(p,snap+8+proneOffset,snapshotProne,12);
+  read(p,cg+(uo?0x26d9e4:0x11e0b4)+proneOffset,predictedProne,12);
+  unsigned delta=uo?0x4c:0x48;
+  std::printf(",\"prone_basis\":{\"native\":[%.5f,%.5f,%.5f],\"current_snapshot\":[%.5f,%.5f,%.5f],\"predicted\":[%.5f,%.5f,%.5f]},\"delta_angles\":[%d,%d,%d]",nativeProne[0],nativeProne[1],nativeProne[2],snapshotProne[0],snapshotProne[1],snapshotProne[2],predictedProne[0],predictedProne[1],predictedProne[2],(int32_t)u32(p,ps+delta),(int32_t)u32(p,ps+delta+4),(int32_t)u32(p,ps+delta+8));
   std::printf(",\"pm_flags\":%u,\"cmd_angles\":[%u,%u,%u]",u32(p,ps+0xc),u32(p,ps+(uo?0x822c:0x73e4)+8),u32(p,ps+(uo?0x822c:0x73e4)+12),u32(p,ps+(uo?0x822c:0x73e4)+16));
   unsigned playerEntities=u32(p,uo?0x47fefb8:0x152bc58),playerEntitySize=u32(p,uo?0x47fefbc:0x152bc5c);
   bool linked=playerEntities&&u32(p,playerEntities+slot*playerEntitySize+(uo?0x29c:0x294));

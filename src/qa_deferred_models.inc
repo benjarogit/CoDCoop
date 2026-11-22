@@ -130,7 +130,7 @@ extern "C" void __cdecl QABeforeVM(void* vm, const int* args)
     if(S&&S->role==HOST)HookLoad((uint8_t*)GetModuleHandleA(g::GameDll()),true);
     PrepareInventoryGameInit();
     QAPreGameInitHostBodies();
-    if (!g_qaDeferredEnabled) return;
+    if (!g_qaDeferredEnabled) {BootPreInit();return;}
     uintptr_t base = (uintptr_t)GetModuleHandleA(g::GameDll());
     if (!base) return;
     constexpr unsigned char signature[] = {0x80,0x3b,0,0x75,3,0x33,0xc0,0xc3};
@@ -158,6 +158,7 @@ extern "C" void __cdecl QABeforeVM(void* vm, const int* args)
     QAImportLedger(suite::GameDir() + "qa-deferred-models.txt");
     Log("QA deferred: hooked BEFORE GAME_INIT %u map=%s imported=%u initflag=%d", g_qaInitCount,
         map.c_str(), (unsigned)g_qaLedger.entries.size(), *(int*)(base + 0x307f28));
+    BootPreInit();
 }
 bool HookQADeferred(bool on)
 {

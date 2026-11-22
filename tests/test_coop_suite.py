@@ -77,7 +77,7 @@ class SuiteTest(unittest.TestCase):
         self.assertEqual((self.game / 'Main/config.cfg').read_bytes(), b'player settings')
 
     def test_missing_partial_or_unsafe_compiled_features_cannot_be_sealed_or_prepared(self):
-        examples=[core_pe(suite.PROTOCOL,bits) for bits in (None,0,1,3,7)]
+        examples=[core_pe(suite.PROTOCOL,bits) for bits in (None,0,1,3,7,15)]
         examples += [malformed_feature(kind,suite.PROTOCOL) for kind in ('forwarded','writable','executable','out_of_bounds','ordinal')]
         for data in examples:
             with self.subTest(core=data[-8:]):
