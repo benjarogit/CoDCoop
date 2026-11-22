@@ -6,14 +6,14 @@ import tempfile
 TEXT = {
 'en': {'title':'United Fronts party', 'create':'Create party', 'join':'Join party', 'invite':'Invitation (share privately)',
        'address':'Advertised LAN IPv4', 'port':'Lobby port', 'submit':'Submit your saved equipment', 'confirm':'Confirm current choices',
-       'unconfirm':'Withdraw confirmation', 'retry':'Retry connection', 'leave':'Leave lobby', 'cancel':'Cancel party', 'waiting':'Waiting for the authenticated party…',
+       'native_wait':'Waiting for group/native verification: {reason}', 'native_proof':'Player identity proof verified. Waiting for native allocation; equipment has not been applied.', 'unconfirm':'Withdraw confirmation', 'retry':'Retry connection', 'leave':'Leave lobby', 'cancel':'Cancel party', 'waiting':'Waiting for the authenticated party…',
        'blocked':'Lobby choices are synchronized. Starting with these kits is unavailable until the native roster/resource bootstrap is verified.',
        'member':'Player {slot}: {mode} — {ready}', 'yes':'choice confirmed', 'no':'waiting for confirmation',
        'world':'Mission: {map} · Revision {revision}', 'connected':'Connected', 'error':'Lobby request rejected',
        'host':'Host', 'peer':'Participant', 'native':'Start with party equipment (unavailable)', 'copy':'Copy invitation', 'you':'you', 'automatic':'original automatic kit', 'manual':'individual kit'},
 'de': {'title':'United-Fronts-Gruppe', 'create':'Gruppe erstellen', 'join':'Gruppe beitreten', 'invite':'Einladung (privat weitergeben)',
        'address':'Bekanntgegebene LAN-IPv4', 'port':'Lobby-Port', 'submit':'Eigene gespeicherte Ausrüstung senden', 'confirm':'Aktuelle Auswahl bestätigen',
-       'unconfirm':'Bestätigung zurücknehmen', 'retry':'Verbindung wiederholen', 'leave':'Lobby verlassen', 'cancel':'Gruppe abbrechen', 'waiting':'Warte auf die authentifizierte Gruppe…',
+       'native_wait':'Warte auf Gruppen-/Spielprüfung: {reason}', 'native_proof':'Spieleridentität geprüft. Warte auf native Platzzuordnung; die Ausrüstung wurde noch nicht angewendet.', 'unconfirm':'Bestätigung zurücknehmen', 'retry':'Verbindung wiederholen', 'leave':'Lobby verlassen', 'cancel':'Gruppe abbrechen', 'waiting':'Warte auf die authentifizierte Gruppe…',
        'blocked':'Die Auswahl wird synchronisiert. Der Start mit diesen Ausrüstungen wartet auf die geprüfte native Gruppen-/Ressourcenanbindung.',
        'member':'Spieler {slot}: {mode} — {ready}', 'yes':'Auswahl bestätigt', 'no':'Bestätigung ausstehend',
        'world':'Mission: {map} · Stand {revision}', 'connected':'Verbunden', 'error':'Lobby-Anfrage abgelehnt',
@@ -77,6 +77,8 @@ def create_dialog(parent, *, language, game, map_name, difficulty, preferences, 
                 if value['status']=='waiting':dialog.status.setText(words['waiting'])
                 dialog.submit.setEnabled(value['status']!='cancelled');dialog.confirm.setEnabled(value['status']!='cancelled')
                 if value['status']=='cancelled':dialog.status.setText(words['cancel']);dialog.launch.setEnabled(False)
+            elif value.get('phase')=='party_native_waiting':dialog.status.setText(words['native_wait'].format(reason=str(value.get('error',''))))
+            elif value.get('phase')=='party_native_proof':dialog.status.setText(words['native_proof'])
             else:dialog.status.setText(words['waiting'] if value.get('phase')=='party_waiting' else words['error']+': '+str(value.get('error','')))
     def read_invitation():
         if dialog.hosting and dialog.invite_path and dialog.invite_path.stat().st_size:

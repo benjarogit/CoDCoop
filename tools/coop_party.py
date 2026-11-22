@@ -256,6 +256,9 @@ class PartyNode:
         peer['last'] = self.clock()
         if kind == 'heartbeat':
             self.send(self.base('snapshot', view=self.latest_view), address)
+        elif kind == 'native_proof':
+            if not hasattr(self, 'bridge'): raise ValueError('Native party proof bridge is unavailable')
+            self.bridge.proof(guid, body['proof'])
         elif kind == 'request':
             request_id = body.get('request_id')
             if not isinstance(request_id, str) or len(request_id) != 32: raise ValueError('Invalid request ID')
@@ -297,7 +300,10 @@ class PartyNode:
             own = next((m for m in members if m['guid'] == self.identity.guid), None)
             if own is None or own['slot'] not in [m['slot_id'] for m in snapshot['members']]: raise ValueError('Own party slot missing')
             if view.get('runtime_ready') is not False: raise ValueError('Network cannot grant native runtime readiness')
-            self.last_host_serial = view['serial']; self.snapshot = deepcopy(snapshot); self.slot = own['slot']; self.cancelled = view['status'] == 'cancelled'; self.events.append(dict(deepcopy(view), local_slot=self.slot))
+            self.last_host_serial = view['serial']; self.snapshot = deepcopy(snapshot); self.slot = own['slot']; self.cancelled = view['status'] == 'cancelled'; self.public_view=deepcopy(view);self.events.append(dict(deepcopy(view), local_slot=self.slot))
+        elif body['kind'] == 'native_challenge':
+            if not hasattr(self, 'bridge'): raise ValueError('Native party proof bridge is unavailable')
+            self.bridge.challenge(guid,body['challenge'])
         elif body['kind'] == 'reply':
             self.pending.pop(body.get('request_id'), None)
             if body.get('ok') is not True: self.events.append({'phase': 'party_error', 'error': body.get('error', 'Request rejected')})
@@ -379,6 +385,8 @@ def main(argv=None):
         invitation = json.loads(args.invitation_file.read_text())['invitation']
         if decode_invite(invitation)['package'] != digest: raise ValueError('Party installation package mismatch')
         node = PartyNode(catalog, identity, invitation=invitation)
+    from party_native_bridge import NativePartyBridge
+    node.bridge = NativePartyBridge(node,args.game)
     controls = queue.Queue(maxsize=64); stop_deadline = None
     def reader():
         while True:
@@ -411,7 +419,7 @@ def main(argv=None):
                                 raise ValueError('Unknown UF mission')
                         node.command(command)
                 except (ValueError,KeyError,TypeError) as error: print(json.dumps({'phase':'party_error','error':str(error)}),flush=True)
-            node.tick()
+            node.tick();node.bridge.poll()
             for view in node.events: print(json.dumps(view),flush=True)
             node.events.clear()
             if stop_deadline is not None and (node.hosting or not node.pending or time.monotonic() >= stop_deadline): return 0
