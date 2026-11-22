@@ -1497,3 +1497,141 @@ It does not establish linked/vehicle/cinematic/downed/dead restoration,
 checkpoint correctness in all missions, full campaigns or native Windows.
 The Native fix adds bounded owner/world-bound numeric vitals after ClientBegin;
 no script, links, entity pointers or full playerState are copied by the fixture.
+
+### Four saved owners versus later live state: native training PASS
+
+`tools/qa_checkpoint_group.py` runs four actual CoD1 instances under the trusted
+scenario API with immutable d982 and256MiB. The tightened accepted archive is
+`run/qa-cod1-four/history/four-owner-d982-training-distinct-yaw-saved-not-latest-pose-vitals-nativeCP-PASS-1795309048301166085`.
+Original training scripts run; no forced weapons, player teleport or objective
+completion substitutes for the fixture. Actual movement separates all four
+owners by at least24units, and real look input establishes distinct yaw
+[-58.3374,-13.24402,32.74475,79.99695]. Native damage50/100/150 produces
+PS/entity health[600,550,500,450], with Host unchanged and all owners ordinary,
+alive and unlinked.
+
+After the actual SVG and ownership sidecar are written, every owner genuinely
+moves and turns again. Guest2 takes another10 native damage, reaching490.
+Loading the SVG restores its saved500 rather than current490; all owners'
+saved positions and look angles return with measured deltas0. Personal weapon
+slots, stock/clip arrays and active selection match their own saved seats.
+Every local current CGame snapshot has its true client0..3, saved snapshot and
+predicted positions and saved predicted look. No fresh tickets are issued;
+all four native inventory lifecycle receipts are PRESERVED. All four owners
+then move through actual input, command clocks and snapshots remain live,
+strict logs pass and all four actual processes quit0. Training is naturally
+unarmed here, so this proves no armed-fire or four-role weapon-selection case.
+The earlier numeric pass with coincident yaw0/2 is separately retained as
+`four-owner-d982-training-saved-not-latest-pose-vitals-nativeCP-PASS-1795308946013610840`;
+the tightened fixture explicitly rejects insufficient pairwise yaw separation.
+
+The focused oracle rejects swapped owner records, fresh/default health,
+post-save current positions and a wrong local snapshot client. Full raw native
+JSON is separately SHA-bound to the bounded scenario summary. This is a
+four-owner checkpoint isolation proof in the starting training area, not
+training completion or a campaign-wide checkpoint claim.
+
+### Actual downed-owner checkpoint: confirmed negative gate
+
+`tools/qa_checkpoint_downed.py` uses two actual training instances and d982.
+With Host alive, native `coopgod 1 0` then `coopkill 1 100000` enters the genuine
+Core downed lifecycle: downed=true, PS/entity health1, native prone flag1 and
+actor INELIGIBLE. This is explicitly not an inference from health1; an ordinary
+standing1HP owner is a different valid state. Only Host camera/position is
+arranged96units from the actual guest for the visible-body observation; guest
+body and mission scripts are not teleported or rewritten.
+
+Actual SVG save/load and real peer reconnection lose the downed state:
+downed=false, PS/entity600, prone flag0, actor ELIGIBLE. Host remains alive.
+The strict downed assertion correctly fails, so the normal Host three-second
+Use revive phase is not attempted or claimed. Both the actual native state
+records and inspected screenshots show the prone guest/body and YOU ARE DOWN
+before load, then a standing body/full health afterward. Evidence is retained
+in `run/qa-cod1-four/history/downed-owner-d982-training-actuallethal-save-load-lostflag-FAIL-1795309478092150380`,
+including the original SVG and ownership sidecar. The inspected before/after
+contact is `run/campaign-investigation/downed-d982-before-after-nativeCP.png`.
+This separate negative does not invalidate the explicitly ordinary healthy
+four-owner restoration proof, but prevents general downed checkpoint acceptance.
+No fixture writes S.downed or health memory and no Core fix is included here.
+
+### Actual downed-owner checkpoint and normal revive: native regression PASS
+
+Candidate Core `fc01f8d89702af7bbf47240a0f01b49e3001adcc9b3468b567214104509e1905`
+(State22, exact snapshot `run/saved-role-prototype`, loader85fc) passes the
+same genuine lethal-damage/save/load counterfactual for CoD1 and UO+YAP:
+
+- `downed-owner-fc01-CoD1-actuallethal-nativeCP-HP1-prone-normalUseRevive-PASS-1795310281883047058`
+- `downed-owner-fc01-UO-YAP-actuallethal-nativeCP-HP1-prone-normalUseRevive-PASS-1795310338602983641`
+
+Both full archives are under `run/qa-cod1-four/history/`, including the exact
+native SVG and V2 ownership sidecar, frozen runtime/helper/source, logs and
+screenshots. Run `tools/qa_checkpoint_downed.py --source run/campaign-host
+--run run/qa-cod1-four --runtime-dir run/saved-role-prototype --variant cod1
+--port 29950 --timeout 180`, changing variant to `uo` for the YAP case.
+
+Actual downed state remains true after reconnect, with PS/entity health1,
+prone bit1 and actor INELIGIBLE. Both owners' saved position/look deltas are0;
+the actual guest current CGame snapshot client1, predicted position and look
+agree with its saved owner. Personal equipment remains unchanged. The Host
+then uses the normal actual `+activate` input at the fixture's64unit camera
+arrangement; native logs show one, two and three seconds of revive followed by
+the original revival. Observed result is downed=false, PS/entity300, prone0,
+actor ELIGIBLE. Native body images remain prone before and after load, then
+stand after revival; the guest has YOU ARE DOWN and its low camera before and
+after load, then its ordinary camera afterward. Inspected contacts are
+`run/campaign-investigation/downed-fc01-CoD1-restored-and-revived.png` and
+`run/campaign-investigation/downed-fc01-UO-restored-and-revived.png`.
+
+Both real processes per test render, pass strict logs and quit0. UO retains the
+explicit prone bit rather than copying every transient movement flag (observed
+saved8193→restored1). The explicit saved-role metadata distinguishes genuine
+Downed from a valid standing Alive owner with1HP; no role is inferred from
+health alone. Standing1HP and Host-down checkpoints are still separate next
+counterfactuals. These256MiB raw-copy Wine tests cover this guest-down scenario
+in training, not linked roles, campaign completion or native Windows.
+
+### Host-down and standing Alive1HP: separate native counterfactuals PASS
+
+The same immutablefc01 Core passes both additional modes of
+`tools/qa_checkpoint_downed.py` for CoD1 and UO+YAP. Add `--mode host-down` or
+`--mode standing-one-hp` to the command above. All four archives under
+`run/qa-cod1-four/history/` preserve the original native SVG and V2 sidecar:
+
+- `role-fc01-CoD1-actualHOSTdown-nativeCP-GUESTnormalUseRevive-PASS-1795310559443487904`
+- `role-fc01-UO-YAP-actualHOSTdown-nativeCP-GUESTnormalUseRevive-PASS-1795310661000967671`
+- `role-fc01-CoD1-standingALIVE1HP-native599damage-nativeCP-normalinput-PASS-1795310600299534519`
+- `role-fc01-UO-YAP-standingALIVE1HP-native599damage-nativeCP-normalinput-PASS-1795310716483178300`
+
+For Host-down, genuine native lethal damage acts on slot0 while the real guest
+is alive. The native SVG load preserves Host Downed=true, PS/entity1, prone1,
+actor INELIGIBLE and the saved own Host current-CGame camera. The real guest
+rejoins its reserved saved seat. Both owners' saved pose deltas are0; the guest
+then holds actual Use, native progress reaches one/two/three seconds, and Host
+revives to PS/entity300, Downed=false, prone0, actor ELIGIBLE. Inspected contacts
+`run/campaign-investigation/hostdown-fc01-CoD1-restored-and-revived.png` and
+`run/campaign-investigation/hostdown-fc01-UO-restored-and-revived.png` show the
+Host's low downed camera and prone body before/after load, then normal standing
+body/camera after the guest's revival.
+
+For standing Alive1HP, actual native damage599 reduces an initially observed
+600HP guest to1HP without entering Downed. After actual save/load/rejoin it
+remains Downed=false, PS/entity1, posture bits0 and actor ELIGIBLE. The saved
+pose/current own CG camera match with0 deltas. Actual backward input then moves
+the owner while it remains Alive1HP/ELIGIBLE (observed moving flag64, no posture
+bits). The inspected contact
+`run/campaign-investigation/standing1HP-fc01-CoD1-UO-afterCP-and-input.png` shows
+standing bodies and normal guest cameras with the low health bar. These
+unarmed training cases do not claim weapon-fire coverage.
+
+All four tests keep personal inventory checks, original mission scripts,
+strict logs, rendering and actual exit0 for both processes. Only the observer's
+camera/position is arranged; the damaged target is not teleported. The pure
+role oracle explicitly distinguishes Alive1HP from Downed1HP and rejects wrong
+posture, health resets or eligibility. The first CoD1 Host-down execution used
+an earlier boolean posture check; its actual recorded prone bit1 also satisfies
+the tightened explicit-prone oracle. Future runs archive the producer bytes
+captured at startup and their SHA so later source edits cannot replace the
+executed producer snapshot. No Core edits or health/role-memory setters are
+performed by these fixtures. This closes the shown ordinary-Alive and genuine
+Host/guest-Downed distinction in training; exclusive linked/vehicle/cinematic
+roles, complete missions/campaigns and native Windows remain separate gates.

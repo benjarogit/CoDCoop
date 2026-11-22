@@ -17,6 +17,28 @@ published v0.5.4 binaries have not been replaced.
 This addendum supersedes pending statements below. Nothing has been published.
 / Diese Ergänzung ersetzt ältere Offen-Angaben unten. Nichts wurde veröffentlicht.
 
+- **Latest parent — State22 / sidecarV2:** Core
+  `fc01f8d89702af7bbf47240a0f01b49e3001adcc9b3468b567214104509e1905`
+  under `run/saved-role-prototype/` adds explicit Alive/Downed ownership roles
+  to the hash-bound `.coopowners` file. The SVG remains unchanged. Exact legacy
+  V1 prefixes still decode without inventing a missing role. Native saved HP1
+  alone never establishes Downed. Loaded Host state waits safely for a known
+  returning saved teammate; normal revival starts a fresh3-second action.
+  Actual CoD1 and UO+YAP guest-Downed, Host-Downed and standingAlive1HP cases
+  all pass pose/camera/PS+entity health/actor eligibility, normal revival or
+  ordinary post-load movement and both clean exits. Exact SVG+sidecar retained.
+  Evidence under `run/qa-cod1-four/history/`:
+  `downed-owner-fc01-CoD1-actuallethal-nativeCP-HP1-prone-normalUseRevive-PASS-1795310281883047058`,
+  `downed-owner-fc01-UO-YAP-actuallethal-nativeCP-HP1-prone-normalUseRevive-PASS-1795310338602983641`,
+  `role-fc01-CoD1-actualHOSTdown-nativeCP-GUESTnormalUseRevive-PASS-1795310559443487904`,
+  `role-fc01-UO-YAP-actualHOSTdown-nativeCP-GUESTnormalUseRevive-PASS-1795310661000967671`,
+  `role-fc01-CoD1-standingALIVE1HP-native599damage-nativeCP-normalinput-PASS-1795310600299534519`,
+  `role-fc01-UO-YAP-standingALIVE1HP-native599damage-nativeCP-normalinput-PASS-1795310716483178300`.
+  Newer mixed/four-owner role coverage, vehicles/scripted roles, cross-process
+  stable-GUID resume and full campaigns are separate outstanding gates.
+  The private production-bootstrap baseline3855 is now ready for logical merge;
+  its State19 must become **State23** while retaining these State22 fields.
+
 - **Latest native checkpoint — State21:** Core
   `d982970ed3bac9ef70b4068a593b044ade6656f95105dfe1bb2f5956b469caf5`
   under `run/saved-vitals-native-prototype/` preserves the returning owner's

@@ -5,6 +5,7 @@
 #include "reload_delivery.h"
 #include "peer_pose.h"
 #include "peer_vitals.h"
+#include "saved_role.h"
 
 // Numeric loadout and separately guarded plain-player pose. No script
 // references, HUD, vehicle links, pointers or complete playerState copies.
@@ -23,6 +24,7 @@ struct Record {
     uint8_t numeric[BYTES];
     peer_pose::Saved pose;
     peer_vitals::Saved vitals;
+    uint8_t savedRole;
 };
 struct Store { Record slots[SLOTS]; };
 static_assert(std::is_trivial<Store>::value && std::is_standard_layout<Store>::value,
@@ -48,7 +50,7 @@ inline void Reserve(Record& r, unsigned slot, reload_delivery::Token world, Endp
 }
 inline void Transition(Record& r, reload_delivery::Token world, const char* map) {
     if (!r.reserved || r.world.session != world.session || !reload_delivery::Valid(world) || !map || std::strlen(map)>=sizeof r.map) { r={}; return; }
-    r.world=world; std::strcpy(r.map,map); r.captured=r.installed=false; r.size=0;r.pose={};r.vitals={};
+    r.world=world; std::strcpy(r.map,map); r.captured=r.installed=false; r.size=0;r.pose={};r.vitals={};r.savedRole=saved_role::Unknown;
 }
 inline bool Capture(Record& r, unsigned slot, reload_delivery::Token world, Endpoint peer, const char* map,
                     const void* bytes, unsigned size, int weapon, int viewmodel) {

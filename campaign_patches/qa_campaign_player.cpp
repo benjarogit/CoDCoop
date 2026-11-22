@@ -58,7 +58,10 @@ int main(int argc,char** argv){
   std::printf(",\"desired\":");weapon(p,cdefs,u32(p,cg+(uo?0x24aecc:0xfe24c)));
   std::printf(",\"predicted\":");weapon(p,cdefs,u32(p,cg+(uo?0x26daac:0x11e154)));
   float predictedAngles[3]={};read(p,cg+(uo?0x26d9e4:0x11e0b4)+0xb0+off,predictedAngles,12);
-  std::printf(",\"predicted_angles\":[%.5f,%.5f,%.5f]}",predictedAngles[0],predictedAngles[1],predictedAngles[2]);
+  float predictedPosition[3]={},snapshotPosition[3]={};
+  read(p,cg+(uo?0x26d9e4:0x11e0b4)+0x14,predictedPosition,12);
+  if(snap)read(p,snap+8+0x14,snapshotPosition,12);
+  std::printf(",\"predicted_angles\":[%.5f,%.5f,%.5f],\"predicted_position\":[%.5f,%.5f,%.5f],\"snapshot_position\":[%.5f,%.5f,%.5f]}",predictedAngles[0],predictedAngles[1],predictedAngles[2],predictedPosition[0],predictedPosition[1],predictedPosition[2],snapshotPosition[0],snapshotPosition[1],snapshotPosition[2]);
   std::printf(",\"pm_flags\":%u,\"cmd_angles\":[%u,%u,%u]",u32(p,ps+0xc),u32(p,ps+(uo?0x822c:0x73e4)+8),u32(p,ps+(uo?0x822c:0x73e4)+12),u32(p,ps+(uo?0x822c:0x73e4)+16));
   unsigned playerEntities=u32(p,uo?0x47fefb8:0x152bc58),playerEntitySize=u32(p,uo?0x47fefbc:0x152bc5c);
   bool linked=playerEntities&&u32(p,playerEntities+slot*playerEntitySize+(uo?0x29c:0x294));

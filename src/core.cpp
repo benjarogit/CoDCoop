@@ -134,12 +134,15 @@ struct PendingReload {
     char map[64];
     uint32_t movieCutoff;
 };
-constexpr uint32_t STATE_VERSION = 21; // saved plain-player pose/vitals; private bootstrap uses separate State19
+constexpr uint32_t STATE_VERSION = 22; // explicit saved Coop role; private bootstrap uses separate State19
 struct State {
     int role;
     host_body_owner::Store hostBodies;
     peer_inventory::Store inventories;
     uint64_t inventoryLeaseCounter,loadedInventoryLease[g::MAX_CLIENTS];
+    uint8_t loadedSavedRoles[g::MAX_CLIENTS];
+    uint32_t loadedSavedRoleWorld;
+    bool hostSavedRoleApplied;
     bool inventoryLoading;
     uint32_t spawnTicketCounter,spawnTicket[g::MAX_CLIENTS];
     weapon_selection::Control selection;
@@ -193,6 +196,8 @@ void PreservationIssued(int n);
 void PreservationWait(int n,bool keepFresh=false);
 void PreservationCommit(int n,bool preserved);
 bool PreservationFresh(int n);
+void SetDowned(int n,bool downed);
+bool WaitingSavedAlivePeer();
 void PreservationBeforeInit(int intent);
 void PreservationObserveReady();
 void PreservationTick();
@@ -977,6 +982,7 @@ void CapturePeerInventory(int n, const char* reason, bool restoredCheckpoint=fal
     auto& record=S->inventories.slots[n];
     record.pose={};
     record.vitals={};
+    record.savedRole=restoredCheckpoint?saved_role::Unknown:(S->downed[n]?saved_role::Downed:saved_role::Alive);
     bool observedWorld=g_gameLifecycleReady&&patch_owner::JumpTargets((uint8_t*)g::A(0x44f270,0x451570),(uintptr_t)Hook_QAPreVM);
     if(restoredCheckpoint&&record.reserved&&(!observedWorld||!record.lease||S->loadedInventoryLease[n]!=record.lease)) {
         record.captured=record.installed=false;
@@ -988,6 +994,8 @@ void CapturePeerInventory(int n, const char* reason, bool restoredCheckpoint=fal
     }
     uint8_t* ps=g::PlayerState(n);
     if (!ps || !peer_inventory::Current(record,n,S->reloadToken,record.endpoint,g::CvarString("mapname"))) return;
+    if(restoredCheckpoint&&S->loadedSavedRoleWorld==S->reloadToken.generation)
+        record.savedRole=S->loadedSavedRoles[n];
     int weapon=*(int*)(ps+g::PS_WEAPON), viewmodel=*(int*)(ps+g::PS_VIEWMODEL);
     if(weapon<0 || weapon>=g::MAX_WEAPONS || viewmodel<0 || viewmodel>255) {
         record.captured=record.installed=false;
@@ -996,8 +1004,10 @@ void CapturePeerInventory(int n, const char* reason, bool restoredCheckpoint=fal
     if(peer_inventory::Capture(record,n,S->reloadToken,record.endpoint,g::CvarString("mapname"),
         ps+g::PS_AMMO,g::PS_LOADOUT_END-g::PS_AMMO,weapon,viewmodel)) {
         Log("inventory: captured own slot=%d weapon=%d viewmodel=%d world=%u reason=%s",n,weapon,viewmodel,S->reloadToken.generation,reason);
-        bool plain=*(int*)(ps+4)==0&&*(int*)(ps+g::PS_HEALTH)>0&&!S->downed[n]&&
-            !(*(int*)(ps+12)&3)&&!*(uint8_t**)(g::Entity(n)+g::GE_LINK)&&
+        bool downed=record.savedRole==saved_role::Downed;
+        bool plain=*(int*)(ps+4)==0&&*(int*)(ps+g::PS_HEALTH)>0&&
+            (downed?(*(int*)(ps+g::PS_HEALTH)==1&&*(int*)(g::Entity(n)+g::GE_HEALTH)==1):(!S->downed[n]&&!(*(int*)(ps+12)&3)))&&
+            !*(uint8_t**)(g::Entity(n)+g::GE_LINK)&&
             !*(int*)(ps+g::A(0x35c,0x5a0))&&!S->movieWorldSuspended;
         if(peer_pose::Capture(record.pose,(const float*)(ps+0x14),(const float*)(ps+g::A(0xb0,0xd8)),plain))
             Log("pose: captured own slot=%d origin=%.6f,%.6f,%.6f view=%.6f,%.6f,%.6f",n,
@@ -1011,7 +1021,8 @@ void CapturePeerInventory(int n, const char* reason, bool restoredCheckpoint=fal
 void RestorePeerPose(int n,uint8_t* ps)
 {
     auto& pose=S->inventories.slots[n].pose;
-    if(!pose.valid||!ps||S->downed[n]||S->movieWorldSuspended||*(int*)(ps+4)!=0||
+    bool savedDowned=S->inventories.slots[n].savedRole==saved_role::Downed;
+    if(!pose.valid||!ps||(S->downed[n]&&!savedDowned)||S->movieWorldSuspended||*(int*)(ps+4)!=0||
         *(uint8_t**)(g::Entity(n)+g::GE_LINK)||*(uint8_t**)(g::Entity(0)+g::GE_LINK)||
         *(int*)(ps+g::A(0x35c,0x5a0)))return;
     memcpy(ps+0x14,pose.origin,12);memset(ps+0x20,0,12);
@@ -1028,7 +1039,7 @@ void RestorePeerPoseView(int n,const uint8_t* cmd)
     if(!peer_pose::CommandReady(pose,*(const uint32_t*)cmd))return;
     uint8_t* ps=g::PlayerState(n);
     if(!ps)return;
-    if(*(int*)(ps+4)!=0||S->downed[n]||S->movieWorldSuspended||
+    if(*(int*)(ps+4)!=0||(S->downed[n]&&S->inventories.slots[n].savedRole!=saved_role::Downed)||S->movieWorldSuspended||
         *(uint8_t**)(g::Entity(n)+g::GE_LINK)||*(int*)(ps+g::A(0x35c,0x5a0))) {
         pose.pending=false;Log("pose: cancelled saved view for changed scripted/downed role slot=%d",n);return;
     }
@@ -1046,11 +1057,12 @@ void RestorePeerInventory(int n)
     if(ps && peer_inventory::Restore(record,n,S->reloadToken,InventoryEndpoint(S->remote[n].addr),g::CvarString("mapname"),
         ps+g::PS_AMMO,g::PS_LOADOUT_END-g::PS_AMMO,*(int*)(ps+g::PS_WEAPON),*(int*)(ps+g::PS_VIEWMODEL))) {
         Log("inventory: restored own slot=%d weapon=%d viewmodel=%d world=%u",n,record.weapon,record.viewmodel,S->reloadToken.generation);
-        if(record.vitals.valid&&*(int*)(ps+4)==0&&!S->downed[n]&&!S->movieWorldSuspended&&
+        if(record.vitals.valid&&*(int*)(ps+4)==0&&!S->movieWorldSuspended&&
             !*(uint8_t**)(g::Entity(n)+g::GE_LINK)&&!*(int*)(ps+g::A(0x35c,0x5a0))) {
             *(int*)(ps+g::PS_HEALTH)=*(int*)(g::Entity(n)+g::GE_HEALTH)=record.vitals.health;
             *(int*)(ps+g::PS_MAXHEALTH)=record.vitals.maxHealth;
             Log("vitals: restored own slot=%d health=%d max=%d",n,record.vitals.health,record.vitals.maxHealth);
+            if(record.savedRole==saved_role::Downed)SetDowned(n,true);
         }
         RestorePeerPose(n,ps);
         QueueWeaponSelection(n,record.weapon,true);
@@ -1223,6 +1235,16 @@ bool HostDropGhosts()
     uint8_t* reloading = g::Cvar_FindVar("g_reloading");
     if (g::sv_state != 2 || !g::svs_clients || !g::sv_gameClients || (reloading && *(int*)(reloading + 0x20))) return false;
     S->inventoryLoading=false;
+    if(!S->hostSavedRoleApplied&&S->loadedSavedRoleWorld==S->reloadToken.generation&&S->loadedSavedRoles[0]) {
+        if(S->loadedSavedRoles[0]==saved_role::Downed) {
+            uint8_t* ps=g::PlayerState(0);
+            if(*(int*)(ps+g::PS_HEALTH)!=1||*(int*)(g::Entity(0)+g::GE_HEALTH)!=1) {
+                CoopStatus("Saved host downed state is inconsistent. Restore a verified checkpoint.");return false;
+            }
+            SetDowned(0,true);
+        }
+        S->hostSavedRoleApplied=true;
+    }
     for (int n = 1; n < g::MAX_CLIENTS; ++n) {
         if (S->remote[n].active || *(int*)(g::Client(n) + g::CL_STATE) || !*(int*)(g::PlayerState(n) + g::GC_CONNECTED))
             continue;
@@ -1288,6 +1310,9 @@ void HostJoin(const sockaddr_in& from, Reader r)
         rm->active = true;
         rm->addr = from;
         auto& inventory=S->inventories.slots[n];
+        if(inventory.savedRole==saved_role::Downed&&inventory.captured&&(!inventory.pose.valid||!inventory.vitals.valid)) {
+            rm->active=false;CoopStatus("Saved downed player needs an unsupported scripted or vehicle role. Joining is waiting.");return;
+        }
         if(!peer_inventory::Owner(inventory,n,S->reloadToken.session,InventoryEndpoint(from))) {
             if(!++S->inventoryLeaseCounter) ++S->inventoryLeaseCounter;
             peer_inventory::Reserve(inventory,n,S->reloadToken,InventoryEndpoint(from),hostMap,S->inventoryLeaseCounter);
@@ -2303,6 +2328,17 @@ bool AnyOtherStanding(int n)
     return false;
 }
 
+bool WaitingSavedAlivePeer()
+{
+    if(S->loadedSavedRoleWorld!=S->reloadToken.generation)return false;
+    for(int n=1;n<g::MAX_CLIENTS;++n) {
+        const auto& record=S->inventories.slots[n];
+        if(S->loadedSavedRoles[n]==saved_role::Alive&&record.reserved&&record.lease&&
+            reload_delivery::Same(record.world,S->reloadToken)&&(!S->remote[n].active||!S->remote[n].worldReady))return true;
+    }
+    return false;
+}
+
 void SetHealth(int n, int health)
 {
     *(int*)(g::Entity(n) + g::GE_HEALTH) = health;
@@ -2394,7 +2430,8 @@ void __cdecl Hook_GDamage(uint8_t* targ, uint8_t* inflictor, uint8_t* attacker, 
         return;  // un jugador no lastima a otro (si a si mismo, como en el SP)
     }
     int n = targPlayer ? *(uint16_t*)(targ + 6) : -1;
-    if (n < 0 || n >= g::MAX_CLIENTS || !CoopActive()) {
+    bool savedHostWaiting=n==0&&S->downed[0]&&WaitingSavedAlivePeer();
+    if (n < 0 || n >= g::MAX_CLIENTS || (!CoopActive()&&!savedHostWaiting)) {
         g_origDamage(targ, inflictor, attacker, dir, point, damage, dflags, mod, hitLoc);
         return;
     }
@@ -2512,7 +2549,8 @@ void HostDownedFrame(float dt)
     int reviving[g::MAX_CLIENTS] = {-1, -1, -1, -1};  // a quien esta levantando cada jugador
     for (int n = 0; n < g::MAX_CLIENTS; ++n) {
         if (!S->downed[n]) continue;
-        if (!PlayerInGame(n) || !CoopActive()) { SetDowned(n, false); continue; }
+        bool savedHostWaiting=n==0&&WaitingSavedAlivePeer();
+        if (!PlayerInGame(n) || (!CoopActive()&&!savedHostWaiting)) { SetDowned(n, false); continue; }
         SetHealth(n, 1);
         const float* o = (const float*)(PlayerState(n) + 0x14);
         int reviver = -1;
@@ -3071,7 +3109,6 @@ void HostDropRemote(int n, bool explicitLeave = false)
     S->selection.host[n]={};S->selection.producer[n]={};
     Log("host: se libera el lugar del jugador %d (ultimo paquete hace %lu ms)", n, GetTickCount() - g_lastSeen[n]);
     if (S->bodyTree[n]) HostFreeBody(n);
-    S->downed[n] = false;
     S->remote[n].active = false;
     if (explicitLeave) {
         char expected[8];
@@ -3081,6 +3118,7 @@ void HostDropRemote(int n, bool explicitLeave = false)
     }
     if(explicitLeave) {S->inventories.slots[n]={};S->preservation.slots[n]={};}
     else CapturePeerInventory(n,"temporary disconnect before native cleanup");
+    S->downed[n] = false;
     PreservationWait(n);
     g::GameCall(4, n);
     *(int*)(g::Client(n) + g::CL_STATE) = 0;
@@ -3143,7 +3181,12 @@ void HostReloadTick()
 
 void HostDropRemotes(const char* map, bool freeBodies)
 {
+    const auto& init=S->preservation.init;
+    bool carryRoles=S->loadedSavedRoleWorld==S->reloadToken.generation&&init.valid&&init.nativeReady&&
+        !init.handled&&init.intent==1&&init.session==S->reloadToken.session&&map&&!_stricmp(init.map,map);
+    if(!carryRoles)ClearLoadedSavedRoles();
     if (!++S->reloadToken.generation) ++S->reloadToken.generation;
+    if(carryRoles){S->loadedSavedRoleWorld=S->reloadToken.generation;S->hostSavedRoleApplied=false;}
     memset(S->selection.host,0,sizeof S->selection.host);memset(S->selection.producer,0,sizeof S->selection.producer);
     for(int n=1;n<g::MAX_CLIENTS;++n)SelectionResetStatus(n);
     // A new native world must supply its restored numeric data, never reuse a
@@ -3162,6 +3205,7 @@ void HostDropRemotes(const char* map, bool freeBodies)
         if (S->bodyTree[n] && server && freeBodies) HostFreeBody(n);
         S->bodyTree[n] = nullptr;
         S->downed[n] = false;
+        S->reviveTime[n] = 0;
     }
     for (int n = 1; n < g::MAX_CLIENTS; ++n) {
         if (!S->remote[n].active && !S->reloadPending[n].delivery.active) continue;

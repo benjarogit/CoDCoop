@@ -74,6 +74,12 @@
   acknowledgement remains in development, so the equipment launch stays disabled.
 - Honor intentional departure after a temporary timeout: release only the
   current inactive owner's seat, then give an explicit fresh rejoin a new lease.
+- Restore saved position, view and health after reconnecting ordinary players;
+  retain explicit downed state and normal revival for Host and joiners. A
+  standing1HP player remains alive. Targeted CoD1/UO+YAP checks pass; full
+  mission, vehicle and scripted-role coverage is still required.
+- Give generated mission fixes priority over mod asset overlays, and retire
+  unchanged older owned layers transactionally when updating.
 
 Mission-level coverage, Steam across accounts, native Windows and all special
 mechanics remain acceptance gates. See [handoff](docs/HANDOFF-0.6.md).
@@ -158,6 +164,13 @@ mechanics remain acceptance gates. See [handoff](docs/HANDOFF-0.6.md).
   der Ausrüstungsstart bleibt deshalb gesperrt.
 - Bewusstes Verlassen nach einem Ausfall beachten: ausschließlich den Platz
   dieses inaktiven Besitzers freigeben; ein neuer Beitritt erhält eine neue Kennung.
+- Gespeicherte Position, Blickrichtung und Gesundheit nach der Neuanmeldung
+  normaler Spieler erhalten; Downed-Zustand und reguläres Wiederbeleben für
+  Host und Mitspieler bewahren. Ein stehender Spieler mit1HP bleibt lebendig.
+  Gezielte CoD1-/UO+YAP-Prüfungen bestehen; vollständige Missionen, Fahrzeuge
+  und geskriptete Rollen müssen weiter abgenommen werden.
+- Generierte Missionskorrekturen vor Mod-Asset-Paketen laden; ältere unveränderte
+  eigene Pakete beim Update gesichert und mit Rücknahme entfernen.
 
 Missionsabdeckung, Steam zwischen Accounts, native Windows-Läufe und sämtliche
 Spezialmechaniken bleiben Abnahmekriterien. Siehe [Übergabe](docs/HANDOFF-0.6.md).

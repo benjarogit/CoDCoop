@@ -36,19 +36,40 @@ std::string InventorySavePath(const std::string& relative)
     return path.size()<MAX_PATH-32?path:std::string();
 }
 
+bool ReadInventoryMetadata(const std::string& path,save_provenance::Metadata& metadata)
+{
+    uint8_t bytes[sizeof metadata];FILE* f=fopen((path+".coopowners").c_str(),"rb");
+    if(!f)return false;
+    size_t got=fread(bytes,1,sizeof bytes,f);bool ended=fgetc(f)==EOF;fclose(f);
+    return ended&&save_provenance::Decode(bytes,got,metadata);
+}
+
+void ClearLoadedSavedRoles()
+{
+    memset(S->loadedSavedRoles,0,sizeof S->loadedSavedRoles);
+    S->loadedSavedRoleWorld=0;S->hostSavedRoleApplied=false;
+}
+
 void InventoryLoadProvenance(const std::string& relative)
 {
     memset(S->loadedInventoryLease,0,sizeof S->loadedInventoryLease);
+    ClearLoadedSavedRoles();
     std::string path=InventorySavePath(relative); char hash[65]{};
     save_provenance::Metadata metadata{};
-    FILE* f=path.empty()?nullptr:fopen((path+".coopowners").c_str(),"rb");
-    bool valid=f&&fread(&metadata,1,sizeof metadata,f)==sizeof metadata&&fgetc(f)==EOF;
-    if(f) fclose(f);
+    bool valid=!path.empty()&&ReadInventoryMetadata(path,metadata);
     valid=valid&&InventoryFileHash(path,hash)&&save_provenance::Valid(metadata,g_identity.engine,g_identity.variant,
         g::CvarString("mapname"),hash,S->reloadToken.session);
     if(!valid) { Log("inventory: native save ownership unavailable/unverified: %s",relative.c_str()); return; }
+    if(metadata.version==save_provenance::VERSION) {
+        S->loadedSavedRoleWorld=S->reloadToken.generation;S->loadedSavedRoles[0]=metadata.roles[0];
+    }
     for(unsigned n=1;n<g::MAX_CLIENTS;++n)
-        if(save_provenance::Owns(metadata,n,S->inventories.slots[n])) S->loadedInventoryLease[n]=metadata.owners[n].lease;
+        if(save_provenance::Owns(metadata,n,S->inventories.slots[n])) {
+            S->loadedInventoryLease[n]=metadata.owners[n].lease;
+            S->loadedSavedRoles[n]=metadata.roles[n];
+        }
+    Log("inventory: loaded saved roles version=%u flags=%u/%u/%u/%u",metadata.version,
+        S->loadedSavedRoles[0],S->loadedSavedRoles[1],S->loadedSavedRoles[2],S->loadedSavedRoles[3]);
     Log("inventory: native save ownership verified: %s leases=%llu/%llu/%llu",relative.c_str(),
         (unsigned long long)S->loadedInventoryLease[1],(unsigned long long)S->loadedInventoryLease[2],(unsigned long long)S->loadedInventoryLease[3]);
 }
@@ -57,7 +78,8 @@ bool WriteInventoryMetadata(const std::string& path,const save_provenance::Metad
 {
     std::string target=path+".coopowners",temporary=target+".pending";
     FILE* f=fopen(temporary.c_str(),"wb");
-    bool ok=f&&fwrite(&metadata,1,sizeof metadata,f)==sizeof metadata;
+    size_t bytes=save_provenance::Bytes(metadata);
+    bool ok=f&&bytes&&fwrite(&metadata,1,bytes,f)==bytes;
     if(f) ok=fclose(f)==0&&ok;
     if(ok) ok=MoveFileExA(temporary.c_str(),target.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH)!=FALSE;
     if(!ok) {DeleteFileA(temporary.c_str());DeleteFileA(target.c_str());}
@@ -85,11 +107,14 @@ void InventoryFSObserver(const intptr_t* args,intptr_t result,bool after)
         *entry={};entry->handle=handle;strcpy(entry->relative,relative.c_str());
         auto& m=entry->metadata;m.magic=save_provenance::MAGIC;m.version=save_provenance::VERSION;
         m.session=S->reloadToken.session;m.engine=g_identity.engine;m.variant=g_identity.variant;
+        m.roles[0]=S->downed[0]?saved_role::Downed:saved_role::Alive;
         snprintf(m.map,sizeof m.map,"%s",g::CvarString("mapname"));
         for(unsigned n=1;n<g::MAX_CLIENTS;++n) {
             const auto& record=S->inventories.slots[n];
-            if(S->remote[n].active&&peer_inventory::Current(record,n,S->reloadToken,InventoryEndpoint(S->remote[n].addr),m.map))
+            if(S->remote[n].active&&peer_inventory::Current(record,n,S->reloadToken,InventoryEndpoint(S->remote[n].addr),m.map)) {
                 m.owners[n]={record.lease,record.endpoint.address,record.endpoint.port};
+                m.roles[n]=S->downed[n]?saved_role::Downed:saved_role::Alive;
+            }
         }
     } else if(args[0]==0x25) {
         for(auto& entry:g_inventoryOpen) if(entry.handle&&entry.handle==args[1]) {
@@ -110,9 +135,7 @@ void InventoryFSObserver(const intptr_t* args,intptr_t result,bool after)
         std::string source=InventorySavePath(from),target=InventorySavePath(to);
         if(source.empty()||target.empty()) return;
         save_provenance::Metadata metadata{};char hash[65]{};
-        FILE* f=fopen((source+".coopowners").c_str(),"rb");
-        bool ok=f&&fread(&metadata,1,sizeof metadata,f)==sizeof metadata&&fgetc(f)==EOF;
-        if(f) fclose(f);
+        bool ok=ReadInventoryMetadata(source,metadata);
         ok=ok&&InventoryFileHash(target,hash)&&save_provenance::Valid(metadata,g_identity.engine,g_identity.variant,
             g::CvarString("mapname"),hash,S->reloadToken.session);
         if(ok) ok=WriteInventoryMetadata(target,metadata);
@@ -132,6 +155,7 @@ void PrepareInventoryGameInit()
     if(!S||S->role!=HOST) return;
     S->inventoryLoading=true;
     memset(S->loadedInventoryLease,0,sizeof S->loadedInventoryLease);
+    ClearLoadedSavedRoles();
     memset(g_inventoryOpen,0,sizeof g_inventoryOpen);
     campaign_cinematics::observer=InventoryFSObserver;
     if(!campaign_cinematics::Sync(g::gvm,true,HostScriptMovie)) Log("inventory: could not observe native load ownership; restored guests require fresh roles");
