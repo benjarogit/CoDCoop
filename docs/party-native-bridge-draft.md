@@ -12,11 +12,19 @@ Only these names under the selected, receipt-checked installation's
 
 - `party.json`: worker-owned public context/heartbeat, no invitation/private key.
   Contains party session, catalog/package/world/plan SHA, revision, GUID→lobby
-  slot membership and confirmations. Refreshed at most once per second; expiry
+  slot membership and confirmations. Includes `plan`: the exact canonical
+  `roster.plan()` object (own submitted kits, required weapons/models/support
+  and its plan SHA). Hash canonical plan bytes with `plan_sha256` excluded;
+  Native must verify that SHA and all catalog/package/world/revision bindings
+  and validate original manual choices before pre-G_INIT application. This
+  addition is not proof that the pending Native consumer exists. Refreshed at most once per second; expiry
   five seconds. Loss of confirmations writes an explicit waiting record.
 - `host-ready.json`: **Native HostCore-produced** phase2 context plus actual full
   bootstrap resources. Context fields match `CONTEXT_FIELDS` in the helper.
-  Native must only emit this after its real Game/CG/renderer closure.
+  Native must only emit this after its real Game/CG/renderer closure. This is
+  shared world/resource/party context: `client_target` is deliberately absent.
+  Different peers may target the same Host through LAN/public addresses; each
+  target remains bound separately in its exact challenge and local peer intent.
 - `host-0.json` to `host-2.json`: **Native HostCore-produced** pending challenges.
   Three pending indices are distinct from the eventual native player slots;
   native slot zero always belongs to the host.

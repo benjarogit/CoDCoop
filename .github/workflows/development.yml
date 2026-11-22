@@ -49,6 +49,7 @@ jobs:
       - run: g++ -std=c++17 -Wall -Wextra -fsanitize=address,undefined tests/test_host_body_policy.cpp -o build/test_host_body_policy && ./build/test_host_body_policy
       - run: g++ -std=c++17 -Wall -Wextra -fsanitize=address,undefined tests/test_peer_inventory.cpp -o build/test_peer_inventory && ./build/test_peer_inventory
       - run: g++ -std=c++17 -Wall -Wextra -fsanitize=address,undefined tests/test_peer_pose.cpp -o build/test_peer_pose && ./build/test_peer_pose
+      - run: g++ -std=c++17 -Wall -Wextra -fsanitize=address,undefined tests/test_party_native_bridge.cpp -o build/test_party_native_bridge && ./build/test_party_native_bridge
       - run: g++ -std=c++17 -Wall -Wextra -fsanitize=address,undefined tests/test_peer_vitals.cpp -o build/test_peer_vitals && ./build/test_peer_vitals
       - run: g++ -std=c++17 -Wall -Wextra -fsanitize=address,undefined tests/test_save_provenance.cpp -o build/test_save_provenance && ./build/test_save_provenance
       - run: g++ -std=c++17 -Wall -Wextra -fsanitize=address,undefined tests/test_spawn_ticket.cpp -o build/test_spawn_ticket && ./build/test_spawn_ticket

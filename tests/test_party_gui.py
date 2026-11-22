@@ -41,7 +41,7 @@ class PartyUI(unittest.TestCase):
         try:
             for index in range(2):
                 fixture=SuiteTest();fixture.setUp();fixtures.append(fixture)
-                with zipfile.ZipFile(fixture.game/'UnitedFronts/lobby_fixture.pk3','w') as archive:archive.writestr('maps/pathfinder.bsp',b'fixture map, never executed')
+                with zipfile.ZipFile(fixture.game/'UnitedFronts/lobby_fixture.pk3','w') as archive:archive.writestr(zipfile.ZipInfo('maps/pathfinder.bsp',date_time=(2020,1,1,0,0,0)),b'fixture map, never executed')
                 suite.seal_installation(fixture.game)
                 prefs={'schema':1,'mode':'manual','manual':{'family':'american','slots':{'primary':9,'secondary':6,'pistol':22,'grenade':34}}}
                 d=create_dialog(None,language='en' if index==0 else 'de',game=fixture.game,map_name='pathfinder',difficulty=2,preferences=lambda:prefs,command_factory=launcher.worker_command,settings_directory=fixture.game.parent/('private-party-'+str(index)))

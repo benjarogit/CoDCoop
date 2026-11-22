@@ -28,7 +28,7 @@ CHALLENGE_FIELDS = {'schema','kind','pending_index','nonce','client_join_nonce',
                     'engine','variant','map','client_target','client_endpoint','party_session','catalog_sha256',
                     'package_sha256','world_sha256','member_guid','roster_revision','plan_sha256',
                     'resource_sha256','created_unix_ms','expires_unix_ms'}
-CONTEXT_FIELDS = ('native_session','native_world','engine','variant','map','client_target','party_session',
+CONTEXT_FIELDS = ('native_session','native_world','engine','variant','map','party_session',
                   'catalog_sha256','package_sha256','world_sha256','roster_revision','plan_sha256','resource_sha256')
 
 
@@ -174,6 +174,18 @@ class NativePartyBridge:
         if view['status']!='connected' or sorted(view['confirmed_slots'])!=sorted(m['slot_id'] for m in snapshot['members']):raise ValueError('Waiting for all current owner confirmations')
         if snapshot['unresolved_automatic_slots']:raise ValueError('Original automatic equipment is not natively resolved')
         return snapshot,members
+    def current_plan(self,snapshot):
+        # Rebuild the EXACT canonical plan on both host and peer. The peer
+        # projection contains authenticated own-kit submissions; readiness is
+        # deliberately not a native approval and is excluded from the plan.
+        state={'schema':snapshot['schema'],'catalog_sha256':snapshot['catalog_sha256'],
+               'host_slot':snapshot['host_slot'],'world':deepcopy(snapshot['world']),
+               'members':[{'slot_id':m['slot_id'],'kit':deepcopy(m['kit'])} for m in snapshot['members']],
+               'revision':snapshot['revision'],'ready_slots':[],'resource_approval':None}
+        plan=roster.plan(state,self.node.catalog)
+        if plan['plan_sha256']!=snapshot['plan_sha256']:
+            raise ValueError('Authenticated roster does not match its canonical plan')
+        return plan
     def matches_party(self,challenge):
         snapshot,members=self.current()
         expected={'party_session':self.node.invitation['session'],'catalog_sha256':snapshot['catalog_sha256'],'package_sha256':snapshot['world']['package_id'],
@@ -274,7 +286,7 @@ class NativePartyBridge:
             context={'schema':1,'kind':IDL,'party_session':self.node.invitation['session'],'catalog_sha256':snapshot['catalog_sha256'],
                      'package_sha256':snapshot['world']['package_id'],'world':snapshot['world'],'world_sha256':roster.identity(snapshot['world']),
                      'revision':snapshot['revision'],'plan_sha256':snapshot['plan_sha256'],'members':view['members'],'local_guid':self.node.identity.guid,
-                     'confirmed_slots':view['confirmed_slots'],'runtime_ready':False}
+                     'confirmed_slots':view['confirmed_slots'],'plan':self.current_plan(snapshot),'runtime_ready':False}
             digest=hashlib.sha256(canonical(context)).hexdigest()
             if self.latest_plan!=digest or self.clock()-self.last_context_write>=1:
                 context.update(worker_pid=os.getpid(),updated_unix_ms=now,expires_unix_ms=now+5000)

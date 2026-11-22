@@ -25,7 +25,7 @@ import uf_equipment_roster as roster
 class Worker:
     def __init__(self,args,env):
         self.process=subprocess.Popen([sys.executable,str(ROOT/'tools/coop_party.py'),*args],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,env=env)
-        self.events=queue.Queue();self.latest=None;self.proof_events=[]
+        self.events=queue.Queue();self.latest=None;self.proof_events=[];self.last_error=None
         def reader():
             for line in self.process.stdout:
                 try:self.events.put(json.loads(line))
@@ -35,6 +35,7 @@ class Worker:
     def drain(self):
         while not self.events.empty():
             event=self.events.get()
+            if event.get('error'):self.last_error=event['error']
             if event.get('phase')=='party':self.latest=event
             if event.get('phase')=='party_native_proof':self.proof_events.append(event)
     def stop(self):
@@ -55,18 +56,22 @@ class NativeBridgeWorkers(unittest.TestCase):
         for _ in range(2):
             f=suite_fixture.SuiteTest();f.setUp();self.fixtures.append(f)
             import zipfile
-            with zipfile.ZipFile(f.game/'UnitedFronts/bridge_fixture.pk3','w') as z:z.writestr('maps/noville.bsp',b'fixture, never executed')
+            with zipfile.ZipFile(f.game/'UnitedFronts/bridge_fixture.pk3','w') as z:z.writestr(zipfile.ZipInfo('maps/noville.bsp',date_time=(2020,1,1,0,0,0)),b'fixture, never executed')
             suite_fixture.suite.seal_installation(f.game)
         self.host_game,self.peer_game=[f.game for f in self.fixtures]
     def cleanup(self):
-        for w in reversed(self.workers):w.stop()
+        failures=[]
+        for w in reversed(self.workers):
+            try:w.stop()
+            except AssertionError as error:failures.append(str(error))
         for f in self.fixtures:f.doCleanups()
+        if failures:self.fail('; '.join(failures))
     def wait(self,predicate,timeout=12):
         deadline=time.monotonic()+timeout
         while time.monotonic()<deadline:
             for worker in self.workers:worker.drain()
             if predicate():return
-            if any(w.process.poll() is not None for w in self.workers):self.fail('Source party worker exited unexpectedly')
+            if any(w.process.poll() is not None for w in self.workers):self.fail('Source party worker exited unexpectedly: '+str([(w.process.returncode,w.last_error) for w in self.workers]))
             time.sleep(.02)
         self.fail('Native bridge condition timed out')
     def party(self):
@@ -98,6 +103,24 @@ class NativeBridgeWorkers(unittest.TestCase):
     def local_intent(self,c):
         fields=('client_join_nonce','native_session','native_world','engine','variant','map','client_target','member_guid','party_session','catalog_sha256','package_sha256','world_sha256','roster_revision','plan_sha256','resource_sha256')
         return {'schema':1,'kind':IDL,'phase':2,'received_unix_ms':int(time.time()*1000),'received_source':c['client_target'],'intent':{key:c[key] for key in fields},'received_challenge':c}
+    def test_both_real_workers_emit_exact_canonical_plan_with_owned_kits(self):
+        host,peer,c,ready=self.party()
+        for files in (self.host_files,self.peer_files):
+            value=files.read('party.json');plan=value['plan'];unsigned=dict(plan);unsigned.pop('plan_sha256')
+            self.assertEqual(hashlib.sha256(canonical(unsigned)).hexdigest(),value['plan_sha256'])
+            self.assertEqual(plan['plan_sha256'],value['plan_sha256']);self.assertEqual(plan['revision'],value['revision'])
+            self.assertEqual(plan['world'],value['world']);self.assertEqual(plan['catalog_sha256'],value['catalog_sha256'])
+            self.assertEqual(plan['world']['package_id'],value['package_sha256']);self.assertEqual(len(plan['members']),2)
+            self.assertTrue(all(m['kit']['mode']=='manual' and set(m['kit']['slots'])=={'primary','secondary','pistol','grenade'} for m in plan['members']))
+            self.assertTrue(plan['required_weapons']);self.assertTrue(plan['required_server_models']);self.assertTrue(plan['required_media_models']);self.assertFalse(value['runtime_ready'])
+        self.assertEqual(self.host_files.read('party.json')['plan'],self.peer_files.read('party.json')['plan'])
+        from types import SimpleNamespace
+        from party_native_bridge import NativePartyBridge
+        catalog=json.loads((ROOT/'campaign_patches/uf_equipment_catalog.json').read_text());local=NativePartyBridge(SimpleNamespace(catalog=catalog),self.host_game)
+        snapshot=json.loads(json.dumps(host.latest['roster']));snapshot['members'][0]['kit']['slots']['grenade']=32
+        with self.assertRaisesRegex(ValueError,'canonical plan'):local.current_plan(snapshot)
+        self.assertFalse(self.host_files.read('party.json')['runtime_ready'])
+
     def test_actual_workers_require_received_socket_challenge_then_one_use_approval(self):
         host,peer,c,ready=self.party();ack=self.host_game/'coop/party-bridge/ack-0.json'
         # A signed host UDP challenge alone must NEVER trigger a peer proof.
@@ -181,6 +204,30 @@ class NativeBridgeWorkers(unittest.TestCase):
         ledger.activate(other)  # explicit trusted local Native session only
         self.assertFalse(ledger.admit(challenge(1,epoch=other))['consumed'])
         with self.assertRaises(ValueError):ledger.admit(challenge(1105))
+
+    def test_parallel_peers_different_targets_share_one_host_ready_context(self):
+        host,peer,c,ready=self.party()
+        third_fixture=suite_fixture.SuiteTest();third_fixture.setUp();self.fixtures.append(third_fixture)
+        import zipfile
+        with zipfile.ZipFile(third_fixture.game/'UnitedFronts/bridge_fixture.pk3','w') as z:z.writestr(zipfile.ZipInfo('maps/noville.bsp',date_time=(2020,1,1,0,0,0)),b'fixture, never executed')
+        suite_fixture.suite.seal_installation(third_fixture.game)
+        third=Worker(['--game',str(third_fixture.game),'--invitation-file',str(self.base/'invitation.json')],self.env);self.workers.append(third)
+        self.wait(lambda:all(w.latest and len(w.latest['members'])==3 for w in self.workers))
+        revision=third.latest['roster']['revision'];third.send({'action':'kit','revision':revision,'kit':{'mode':'manual','family':'american','slots':{'primary':9,'secondary':6,'pistol':22,'grenade':31}}})
+        self.wait(lambda:all(w.latest['roster']['revision']>revision for w in self.workers))
+        for w in self.workers:w.send({'action':'confirm','revision':w.latest['roster']['revision'],'plan':w.latest['roster']['plan_sha256'],'ready':True})
+        self.wait(lambda:all(len(w.latest['confirmed_slots'])==3 for w in self.workers))
+        self.wait(lambda:self.host_files.read('party.json').get('revision')==host.latest['roster']['revision'])
+        current=self.host_files.read('party.json');now=int(time.time()*1000)
+        first=dict(c,challenge_serial='0000000000000003',nonce='a'*64,client_join_nonce='b'*64,roster_revision=current['revision'],plan_sha256=current['plan_sha256'],created_unix_ms=now,expires_unix_ms=now+20000)
+        second=dict(first,pending_index=1,challenge_serial='0000000000000002',nonce='c'*64,client_join_nonce='d'*64,member_guid=next(m['guid'] for m in host.latest['members'] if m['slot']==2),client_target='192.0.2.7:28960',client_endpoint='192.0.2.8:31001')
+        ready['context']={key:first[key] for key in CONTEXT_FIELDS};self.assertNotIn('client_target',ready['context'])
+        self.host_files.write('host-ready.json',ready);shared_hash=hashlib.sha256((self.host_files.root/'host-ready.json').read_bytes()).hexdigest()
+        self.peer_files.write('client.json',self.local_intent(first));FixedFiles(third_fixture.game).write('client.json',self.local_intent(second))
+        self.host_files.write('host-0.json',first);self.host_files.write('host-1.json',second)
+        self.wait(lambda:all((self.host_files.root/f'ack-{index}.json').exists() for index in (0,1)))
+        self.assertEqual(self.host_files.read('ack-0.json')['challenge']['client_target'],'127.0.0.1:28960');self.assertEqual(self.host_files.read('ack-1.json')['challenge']['client_target'],'192.0.2.7:28960')
+        self.assertEqual(hashlib.sha256((self.host_files.root/'host-ready.json').read_bytes()).hexdigest(),shared_hash)
 
     def test_actual_workers_300_consumed_requests_keep_party_identity_and_three_records(self):
         host,peer,c,ready=self.party();ack=self.host_game/'coop/party-bridge/ack-0.json'
