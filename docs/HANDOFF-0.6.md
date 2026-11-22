@@ -67,6 +67,27 @@ This addendum supersedes pending statements below. Nothing has been published.
   Schreibzugriff; die frühere Korruption bleibt ein Defekt des eigenen
   Free-/Ownership-Pfads. Kein Beweis für Reload/Disconnect und keine
   Produktionslösung.
+- **M3 reload/rejoin and writer / M3 Reload/Rejoin und Writer:** local commit
+  `5cbf05a` adds the native checkpoint roundtrip to the four-role scenario and
+  re-arms the tree watch per map generation. `run/qa-noville-m1-reload2`
+  PASSes: real host `savegame`/`loadgame`, all three joiners rejoin the restored
+  world, move 105.9/209.1/250.8 units, no allocator failure and a clean
+  shutdown. `run/qa-noville-m1-reload-watch1` PASSes and identifies the writer:
+  on generation 1 all three joiners hit `definition+4` with `0xFFFFFFFF`,
+  written by the engine `memset` at RVA `0x2C460` (store IP RVA `0x2C49B`);
+  generation 2 has no hit. The engine poisons the shared XAnim definition
+  during map teardown. An own tree freed after that teardown reads the poisoned
+  node count, which is the earlier `0xff000000` free-entry corruption. Borrow
+  avoids it because no own tree survives the teardown. This is a causal
+  diagnosis, not a production fix; promoting borrowing still needs native
+  Windows/Steam and further map coverage.
+  / Commit `5cbf05a`; Reload `reload2` besteht (drei Joiner zurück, Bewegung,
+  kein Alloc-Fehler, sauberer Shutdown). Watch `reload-watch1` findet den
+  Writer: Engine-`memset` RVA `0x2C460` schreibt `0xFFFFFFFF` auf
+  `definition+4` beim Map-Teardown (Generation 1), Generation 2 ohne Treffer.
+  Eigener Baum nach dem Teardown liest die vergiftete Node-Zahl → frühere
+  `free-entry`-Korruption. Borrow vermeidet das. Kausale Diagnose, keine
+  Produktionslösung; Windows/Steam und weitere Karten fehlen.
 - **Latest worker checkpoint / Neuester Worker-Stand:** local source `277fc47`
   fixes actual Windows/Wine atomic-replace sharing failures and physical-link
   rejection. Fresh immutable worker source graph
