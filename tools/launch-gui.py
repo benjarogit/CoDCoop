@@ -176,7 +176,7 @@ def worker_command(kind, arguments):
 def internal_worker(argv):
     if argv[:1] != ["--internal-command"]:
         return None
-    if len(argv) < 2 or argv[1] not in {"suite", "session", "party"}:
+    if len(argv) < 2 or argv[1] not in {"suite", "session", "party", "capabilities"}:
         return 2
     # A Windows windowed bundle normally sets sys.std* to None. QProcess still
     # supplies inherited pipes for worker invocations; attach Python streams to
@@ -197,6 +197,10 @@ def internal_worker(argv):
                     return 2
                 fd = msvcrt.open_osfhandle(handle, flags)
                 setattr(sys, name, os.fdopen(fd, mode, encoding="utf-8", buffering=1))
+    if argv[1]=="capabilities":
+        if len(argv)!=2:return 2
+        from launcher_provenance import capabilities
+        print(json.dumps(capabilities()),flush=True);return 0
     module = importlib.import_module({"suite":"coop_suite", "session":"coop_session", "party":"coop_party"}[argv[1]])
     return module.main(argv[2:])
 

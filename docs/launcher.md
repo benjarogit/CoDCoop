@@ -51,7 +51,8 @@ On Windows, build the self-contained native directory with the pinned native
 Python environment:
 
 ```sh
-python tools/build-launcher.py
+python tools/launcher_provenance.py --output build/launcher-source-graph.json
+python tools/build-launcher.py --source-graph build/launcher-source-graph.json
 ```
 
 For distributable Linux binaries, use the isolated Ubuntu 22.04 builder:

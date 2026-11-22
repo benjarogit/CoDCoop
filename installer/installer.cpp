@@ -89,8 +89,15 @@ static void RememberFile(const std::wstring& path) {
         throw std::runtime_error("unsafe destination: "+suite::Utf8(path));
     std::wstring backup;
     if (exists) {
-        backup=path+L".coop-backup."+std::to_wstring(GetCurrentProcessId())+L"."+std::to_wstring(g_changes.size());
-        if (!CopyFileW(path.c_str(),backup.c_str(),TRUE)) throw std::runtime_error("cannot back up "+suite::Utf8(path));
+        const auto base=path+L".coop-backup."+std::to_wstring(GetCurrentProcessId())+L"."+std::to_wstring(g_changes.size());
+        bool copied=false;
+        for (unsigned attempt=0;attempt<1000;++attempt) {
+            backup=base+(attempt?L"."+std::to_wstring(attempt):L"");
+            if (CopyFileW(path.c_str(),backup.c_str(),TRUE)) { copied=true;break; }
+            const DWORD error=GetLastError();
+            if (error!=ERROR_FILE_EXISTS && error!=ERROR_ALREADY_EXISTS) break;
+        }
+        if (!copied) throw std::runtime_error("cannot back up "+suite::Utf8(path));
     }
     g_changes.push_back({path,backup,exists});
 }
@@ -1573,7 +1580,59 @@ static std::wstring g_summary;
 
 static void Line(const std::wstring& text) { g_summary += text + L"\r\n"; }
 
+static bool RetiredTriggerName(const std::string& base) {
+    return base=="zzzzz_codcoop_triggers.pk3" || base=="zzzzz_coop_triggers.pk3";
+}
+static std::map<std::string,suite::Json> PayloadPins(const suite::Json& files) {
+    if (!files.is_object()) throw std::runtime_error("invalid previous or replacement payload ownership");
+    std::map<std::string,suite::Json> result;
+    for (auto it=files.begin();it!=files.end();++it) {
+        auto lower=suite::Lower(it.key());
+        if (!result.emplace(lower,it.value()).second) throw std::runtime_error("ambiguous payload ownership path: "+it.key());
+    }
+    return result;
+}
+static bool PayloadDigest(const suite::Json& value) {
+    if (!value.is_string()) return false;
+    auto hash=value.get<std::string>();
+    return hash.size()==64 && std::all_of(hash.begin(),hash.end(),[](char c){return (c>='0'&&c<='9')||(c>='a'&&c<='f');});
+}
+static void PreflightRetiredTriggerOverlays(const std::wstring& game,const std::wstring& overlay) {
+    const auto newPath=overlay+L"\\coop\\runtime-lock.json";
+    if (!Exists(newPath)) return;
+    auto current=PayloadPins(suite::Json::parse(suite::Read(newPath)).at("files"));
+    std::map<std::string,suite::Json> old;
+    const auto oldPath=game+L"\\coop\\runtime-lock.json";
+    if (Exists(oldPath)) old=PayloadPins(suite::Json::parse(suite::Read(oldPath)).at("files"));
+    std::set<std::string> required;
+    auto manifestPath=overlay+L"\\coop\\variants.json";
+    if (Exists(manifestPath)) {
+        auto manifest=suite::Json::parse(suite::Read(manifestPath));
+        for (const auto& item:manifest.at("required")) required.insert(suite::Lower(item.at("path").get<std::string>()));
+    }
+    for (const std::string folder:{"Main","uo","sp_improved","UnitedFronts"}) {
+        const auto replacement=folder+"/zzzz_coop_triggers.pk3", lower=suite::Lower(replacement);
+        auto pin=current.find(lower);
+        if (pin==current.end() && !required.count(lower)) continue;
+        auto file=suite::Resolve(overlay,replacement);DWORD attr=GetFileAttributesW(file.c_str());
+        if (pin==current.end() || !PayloadDigest(pin->second) || attr==INVALID_FILE_ATTRIBUTES ||
+            (attr&(FILE_ATTRIBUTE_DIRECTORY|FILE_ATTRIBUTE_REPARSE_POINT)) || suite::Hash(file)!=pin->second.get<std::string>())
+            throw std::runtime_error(suite::Utf8(std::wstring(L("Das neue Missionspaket fehlt oder wurde veraendert: ","Replacement mission overlay is missing or changed: "))+Widen(replacement)));
+        for (const std::string base:{"zzzzz_codcoop_triggers.pk3","zzzzz_coop_triggers.pk3"}) {
+            const auto rel=folder+"/"+base, key=suite::Lower(rel);
+            if (current.count(key)) continue;
+            auto path=suite::Resolve(game,rel);DWORD attributes=GetFileAttributesW(path.c_str());
+            if (attributes==INVALID_FILE_ATTRIBUTES) continue;
+            auto previous=old.find(key);
+            if ((attributes&(FILE_ATTRIBUTE_DIRECTORY|FILE_ATTRIBUTE_REPARSE_POINT)) || previous==old.end() ||
+                !PayloadDigest(previous->second) || suite::Hash(path)!=previous->second.get<std::string>())
+                throw std::runtime_error(suite::Utf8(std::wstring(L("Vorheriges Missionspaket ist veraendert oder nicht paketverwaltet. Bitte sichern und vor dem Update ausdruecklich entfernen: ",
+                    "Previous mission overlay is modified or not payload-owned; back it up and remove it explicitly before updating: "))+Widen(rel)));
+        }
+    }
+}
 static void RetireOldPayload(const std::wstring& game,const std::wstring& overlay) {
+    PreflightRetiredTriggerOverlays(game,overlay);
     auto oldPath=game+L"\\coop\\runtime-lock.json", newPath=overlay+L"\\coop\\runtime-lock.json";
     if (!Exists(oldPath) || !Exists(newPath)) return;
     auto old=suite::Json::parse(suite::Read(oldPath)).at("files");
@@ -1583,7 +1642,7 @@ static void RetireOldPayload(const std::wstring& game,const std::wstring& overla
     for (auto it=old.begin();it!=old.end();++it) {
         std::string lower=suite::Lower(it.key());
         std::string base=lower.substr(lower.find_last_of('/')+1);
-        bool generated=(lower.size()>=4 && lower.substr(lower.size()-4)==".pk3" && base.find("codcoop")!=std::string::npos) || lower.rfind("coop/launcher/",0)==0;
+        bool generated=(lower.size()>=4 && lower.substr(lower.size()-4)==".pk3" && (base.find("codcoop")!=std::string::npos || RetiredTriggerName(base) || base=="zzzz_coop_triggers.pk3" || base=="zzzz_coop_campaign.pk3")) || lower.rfind("coop/launcher/",0)==0;
         if (!generated || keep.count(lower)) continue;
         auto path=suite::Resolve(game,it.key());
         if (suite::PersonalPath(path)) continue;
@@ -1624,6 +1683,7 @@ static bool RunInstall(std::wstring& err)
               "Verified English language files are needed to switch this German installation. Keep German or restore the English base first.");
         return false;
     }
+    PreflightRetiredTriggerOverlays(dir,overlay); // before downloads or transaction mutation
     auto suiteManifest=suite::Json::parse(suite::Read(overlay+L"\\coop\\variants.json"));
     for (const auto& item:suiteManifest.at("required")) {
         if (item.value("kind",std::string())!="base_content" || item.value("engine",std::string())!="cod1") continue;

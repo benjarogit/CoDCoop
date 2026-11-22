@@ -32,7 +32,7 @@ def collect_notices(root, bundle, analysis_toc=None):
     from PySide6.QtCore import qVersion
     inventory['qt_version'] = qVersion()
     for name in ('PySide6', 'PySide6_Essentials', 'PySide6_Addons', 'PySide6_Pdf', 'PySide6_WebEngine', 'shiboken6',
-                 'PyInstaller', 'pyinstaller-hooks-contrib', 'altgraph', 'packaging', 'pefile', 'cryptography', 'cffi', 'pycparser'):
+                 'PyInstaller', 'pyinstaller-hooks-contrib', 'altgraph', 'packaging', 'pefile', 'cryptography', 'cffi', 'pycparser', 'typing_extensions'):
         try:
             dist = importlib.metadata.distribution(name)
         except importlib.metadata.PackageNotFoundError:
@@ -102,9 +102,12 @@ def collect_notices(root, bundle, analysis_toc=None):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--source-graph",type=Path,required=True)
     args = parser.parse_args(argv)
     root = Path(__file__).resolve().parent.parent
-    for package, expected in (("PySide6", "6.12.0"), ("PyInstaller", "6.22.3"), ("cryptography", "50.0.2")):
+    import launcher_provenance as provenance
+    graph=provenance.load(args.source_graph);provenance.assert_sources(root,graph)
+    for package, expected in (("PySide6", "6.12.0"), ("PyInstaller", "6.22.3"), ("cryptography", "50.0.2"), ("cffi", "2.1.1"), ("pycparser", "3.11"), ("typing_extensions", "4.16.0")):
         try:
             actual = importlib.metadata.version(package)
         except importlib.metadata.PackageNotFoundError:
@@ -118,10 +121,14 @@ def main(argv=None):
         parser.error('the source-derived UF equipment catalog is required for launcher preferences')
     destination = (args.output or root / "build/launcher").resolve()
     name = "CoD-Coop-Launcher"
+    generated=root/"build"/"launcher-identity"/sys.platform
+    generated.mkdir(parents=True,exist_ok=True)
+    (generated/"launcher_build_identity.py").write_text("SOURCE_GRAPH_JSON = "+repr(provenance.canonical(graph).decode("ascii"))+"\n")
     command = [sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean", "--onedir", "--windowed",
                "--name", name, "--distpath", str(destination),
                "--workpath", str(root / ("build/launcher-work-" + sys.platform)),
                "--specpath", str(root / "build/launcher-spec"),
+               "--paths", str(generated), "--hidden-import", "launcher_build_identity",
                "--paths", str(root / "tools"), "--hidden-import", "coop_suite", "--hidden-import", "coop_session", "--hidden-import", "coop_party", "--hidden-import", "party_native_bridge",
                "--add-data", str(catalog) + os.pathsep + ".",
                str(root / "tools/launch-gui.py")]
@@ -131,6 +138,9 @@ def main(argv=None):
     executable = destination / name / (name + (".exe" if sys.platform == "win32" else ""))
     if not executable.is_file():
         parser.error("PyInstaller did not produce the expected launcher")
+    provenance.assert_sources(root,graph)
+    receipt={"schema":1,"executable":executable.name,"executable_sha256":provenance.sha(executable),"source_graph":graph,"source_graph_sha256":provenance.digest(graph)}
+    (destination/name/"launcher-build.json").write_bytes(provenance.canonical(receipt)+b"\n")
     collect_notices(root, destination / name)
     print(executable)
     return 0

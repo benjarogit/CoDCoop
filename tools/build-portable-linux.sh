@@ -34,7 +34,8 @@ docker run --rm --user "$(id -u):$(id -g)" \
     -v "$ROOT:/work:ro" -v "$ROOT/run:/work/run:rw" -v "$ROOT/build:/work/build:rw" \
     "$IMAGE_ID" /bin/sh -ec '
         cp /opt/*dependencies.lock /work/build/portable-provenance/
-        /opt/coop-gui/bin/python tools/build-launcher.py
+        if [ ! -f build/launcher-source-graph.json ]; then /opt/coop-gui/bin/python tools/launcher_provenance.py --output build/launcher-source-graph.json; fi
+        /opt/coop-gui/bin/python tools/build-launcher.py --source-graph build/launcher-source-graph.json
         /bin/sh tools/package-appimage.sh
         /opt/coop-gui/bin/python tools/check-linux-abi.py build/launcher/CoD-Coop-Launcher --output build/portable-provenance/launcher-abi.json
         /opt/coop-gui/bin/python tools/check-linux-abi.py build/CoDCoop-Setup.AppDir --output build/portable-provenance/setup-abi.json

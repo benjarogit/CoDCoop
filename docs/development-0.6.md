@@ -107,7 +107,8 @@ Variantenanpassungen und schreibt die Laufzeit-Prüfsummen. Das Quellspiel bleib
 unverändert.
 
 ```sh
-python3 tools/build-launcher.py --output build/launcher
+python3 tools/launcher_provenance.py --output build/launcher-source-graph.json
+python3 tools/build-launcher.py --source-graph build/launcher-source-graph.json --output build/launcher
 python3 tools/stage_suite.py --game-source "/path/to/owned/Call of Duty" \
   --output run/suite-payload
 python3 tools/install-linux.py --game "/path/to/test/Call of Duty" \

@@ -62,7 +62,7 @@ def laa_bytes(original):
     return bytes(data)
 
 
-def stage(game, output, yap_archive, yap_extras, include_base=False, launcher_source=None, base_archive=None, runtime_source=None, checker_prefix=None):
+def stage(game, output, yap_archive, yap_extras, include_base=False, launcher_source=None, base_archive=None, runtime_source=None, checker_prefix=None, source_graph=None):
     game, output = Path(game).resolve(), Path(output).resolve()
     if output.exists():
         raise ValueError('output already exists; choose a fresh payload directory')
@@ -78,6 +78,11 @@ def stage(game, output, yap_archive, yap_extras, include_base=False, launcher_so
             raise ValueError('native checker must use a separate isolated Wine prefix')
     # Reject stale binaries before copying or publishing any payload output.
     require_runtime_protocol(runtime_source, manifest['protocol'], checker_prefix, required_feature_mask(manifest))
+    import launcher_provenance as provenance
+    expected_graph=provenance.load(source_graph or ROOT/"build/launcher-source-graph.json")
+    provenance.assert_sources(ROOT,expected_graph)
+    launcher_source=Path(launcher_source or ROOT/"build/launcher/CoD-Coop-Launcher")
+    provenance.require_launcher(launcher_source,expected_graph,manifest["protocol"],required_feature_mask(manifest),checker_prefix)
     temporary = Path(tempfile.mkdtemp(prefix='codcoop-stage-', dir=output.parent))
     try:
         def copy(src, rel):
@@ -90,7 +95,7 @@ def stage(game, output, yap_archive, yap_extras, include_base=False, launcher_so
         copy(ROOT/'content/variants.json','coop/variants.json')
         copy(ROOT/'tools/coop_suite.py','coop/coop_suite.py')
         copy(ROOT/'tools/coop_session.py','coop/coop_session.py')
-        for name in ('coop_party.py','party_gui.py','party_binding.py','party_native_bridge.py','uf_equipment_roster.py','uf_equipment_catalog.py'):
+        for name in ('coop_party.py','party_gui.py','party_binding.py','party_native_bridge.py','launcher_provenance.py','uf_equipment_roster.py','uf_equipment_catalog.py'):
             copy(ROOT/'tools'/name,'coop/'+name)
         copy(ROOT/'tools/frozen_runtime.py','coop/frozen_runtime.py')
         copy(ROOT/'tools/runtime_protocol.py','coop/runtime_protocol.py')
@@ -193,6 +198,7 @@ def stage(game, output, yap_archive, yap_extras, include_base=False, launcher_so
         files={p.relative_to(temporary).as_posix():sha256(p) for p in sorted(temporary.rglob('*')) if p.is_file() and not (p.name.lower().startswith('localized_') and p.suffix.lower()=='.pk3')}
         lock={'suite_version':manifest['suite_version'],'manifest_sha256':sha256(temporary/'coop/variants.json'),'files':files}
         (temporary/'coop/runtime-lock.json').write_bytes(canonical(lock)+b'\n')
+        provenance.assert_sources(ROOT,expected_graph)
         temporary.rename(output)
         return lock
     except BaseException:
@@ -210,11 +216,12 @@ def main():
     parser.add_argument('--include-base',action='store_true',help='include base PK3s plus reviewed English localization for a local offline payload')
     parser.add_argument('--base-archive',type=Path,default=ROOT/'run/base-ready-v054.zip',help='pinned v0.5.4 Ready ZIP supplying reviewed English UO files')
     parser.add_argument('--runtime-source',type=Path,help='immutable directory with the four reviewed build DLL/checker inputs; defaults to build/')
+    parser.add_argument('--source-graph',type=Path,help='captured immutable launcher source graph used by both target-OS builds')
     parser.add_argument('--checker-prefix',type=Path,help='initialized isolated Wine prefix for native checker capabilities on Linux')
     args=parser.parse_args()
     args.output.parent.mkdir(parents=True,exist_ok=True)
     try:
-        lock=stage(args.game_source,args.output,args.yap_archive,args.yap_extras,args.include_base,args.launcher_source,args.base_archive,args.runtime_source,args.checker_prefix)
+        lock=stage(args.game_source,args.output,args.yap_archive,args.yap_extras,args.include_base,args.launcher_source,args.base_archive,args.runtime_source,args.checker_prefix,args.source_graph)
     except (OSError,ValueError,subprocess.SubprocessError,zipfile.BadZipFile) as error:
         parser.exit(1,'CoDCoop payload failed: '+str(error)+'\n')
     print('Local payload prepared:',args.output)
