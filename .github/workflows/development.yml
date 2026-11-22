@@ -29,7 +29,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - run: sudo apt-get update && sudo apt-get install -y g++-mingw-w64-i686
+      - run: sudo apt-get update && sudo apt-get install -y g++-mingw-w64-i686 libssl-dev
       - run: ./build.sh
       - run: g++ -std=c++17 -Wall -Wextra -fsanitize=address,undefined tests/test_suite_protocol.cpp -o build/test_suite_protocol && ./build/test_suite_protocol
       - run: g++ -std=c++17 -Wall -Wextra -fsanitize=address,undefined tests/test_anim_fragments.cpp -o build/test_anim_fragments && ./build/test_anim_fragments
@@ -59,6 +59,7 @@ jobs:
       - run: g++ -std=c++17 -Wall -Wextra -fsanitize=address,undefined tests/test_resource_mapping_barrier.cpp -o build/test_resource_mapping_barrier && ./build/test_resource_mapping_barrier
       - run: g++ -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined tests/test_resource_model_shadow.cpp -o build/test_resource_model_shadow && ./build/test_resource_model_shadow
       - run: g++ -std=c++17 -Wall -Wextra -Wpedantic -Werror -fsanitize=address,undefined tests/test_first_use_resources.cpp -o build/test_first_use_resources && ./build/test_first_use_resources
+      - run: g++ -std=c++17 -Wall -Wextra -Wpedantic -Werror -fsanitize=address,undefined tests/test_resource_approval_save.cpp -lcrypto -o build/test_resource_approval_save && ./build/test_resource_approval_save
       - run: g++ -std=c++17 -Wall -Wextra -fsanitize=address,undefined tests/test_inventory_preservation.cpp -o build/test_inventory_preservation && ./build/test_inventory_preservation
       - run: g++ -std=c++17 -Wall -Wextra -fsanitize=address,undefined tests/test_saved_remote_patch.cpp -o build/test_saved_remote_patch && ./build/test_saved_remote_patch
       - run: g++ -std=c++17 -Wall -Wextra -fsanitize=address,undefined tests/test_actor_eligibility.cpp -o build/test_actor_eligibility && ./build/test_actor_eligibility
