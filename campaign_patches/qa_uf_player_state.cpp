@@ -18,6 +18,13 @@ static void weaponName(HANDLE process, unsigned definitions, unsigned index, cha
         ReadProcessMemory(process,reinterpret_cast<void*>(pointer),name,size-1,&count);
     name[size-1]=0;
 }
+static void modelName(HANDLE process,unsigned index,char* name,SIZE_T size,uintptr_t table=0x47c7fb4) {
+    name[0]=0;unsigned pool=0;unsigned short handle=0;SIZE_T got=0;
+    if(index>0&&index<256&&read32(process,0x8f72f0,pool)&&pool&&
+       ReadProcessMemory(process,reinterpret_cast<void*>(table+(32+index)*2),&handle,2,&got)&&got==2&&handle)
+        ReadProcessMemory(process,reinterpret_cast<void*>(pool+handle*8+4),name,size-1,&got);
+    name[size-1]=0;
+}
 int main(int argc, char** argv) {
     if (argc < 3 || argc > 4) return 2;
     unsigned slot = std::strtoul(argv[2], nullptr, 10);
@@ -56,6 +63,11 @@ int main(int argc, char** argv) {
             if (weapon && definitions && read32(process,definitions+weapon*4,selecteddef) && selecteddef && read32(process,selecteddef+4,selectednameptr) && selectednameptr)
                 ReadProcessMemory(process,reinterpret_cast<void*>(selectednameptr),selectedname,127,&selectedread);
             std::printf(",\"selected_weapon_name\":\"%s\"",*selectedname?selectedname:"none");
+            // UO game.h/native weapon registration: WD worldModel+1C8.
+            unsigned worldptr=0;char worldname[256]={};SIZE_T worldread=0;
+            if(selecteddef&&read32(process,selecteddef+0x1c8,worldptr)&&worldptr)
+                ReadProcessMemory(process,reinterpret_cast<void*>(worldptr),worldname,255,&worldread);
+            std::printf(",\"selected_world_model\":\"%s\"",worldname);
             unsigned modelpool=0; unsigned short modelhandle=0; char viewname[256]={}; SIZE_T modelread=0;
             if (viewmodel && viewmodel<256 && read32(process,0x8f72f0,modelpool) && modelpool &&
                 ReadProcessMemory(process,reinterpret_cast<void*>(0x47c7fb4+(32+viewmodel)*2),&modelhandle,2,&modelread) && modelhandle)
@@ -125,6 +137,25 @@ int main(int argc, char** argv) {
                 std::printf("]");
             }
             if (references) {
+                // Read all byte IDs, including holes: actual client CS can
+                // advance while the frozen server shadow remains empty.
+                // Native UO G_ModelIndex cache is game RVA D2E70[256].
+                std::printf(",\"native_model_slots\":[");
+                for(unsigned id=1;id<256;++id) {
+                    char svname[256]={},clientname[256]={},cachedname[256]={};unsigned cached=0,pointer=0;SIZE_T got=0;
+                    modelName(process,id,svname,sizeof svname);
+                    modelName(process,id,clientname,sizeof clientname,0x48362d0);
+                    if(read32(process,module+0xd2e70+id*4,cached)&&cached&&read32(process,cached,pointer)&&pointer)
+                        ReadProcessMemory(process,reinterpret_cast<void*>(pointer),cachedname,255,&got);
+                    std::printf("%s{\"index\":%u,\"server_cs\":\"",id>1?",":"",id);
+                    for(const char* c=svname;*c;++c){if(*c=='\\'||*c=='\"')std::putchar('\\');if(static_cast<unsigned char>(*c)>=32)std::putchar(*c);}
+                    std::printf("\",\"client_cs\":\"");
+                    for(const char* c=clientname;*c;++c){if(*c=='\\'||*c=='\"')std::putchar('\\');if(static_cast<unsigned char>(*c)>=32)std::putchar(*c);}
+                    std::printf("\",\"cache_name\":\"");
+                    for(const char* c=cachedname;*c;++c){if(*c=='\\'||*c=='\"')std::putchar('\\');if(static_cast<unsigned char>(*c)>=32)std::putchar(*c);}
+                    std::printf("\"}");
+                }
+                std::printf("]");
                 // Verified UO 1.51 lifecycle: G_InitGentity RVA49FD0 sets
                 // +11C=1; G_FreeEntity RVA4A2C0 zeroes all2D0 bytes at4A534.
                 // G_DObjUpdate48900 resolves body+131 and seven+2A8 bytes,
@@ -167,6 +198,30 @@ int main(int argc, char** argv) {
                     for (unsigned i=0;i<count && i<8;++i) {
                         short flag=0; std::memcpy(&flag,data+0x3c+i*2,2);
                         std::printf("%s%d",i?",":"",static_cast<int>(flag));
+                    }
+                    std::printf("],\"model_names\":[");
+                    for(unsigned i=0;i<count&&i<8;++i) {
+                        unsigned model=0,pointer=0;std::memcpy(&model,data+0x1c+i*4,4);char name[256]={};SIZE_T got=0;
+                        if(model&&read32(process,model,pointer)&&pointer)ReadProcessMemory(process,reinterpret_cast<void*>(pointer),name,255,&got);
+                        std::printf("%s\"",i?",":"");
+                        for(const char* c=name;*c;++c){if(*c=='\\'||*c=='\"')std::putchar('\\');if(static_cast<unsigned char>(*c)>=32)std::putchar(*c);}
+                        std::printf("\"");
+                    }
+                    std::printf("],\"cs_model_names\":[");
+                    for(unsigned i=0;i<count&&i<8;++i) {
+                        short flag=0;std::memcpy(&flag,data+0x3c+i*2,2);char name[256]={};
+                        if(flag<0)modelName(process,static_cast<unsigned>(-flag),name,sizeof name);
+                        std::printf("%s\"",i?",":"");
+                        for(const char* c=name;*c;++c){if(*c=='\\'||*c=='\"')std::putchar('\\');if(static_cast<unsigned char>(*c)>=32)std::putchar(*c);}
+                        std::printf("\"");
+                    }
+                    std::printf("],\"client_cs_model_names\":[");
+                    for(unsigned i=0;i<count&&i<8;++i) {
+                        short flag=0;std::memcpy(&flag,data+0x3c+i*2,2);char name[256]={};
+                        if(flag<0)modelName(process,static_cast<unsigned>(-flag),name,sizeof name,0x48362d0);
+                        std::printf("%s\"",i?",":"");
+                        for(const char* c=name;*c;++c){if(*c=='\\'||*c=='\"')std::putchar('\\');if(static_cast<unsigned char>(*c)>=32)std::putchar(*c);}
+                        std::printf("\"");
                     }
                     std::printf("]}"); comma=true;
                     if (count>8 || !(mask&(side?1:2))) complete=false;

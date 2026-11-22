@@ -33,6 +33,138 @@ This addendum supersedes pending statements below. Nothing has been published.
   `run/worker9-dev6-win-io/handoff.json`. These are real frozen workers but NOT
   native game owner/kit binding, full suite setup/AppImage or physical Windows.
   Older statements about the missing fresh-worker positive are superseded.
+- **Current source regression / Aktuelle Quellregression:** after the Windows
+  file-exchange fix and new UF observer fixtures, `/usr/bin/python3 -m unittest
+  discover -s tests` discovers361 cases:325 pass,36 environment-dependent native
+  cases skip (`run/unit-after-worker-io.log`,68.578s). The ordinary `./build.sh`
+  passes (`run/build-after-worker-io.log`), build-path Core
+  `f69052402e428b3f004fd9f47e9c05b2c0a4d431a9728414c5c3a56fa7cdb086`.
+  This includes the experimental visible-body first-use and QA observer source;
+  it does not replace the exact6c726 native-tested installer candidate above.
+- **UF four-owner investigation / UF-Vier-Spieler-Untersuchung:** local Core
+  checkpoints `2ff61c1` and `17c362b` keep the work QA-only. Actual four-instance
+  Brecourt with experimental defer, default255 slots and no borrowed trees
+  receives four distinct kits, matching own CG and real independent movement.
+  The first06cf body test fails on missing late frozen-SV model mappings;
+  archive `run/qa-cod1-four/history/1795319400630017697/`, proof
+  `3969fafbba80af65bb35b0e491d2df442b13106e99a2e7cda7a9af79d01deaf9`.
+  The232d shadow prototype then exposes an overly strict case comparison:
+  all player bodies are rejected on `gear_us_helmet` versus native
+  `gear_US_helmet`. That FAIL remains at `1795319617626340645/`, proof
+  `aa8b179ba45a5a6df144afae4aa3b149242457c705ba94a3206193db447ac577`.
+  A read-only255-slot diagnostic further shows native cache `gear_us_moody`
+  at the same helmet CS ID; matching CS names alone do not prove correct media.
+  Diagnostic a8bb stopped after the first witnessed WAIT, explicitly NOT PASS,
+  archive `1795319859267421478/`. Candidate
+  `bb02a762ee0fd4bcfd88fe9e916b27f35fd606c9bc9ec1b137a78ceda0d73422`
+  at `run/uf-live-shadow-casefold/` uses native ASCII case identity and verifies/
+  repairs the approved same-ID native cache. ASan/UBSan and strict compiler
+  tests pass; actual four-player retest is pending. Every tested body component
+  must match actual XModel, negative ID, native client CS, frozen SV CS AND
+  native model cache. First-person own-body absence is recorded separately;
+  it never excuses a missing other-player body. No saved-game, native signed
+  equipment binding, special-weapon deployment or campaign acceptance is claimed.
+- **Brecourt four-role PASS / Vier-Rollen-Nachweis Brecourt:** exactbb02 above
+  passes the strengthened fresh-only four-instance scenario with native255 IDs,
+  no borrowed trees and no offline peer media/plan injection. The real initial
+  resource-bootstrap v2 path precedes each peer's native attach. Actual arrival
+  order is Host0/join1→2/join2→1/join3→3 and all owner checks use those real slots.
+  Independent input moves all three remotes; real four-owner firing changes
+  clips30/5/20/8→29/4/15/7. Normal primary and pistol selection displays MG/
+  bazooka and pistol/binocular assets. Every tested body component matches
+  actual XModel, negative ID, actual client CS, frozen SV CS and native cache.
+  All four quit0. Archive `run/qa-cod1-four/history/1795320305470444441/`;
+  proof SHA256 `ca9d08ad51602cb40f0fe0aeff9b65ce33c05b42e996ed6300bacff0ebc24705`.
+  Root spot-checks owner2 bazooka and owner0 binocular images; the campaign QA
+  observer separately reviews all8 captures. No deployment/airstrike, save/load,
+  signed-GUID binding or mission-completion claim. Noville is the next native
+  gate. Setup I/O overlapped initial Brecourt loading, so no performance claim;
+  subsequent dense-map runs are coordinated with the installer tests.
+- **Noville FAIL / Noville fehlgeschlagen:** bb02's four-instance case is NOT
+  accepted. Joiner1 crashes at native45fd50 while freeing tree95d400; exact
+  archive `run/qa-cod1-four/history/1795320581657023310/`, proof SHA256
+  `f3d8a087904e92299bf36a452a43c95f9c77bd7aa157314f29c6d3300aaea6fa`.
+  A separate symbolic rebuild has a byte-identical whole.text section to bb02
+  and attributes returnRVA0xbcdc to non-borrow JoinerFreeDObj→XAnimFreeTree
+  after FreeTreeInfos. Read-only findings: `run/noville-tree-free-re/FINDINGS.md`
+  and `run/bb02-caller-attribution/FINDINGS.md`. Native DObj detach does NOT
+  itself free the tree block; a double-free cause is not established. The free
+  size derived from the definition is invalid. Root's trace-only candidate
+  `9f86261d3248808acd755080e8699093e31492d5cdef14378f72dfe0235edf23`
+  at `run/uf-tree-free-trace/` logs create/free/detach/sync/info boundaries
+  without changing free semantics; causal native rerun is pending. Its initial
+  notify diagnostic reads a pool-relative field16 bytes before the actual
+  native notify handle; do not interpret that field as an SL handle.
+  Independently, Noville AND Foy use `_load_gmi.gsc`, bypassing the classic
+  loader's kit/common-init adapter. Old Noville has no valid distinct-kit
+  receipt and repeats fallback equipment. A separately pinned QA-only GMI
+  transformation is default OFF and preserves the old failing payload byte
+  for byte; it is not a native fix or production integration yet. Foy4 was
+  deliberately not started after the Noville failure.
+- **Trace retry / Wiederholung mit Protokollierung:** 9f's unchanged Noville
+  payload does not reproduce the native crash, but FAILs four-owner connectivity.
+  Only join3 attaches and produces complete normal create/detach/info/free
+  sequences; join1 and join2 fail strict native registered-weapon comparison
+  (Springfield98 / Thompson28 index111 extra local registration). No four-kit
+  or crash-fix acceptance. Archive
+  `run/qa-cod1-four/history/1795328672428275680/`, proof SHA
+  `0020a28400818cc7e753be3236be5889cfdfa0b7c50139bf5ed994cbfe992c1f`.
+  Independent bounded diagnostics:
+  `run/noville9f-bootstrap-diagnostic/1795328608465252512/FINDINGS.md`.
+  Hundreds of thousands of loading messages were a description→ACK→description
+  feedback loop, NOT repeated native loads: each failed peer has one GAME_INIT.
+  Source now replies immediately only to a genuinely advanced ACK phase, keeps
+  periodic retries, suppresses failed-peer ACKs and preserves the concrete
+  failure message. Registration/identity checks remain strict. The new flow
+  fixture passes10000 duplicate-ACK rounds with ASan/UBSan; native feedback-fix
+  runtime verification is pending. The trace notify offset is corrected in
+  current source; immutable9f evidence retains its documented caveat.
+- **Audited policy checkpoint / Geprüfter Richtlinienstand:** local `7da0480`
+  adds the still-unwired58248-byte first-use POD policy and CI fixture. Root's
+  independent strict ASan/UBSan run passes. Frozen source/evidence:
+  `run/first-use-helper-freeze/23523195884bf5a369c9589b357b97a8a5d78ae373d8286391929071b968b538/proof.json`.
+  Actual pinned Game9fd366 PE fingerprints for all20 callers/publication tail
+  and the32-bit Windows/Wine standalone policy pass. Host physical IDs and
+  temporary Peer local-load IDs are separate authorities; adoption requires
+  the native detach barrier plus actual client/shadow/cache evidence. Native
+  definition count is independently observed, not inferred from a partial
+  table. Integration sequence: `docs/first-use-resources.md`. Core does not
+  include this policy yet; resource-save manifest codec work remains separate.
+- **Save codec checkpoint / Speicher-Codec:** local `1342d24` adds only the
+  bounded approval-manifest codec and its CI fixture, independently reviewed
+  with actual OpenSSL ASan/UBSan. Final frozen header SHA
+  `ff5369d77c2df1b38c8ba23aac4eeb00d95b6d62c9cea65a465b9546bfa9e504`;
+  evidence `run/resource-approval-save/freeze/ff5369d77c2df1b38c8ba23aac4eeb00d95b6d62c9cea65a465b9546bfa9e504/proof.json`.
+  Same canonical bytes pass actual Windows CryptoAPI/Wine. Native save IO,
+  old SVG palette migration, registry reconstruction and stable-GUID ownership
+  are still unimplemented; `.coopowners` V2 is unchanged.
+- **Private installer milestone / Private Installationspakete:** completed
+  package tests do NOT close gameplay gates. Linux AppImage
+  `run/private-dev6-state24-277/Install-CoD-Coop-0.6.0-dev.6-state24-private-Linux-x86_64.AppImage`
+  SHA `7c4d9789bb2ba5ce3db6467f80e1ca2e61cca702cef110f7bf1b6f549069eabd`;
+  Windows delivery ZIP
+  `run/private-dev6-state24-rollback2/Install-CoD-Coop-0.6.0-dev.6-state24-private-rollback2-Windows.zip`
+  SHA `46200124449df891e6160edd02d2a8636d4c115403890d8a4cde2e1ab18c2320`.
+  Both retain exact native-tested6c726 runtime and graph8f workers, with NO new
+  experimental Core or QA overlays. Actual offline install/check/corruption/
+  repair/update/public rollback and GUI checks pass; CURRENT post-configure
+  cfg/save edits are retained on both platforms. New guarded Windows Setup
+  inner SHA `5baa2f373d3c115a943fc82ea52b10d6ee47b241b9be198456385c20be5d4bb9`
+  corresponds to the seven-file source overlay checkpointed as `8b9399e`,
+  not original277 Setup. Schema2 guards reject changed/unowned runtime/backups,
+  preserve personal files, restore pre-rollback state on injected failure and
+  reject legacy journals. Old0cd low-level restore rejects new schema2;
+  installer README now points at guarded Setup. Installed cross-OS and EN/DE
+  gameplay fingerprints match. Exact handoff
+  `run/private-dev6-state24-rollback2/milestone-handoff.json`, SHA
+  `c6271073ac2c6cd9682038097b8a3d0a5d0027dad81dc6639d6826676a4fbd48`.
+  All installer processes are idle; no files were uploaded or published.
+- **Latest source checks / Neueste Quellprüfung:** `./build.sh` passes
+  (`run/build-after-bootstrap-feedback.log`); Python discovery has376 cases,
+  330 passed and46 native opt-in skips (`run/unit-after-native-diagnostics.log`,
+  44.618s). Explicit native installer/codec fixtures above remain separate
+  positive evidence. GMI/default-output and source patch/oracle tests pass;
+  nothing here certifies a complete campaign or native Windows hardware.
 - **UF resource blocker / UF-Ressourcenblockade:** clean normal255-slot universal
   startup passes Brecourt250CS but fails Foy and Noville with native model overflow.
   Selected-host-only diagnostic startup passes Foy249 and Noville252; the union

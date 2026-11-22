@@ -30,6 +30,7 @@ MENU_HASHES = {
 MARKER = '// CoDCoop local campaign menu overlay v1'
 UF_WEAPONS_HASH = '7eb9e7251df248a50ce2c2b5db4196a9634221f0207e969d4549946b8a4d1fb2'
 UF_LOAD_HASH = '74a0b1971d6baf6dede4e382d6b867cb04b713223494011264288737d7814ef7'
+UF_LOAD_GMI_HASH = '1062d0435eb6bfa4c3020b27ddb7fb2f6a8c1241f1339d675034b8ef5b76baff'
 UF_PATHFINDER_HASH = '990f290ff4d69996efb333e0d3898cd722887c80897477718662c8c9ac2114ad'
 CLASSIC_PATHFINDER_HASH = '7d42c29df4d94e5801984a5c0bf31f039bf31c03145d6e120b21a4164a36a984'
 UF_HELMET_ALIAS_HASH = '20abf485b01312bc2dc3d4d262a1c2abeeedc2a52f96c8b96be635b332286b7f'
@@ -254,8 +255,8 @@ def transform_uf_binoculars(data, qa=False):
     return (text + '\n' + helper).encode('latin-1')
 
 
-def transform_uf_load(data, qa=False):
-    if hashlib.sha256(data).hexdigest() != UF_LOAD_HASH:
+def _transform_uf_load(data, expected_hash, qa=False):
+    if hashlib.sha256(data).hexdigest() != expected_hash:
         raise ValueError('Unknown United Fronts load script revision')
     text = data.decode('latin-1')
     startup = ('level.player = player;\n    maps\\_UF_weapons::Coop_PrecacheMountModels();\n'
@@ -265,6 +266,15 @@ def transform_uf_load(data, qa=False):
     if qa:
         startup += '\n    precacheItem("binoculars");\n    precacheItem("mg30cal");\n    precacheItem("mg30cal_de");'
     return replace_active(text, r'\blevel\.player\s*=\s*player\s*;', startup, expected=1).encode('latin-1')
+
+
+def transform_uf_load(data, qa=False):
+    return _transform_uf_load(data, UF_LOAD_HASH, qa=qa)
+
+
+def transform_uf_gmi_load(data, qa=False):
+    """Separately pinned UO/GMI startup; build integration is QA-only."""
+    return _transform_uf_load(data, UF_LOAD_GMI_HASH, qa=qa)
 
 
 def transform_uf_support(text, qa=False):
@@ -777,9 +787,11 @@ def uf_airborne_missing_load(data):
     return (text[:start] + prefix + text[start:]).encode('latin-1')
 
 
-def build(source, output, profile, qa=False, world_policy="universal", qa_kits=False):
+def build(source, output, profile, qa=False, world_policy="universal", qa_kits=False, qa_gmi=False):
     if qa_kits and profile != 'united_fronts':
         raise ValueError('QA individual-kit adapter requires United Fronts')
+    if qa_gmi and (profile != 'united_fronts' or not qa_kits):
+        raise ValueError('QA GMI loader experiment requires United Fronts and explicit QA kits')
     if world_policy not in ("universal", "selected"):
         raise ValueError("Unknown world resource policy")
     source, output = Path(source), Path(output)
@@ -789,6 +801,7 @@ def build(source, output, profile, qa=False, world_policy="universal", qa_kits=F
         menu = z.read('ui/main.menu')
         weapons = z.read('maps/_UF_weapons.gsc') if profile == 'united_fronts' else None
         load = z.read('maps/_load.gsc') if profile == 'united_fronts' else None
+        load_gmi = z.read('maps/_load_gmi.gsc') if qa_gmi else None
         pathfinder = z.read('maps/pathfinder.gsc') if profile == 'united_fronts' else None
         aliases = uf_asset_aliases(z) if profile == 'united_fronts' else []
         kit_adapter = uf_actor_kit_adapter(z.read('maps/_UF_loadout.gsc')) if profile == 'united_fronts' and qa_kits else None
@@ -809,10 +822,15 @@ def build(source, output, profile, qa=False, world_policy="universal", qa_kits=F
     if transformed_weapons is not None and world_policy == 'selected':
         transformed_weapons = select_uf_world_resources(transformed_weapons.decode('latin-1')).encode('latin-1')
     transformed_load = transform_uf_load(load, qa=qa) if load is not None else None
+    transformed_load_gmi = transform_uf_gmi_load(load_gmi, qa=qa) if load_gmi is not None else None
     if kit_adapter is not None:
         transformed_load = replace_active(transformed_load.decode('latin-1'),
             r'maps\\_UF_loadout::give_loadout\s*\(\s*\)\s*;',
             'maps\\_UF_loadout::give_loadout();\n    maps\\_coop_uf_kits::Start();', expected=1).encode('latin-1')
+        if transformed_load_gmi is not None:
+            transformed_load_gmi = replace_active(transformed_load_gmi.decode('latin-1'),
+                r'maps\\_UF_loadout::give_loadout\s*\(\s*\)\s*;',
+                'maps\\_UF_loadout::give_loadout();\n    maps\\_coop_uf_kits::Start();', expected=1).encode('latin-1')
     transformed_pathfinder = transform_uf_pathfinder_assets(pathfinder) if pathfinder is not None else None
     output.parent.mkdir(parents=True, exist_ok=True)
     tmp = output.with_suffix(output.suffix + '.part')
@@ -826,6 +844,9 @@ def build(source, output, profile, qa=False, world_policy="universal", qa_kits=F
     if qa_kits:
         metadata.update(qa_only=True, qa_individual_kits=True, kit_transport_implemented=False)
         metadata['qa_processor_global_audit'] = audit_uf_actor_adapter(kit_adapter)
+    if qa_gmi:
+        metadata.update(qa_gmi_loader=True, source_load_gmi_sha256=UF_LOAD_GMI_HASH,
+                        qa_gmi_scope='source-only experimental GMI startup; native compile/application not yet verified')
     if transformed_weapons is not None:
         metadata['world_resource_policy'] = world_policy
         metadata['world_resource_policy_status'] = 'experimental-candidate'
@@ -854,6 +875,8 @@ def build(source, output, profile, qa=False, world_policy="universal", qa_kits=F
             entries.append(('maps/_UF_weapons.gsc', transformed_weapons))
         if kit_adapter is not None:
             entries.append(('maps/_coop_uf_kits.gsc', kit_adapter))
+        if transformed_load_gmi is not None:
+            entries.append(('maps/_load_gmi.gsc', transformed_load_gmi))
         if airborne_fix is not None:
             entries.append(('maps/_UF_mod.gsc', airborne_fix))
             entries.append(('maps/_load.gsc', transformed_load))
@@ -877,10 +900,13 @@ def main():
                         help='experimental UF world resource policy; selected does not decide party kit preferences')
     parser.add_argument('--qa', action='store_true', help='Append isolated runtime fixtures (UF or trigger-only Brecourt; never distribute)')
     parser.add_argument('--qa-kits', action='store_true', help='UF only: opt-in host-plan actor-kit experiment; no lobby transport, never distribute')
+    parser.add_argument('--qa-gmi', action='store_true', help='UF QA-kits only: separately pinned UO/GMI startup adapter; never distribute')
     parser.add_argument('--mainline', action='store_true', help='SP Improved only: preserve CoD ending/credits then follow into UO')
     parser.add_argument('--output', type=Path, required=True,
                         help='Local-only .pk3 in an isolated test installation; source is never overwritten')
     args = parser.parse_args()
+    if args.qa_gmi and (args.profile != 'united_fronts' or not args.qa_kits or args.mainline or args.triggers_only):
+        parser.error('--qa-gmi requires --profile united_fronts --qa-kits and the normal UF overlay mode')
     if args.mainline:
         if args.profile != 'sp_improved':
             parser.error('--mainline requires --profile sp_improved')
@@ -889,7 +915,7 @@ def main():
         result = build_trigger_patch(args.game, args.output, args.profile, qa=args.qa)
     else:
         folder, name = PROFILES[args.profile]
-        result = build(args.game / folder / name, args.output, args.profile, qa=args.qa, world_policy=args.world_policy, qa_kits=args.qa_kits)
+        result = build(args.game / folder / name, args.output, args.profile, qa=args.qa, world_policy=args.world_policy, qa_kits=args.qa_kits, qa_gmi=args.qa_gmi)
     print(json.dumps(result, indent=2))
 
 

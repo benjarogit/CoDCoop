@@ -1967,3 +1967,405 @@ and `run/campaign-investigation/feature63-UO-down-checkpoint-revive.png`.
 These are two separate256MiB isolated native scopes, not one combined mixed-UI
 checkpoint session, installed payload acceptance, native Windows or campaign
 completion. No oracle was weakened and no Core writes were made by the tests.
+
+### UF original-loop world witness: source-only proposal
+
+`campaign_patches/uf_world_observer.gsc` and
+`tools/build_uf_world_observer_fixture.py` prepare a bounded observer for the
+pinned original UF sources. This is not integrated into the common builder,
+packaged, compiled by the game, installed or native-verified. Its review output
+must not be mounted over the existing compatibility overlay: the uncomposed
+original `_UF_mod.gsc` would shadow earlier asset/mechanic fixes.
+
+The original synchronous prefix is `give_loadout` → Campaign → conditional
+Cvars → Map_Climate → Levels/year, before the special-map returns and ordinary
+equipment setup. Original `thread Campaign()` and the relevant Levels prefix
+contain no waits. Cvars assigns the actual nation CVars immediately, while its
+Save_Faction_Cvars child waits one second before copying nation fields; the
+observer therefore compares `sp_ally_nation`/`sp_axis_nation`, not delayed level
+fields. UF_mod's later Spawners stage can change the population, so later
+`getspawnerarray()` rereads are not equivalent evidence.
+
+The fixture retains one original array read and one classname read per original
+iteration. It records the last recognized Campaign index/class in the original
+three case groups and the first exact snow-class match in the separate climate
+scan. The later climate map override is retained and does not invent a snow
+actor. The independent resolver graph supplies the recognized23 campaign and10
+snow classes; class matching remains case-sensitive, including snow_BAR.
+
+The proposed native input prefix is `coop_uf_native_` with fixed fields `api`,
+`mode`, `intent`, `map`, `preinit_world`, `init`, `epoch`. The native publisher
+must clear output to WAIT before GAME_INIT and provide a fresh opaque epoch and
+serial. Only actual HOST/fresh intent0 is observed. GSC requires the actual
+`level.script` and `mapname` to match the published map and rereads the stamp
+before its final commit. Saved intent1, stale contexts and absent API do not
+produce a witness. Initial proof must establish HOST before actual GAME_INIT;
+late activation after an already completed solo init is not covered.
+
+Output prefix `coop_uf_world_` contains stamp `map`, `preinit_world`,
+`init_serial`, `epoch`, `graph`; independent `campaign_count`, `last_index`,
+`last_class`, `climate_count`, `winter`, `winter_index`, `winter_class`; stage
+SVids `campaign_world`, `climate_world`, `year_world`; and `cmp_campaign`,
+`cmp_climate`, `cmp_year`, `cmp_ally_nation`, `cmp_axis_nation` comparison outputs.
+Indices use -1/empty sentinels and positive matches must be inside their own
+observed count. Counts above4096 fail explicitly; this is an observer export
+bound, not a claimed native entity capacity. Only fixed observer CVars are
+written; no actors, game/level fields, mechanics, commands or resource state
+are changed. The final status is OBSERVED, never gameplay/lobby/resource READY.
+
+Fast restart can update native `sv_serverid` after GAME_INIT. Consequently GSC
+does not require the pre-init ID to equal each later stage ID. The future native
+consumer must latch the source snapshot after original init and validate each
+stage's ID against the known pre-init or completed-init world under the same
+private epoch/serial/map/game-VM scope, then bind to the completed final ID.
+An old loaded CVar bank must never be reasserted as current observed facts.
+
+Five focused fixture tests pass, including transformation of the actual pinned
+UF archive, single-read/order preservation, map-override separation, observer
+write scope and rejection of an unknown source SHA. Reproduce with
+`/usr/bin/python3 -m unittest discover -s tests -p 'test_uf_world_observer_fixture.py'`.
+Native publisher/consumer, composition with the production overlay, GSC compile
+and actual paused-pregame observation remain open. The intended native proof
+must distinguish real engine pregame pause (stable world clock/actors with live
+UI/heartbeat) from UF introscreen control locking; neither source tests nor a
+loaded map establish that behavior.
+
+### QA-only native UF world epoch and paused preparation
+
+The subsequent isolated native prototype uses immutable Core
+`6ffc8fd0fd0eea1a5dedde03e47d925468122d659716b417087bba97fea8eb1a`
+from `run/uf-observer-epoch-prototype`, loader85fc, reviewed UO LAA0a and YAP911.
+`tools/qa_uf_world_observer.py` uses only an owned existing Host clone/prefix,
+port29968 and512MiB hunk. It enables only the explicit QA observer publisher,
+starts `coophost` before `devmap`, and supplies expectedplayers2 with only one
+actual Host. This is deliberately a single-Host preparation observation, not a
+joined-player/liveness or equipment-application test. No model-capacity increase
+or deferred-model policy is enabled.
+
+The fixture now optionally composes instrumentation **after** the pinned
+`uf_airborne_missing_load` transform. Repaired `_UF_mod.gsc` hash is
+`c6722cdc75db316cc39fb5ee190ee17165eb415979fc768f3b98accdab5affc6`;
+the composed instrumented hash is
+`e972fe9c30c41624256c12250488ffc3c6b4eb9ce38780229265058599c33034`.
+Only the owned QA overlay `zzzz_coop_world_observer.pk3` contains this composed
+source; normal compatibility assets remain in the separately rebuilt campaign
+overlay. Existing generated QA overlays are archived before replacement.
+
+Actual Brecourt and Foy original-loop scripts compile and publish OBSERVED with
+matching native epoch/serial/map, completed init and known stage world IDs.
+Brecourt reports91 Campaign and Climate spawners, last recognized index90
+`actor_ally_airborne_thompson`, no snow match, american campaign/year1944,
+american/german nation CVars. Foy reports177 in both scans, last recognized166
+`actor_ally_airborne_snow_garand`, first winter index3
+`actor_axis_snow_wehrmacht_soldier_kar98k`, american/year1945/winter. These actual
+ordered-loop observations happen to agree with the separate static BSP
+candidates on these cases; this does not make BSP order a general native oracle.
+
+The paused-pregame samples keep native world time300, `cl_paused=1`,
+`cg_norender=1` and Host position unchanged while native diagnostic files update
+each second. Manually inspected screenshots show the original mission journal
+and “Klicken zum Starten”, not UF's later introscreen cards. Foy then receives
+the ordinary Start UI action; native world time advances to528 and native
+exit0 follows. Other AI actor coordinates were not independently sampled;
+world-clock pause, Host pose and original UI are the demonstrated scope.
+
+Evidence is preserved under `run/uf-script-qa/history/`:
+
+- `1795317003001667421`: initial Brecourt overall FAIL because the first QA
+  oracle inspected OBSERVED before the next native completed-init export.
+  Native completion immediately followed; the repeat waits for both and does
+  not reinterpret this original failed report as a PASS.
+- `1795317068674672270`: Brecourt compile/context/paused-journal PASS, followed
+  directly by normal quit; this earlier scope does not include Start release.
+- `1795317107105074898`: Foy compile/context/pause and ordinary Start-release
+  PASS with normal exit0.
+- `1795317181585869391`: Noville **FAIL**, native `G_ModelIndex: overflow` after
+  model255. The original-loop console reached OBSERVED first (count167,
+  last158 snow_garand, first winter2 snow_waffen_mp40/year1945), but no completed
+  native context or paused-preparation acceptance exists for this run. Those
+  console values are partial diagnostics, not a valid completed-world witness.
+
+The native publisher remains QA-only and declares `runtime_ready=false`. There
+is no production observer capability, independent native resolver enforcement,
+individual-role ready state, late-solo-host handoff, saved-world observation,
+full resource-capacity acceptance or campaign-completion claim. The unchanged
+Noville model overflow is an explicit blocker. Focused source/oracle tests now
+total19, including stale/incomplete epoch rejection and accepting only known
+pre-init/completed IDs under the same context.
+
+### Clean-input selected-resource counterfactual and final witness baseline
+
+A later provenance review found an old owned `qa-render-models.txt` in the
+reused clone. Its SHA256 was
+`a9a7824676355cdb2a41bc53b2f9ab0dfb94a7d46ecabda9efff4f40632bbaff`,
+also shared by its old deferred-input file. Deferred mode was disabled, but the
+renderer-only hook consumed242 cache names. Native logs explicitly showed
+unchanged server CS counts (for example252→252); this is not evidence that the
+cache caused or cured CS overflow. Earlier successful observation runs retain
+their measured scope with this extra-cache caveat. The runner now archives and
+removes both exact known owned input files before launch and explicitly clears
+unrelated QA environment switches. No engine guard is disabled.
+
+The final clean-input cases preserve independent runtime/source/overlay hashes,
+native read-only model-table JSON, genuine journal screenshots, original-loop
+facts, paused samples and ordinary UI Start→native-clock advance:
+
+- `1795317423538485041`: Brecourt, unchanged universal production builder
+  parameter, **PASS**,250 actual server model IDs; paused300→Start543, exit0.
+- `1795317315857769029`: Noville, explicit experimental `selected` resource
+  policy, **PASS**,252 model IDs; original facts167/last158 snow_garand and
+  first snow2 snow_waffen_mp40, matching epoch/completed init and journal pause,
+  then normal Start and exit0.
+- `1795317353239061777`: Noville, same Core/observer with clean inputs and
+  universal resources, **FAIL**, native `G_ModelIndex: overflow` at255. This is
+  not a completed-world/pause PASS despite an earlier GSC OBSERVED console line.
+- `1795317391011712346`: Foy, clean inputs/universal resources, **FAIL**, same
+  native overflow. The earlier Foy success must not be generalized to every
+  authored/random startup path; a causal explanation for its variation has not
+  been proven.
+- `1795317480908677820`: Foy, explicit experimental selected resources,
+  **PASS**,249 native model IDs;177/last166 snow_garand, first snow3
+  snow_wehrmacht_kar98k, paused300→ordinary Start542, exit0.
+
+All paths above are under `run/uf-script-qa/history/`. The first selected Noville
+case `1795317288090733712` also passed252 with the old cache present and remains
+distinct from the subsequent clean-input repeat. Selected policy removes only
+our unconditional universal reservations while retaining the original chosen
+equipment/aircraft setup; it remains a diagnostic parameter. The global builder
+default is unchanged. These checks do not prove four different kits, every
+legal resource union, aircraft/MG mechanics or production asset transport.
+
+The witnessed GSC prefix executes before original equipment setup, but the
+native JSON export is available only after native GAME_INIT returns. By the
+visible journal pause the resource registration has already happened. A future
+approved individual-kit resource plan therefore needs an explicit preparation
+and initialization/restart contract; it cannot infer permission to add late
+models from this OBSERVED snapshot. All owned native games are stopped. The
+clone's current observer overlay and selected diagnostic campaign overlay must
+be quarantined/rebuilt before unrelated UF mechanics acceptance.
+
+### Experimental existing six-caller deferral: three Host-only diagnostics
+
+The same immutable6ffc Core, composed witness, **universal** compatibility
+overlay, UO LAA0a/YAP911 and512MiB hunk were measured with the existing explicit
+`CODCOOP_QA_DEFER_MODELS=1` QA branch. Native model IDs remain byte-sized and the
+native255-slot limit/late guards stay enabled. There is no512-model override,
+ID reuse, new allocator, production registry promotion or Core edit.
+
+Before each launch the runner archives/hashes/removes the exact owned renderer
+input, deferred input and current-map `qa-model-ledger-<map>.txt` input. Symlinks,
+including dangling links, are refused before any of those input files is
+changed. A real-filesystem regression test checks this refusal and confirms
+other-map ledgers and external targets remain untouched. Each actual native log
+reports BEFORE_GAME_INIT with imported0; persistent ledgers therefore do not
+silently prime the experiment. New ledger/media telemetry is retained afterward.
+
+All three native original-loop witnesses match fresh HOST epoch/init/world and
+their earlier class/year/nation observations. Each shows genuine original
+journal pause, unchanged world time300 and Host position while diagnostics
+continue, then ordinary UI Start, native first live registration and exit0.
+Manually inspected three-journal contact is retained in the final Brecourt
+archive. Measurements under `run/uf-script-qa/history/` are:
+
+- `1795318466241371291`, Foy: approved257/loaded257 media,669 deferred discard
+  calls,155 CS IDs before and after EndRegistration; actual paused155 and first
+  live186. Game active m1carbine40 agrees with own current CG snapshot,
+  prediction and desired selection40/name. Its raw registration audit was
+  inspected directly; subsequent runner versions also assert the audit fields.
+- `1795318525433381835`, Noville: approved258/loaded258,736 deferrals,
+  EndRegistration CS173→173; actual paused173 and first live202. Strict1 and
+  unchanged guards are asserted alongside the complete media preload.
+- `1795318574427996733`, Brecourt: approved250/loaded250,617 deferrals,
+  EndRegistration CS111→111; actual paused111 and first live145. Game active
+  m1garand42 agrees with own desired/predicted/current snapshot42/name. Native
+  last-use binding log reaches145 through the normal actor attachment caller.
+
+The startup read-race failure `1795318497480349997` is retained separately:
+Noville's runner tried to inspect the Core log before it existed, before map
+initialization. Only the observer's existence check was corrected; no native
+error or gameplay assertion was waived. The later complete repeat is distinct.
+
+These bounded results show reservation pressure can be avoided by the existing
+QA six-caller deferred path while preserving full early media caching. They do
+not validate production lifecycle/persistence, saved games, hot reload, four
+individual kits, network approval/registration, gameplay completion or all
+eventual map resource demands. The known held-gun ModelIndex lookup issue is
+**unfixed** in this Core; matching own Game/CG selected weapon names is not proof
+of correct third-person weapon models. No actor/world/inventory state is
+changed by this diagnostic beyond ordinary original Start behavior. All owned
+game processes are stopped; the existing QA-only globals are not promoted.
+
+### Experimental four fresh UF roles: body/cache counterfactuals and Brecourt
+
+`tools/qa_uf_fresh_roles.py` is a separate trusted-scenario driver; the older
+checkpoint driver is unchanged. It uses four actual owned instances, the four
+reviewed American `kit_fixture(4)` choices and a Host-only fixed QA plan. Peers
+start without `devmap` and receive the normal resource-bootstrap v2 contract;
+no peer plan, offline item bootstrap or renderer/deferred input union is
+injected. The universal overlay and existing experimental deferral are explicit.
+No borrowed-tree, MT-epoch or DObj-barrier QA flag is enabled in these cases.
+All owned executable/plugin inputs remain LAA0a/YAP911, with512MiB hunk and the
+unmodified native255 model-ID budget.
+
+The read-only native observer distinguishes actual DObj XModel names from
+negative flag IDs' server-shadow CS and actual-client CS names. Its complete
+1..255 slot table retains holes and independently reports the native Game
+model-cache name at RVA D2E70. The ownership-aware oracle requires Host server
+bodies for all four owners, and other-three client/server-shadow bodies in each
+first-person observer. First-person own-body presence/absence is explicitly
+recorded; it is not treated as third-person self-body rendering. Every checked
+body component must match actual model, negative ID, both CS tables and native
+cache name. Own current CG client/weapon identity, native inventory and real
+input/fire remain independently required. Negative fixtures reject missing
+other bodies, wrong actual models, wrong client/shadow CS, positive flags and
+wrong cache despite otherwise matching names.
+
+All archives below are under `run/qa-cod1-four/history/`:
+
+- `1795319400630017697`, Core06cf5844, **FAIL**: four distinct native kits/own CG
+  and real remote movement159/203/188 units pass. The initial oracle also
+  expected an own first-person body (subsequently corrected as above), but the
+  raw observation independently proves missing late shadow mappings for other
+  bodies: peer1 server body2 has actual weapon_bar/flag-157 with empty shadow
+  CS; head basehead2_02/flag-154 is also empty. This remains an overall failure,
+  not a retrospective PASS. Proof SHA256
+  `3969fafbba80af65bb35b0e491d2df442b13106e99a2e7cda7a9af79d01deaf9`.
+- `1795319617626340645`, Core232d34c4, **FAIL**: fresh kits/own CG and real
+  movement196/152/169 pass, but every peer lacks all player-body DObjs while
+  Host has the correct four. Thus the ownership-aware other-player oracle
+  independently fails. The case-sensitive new mirror rejected native
+  case-equivalent model names. Proof SHA256
+  `aa8b179ba45a5a6df144afae4aa3b149242457c705ba94a3206193db447ac577`.
+- `1795319859267421478`, Corea8bb4213, **diagnostic stopped FAIL**: first real
+  WAIT reason8 reports id107 `gear_us_helmet` versus client/shadow
+  `gear_US_helmet`. Independent complete slot data also shows stale native cache
+  `gear_us_moody` at107, a separate same-ID cache problem. After this exact
+  diagnosis all instances receive normal quit; the harness reports exited
+  during connection. This interrupted diagnostic is not four-owner acceptance.
+- `1795320305470444441`, Corebb02a762, **PASS**, with the corrected native
+  case-fold comparison and same-name stale-cache repair. All strict component
+  checks above pass for four fresh roles, including real primary MG/bazooka
+  selection and pistol/binocular selection through normal `weaponslot` input.
+  No observer writes or cache-mismatch waiver are used. Actual owner assignment
+  is Host0, join1→2, join2→1, join3→3; the driver follows observed owner slots
+  rather than assuming process launch order. Before/after actual firearm clips
+  are30/5/20/8→29/4/15/7; all three guests also move through actual owner input.
+  Own current CG, Host active weapon and inventory agree. Normal bootstrap
+  transfer→native init→item registration→Game/CG verification→attach ordering is
+  asserted on all three peers. Four actual native exits are0.
+
+The final proof SHA256 is
+`ca9d08ad51602cb40f0fe0aeff9b65ce33c05b42e996ed6300bacff0ebc24705`;
+generic harness result SHA256 is
+`b6c55dae07df3559253f3025a75e7fe4d5237490709e54a18b3ce99dc3d8880f`.
+Exact runtime/source/overlays, helper executable and eight raw native images
+are archived. The eight-image contact and a full owner3 image were inspected:
+normal world, held MG/bazooka/binoculars/pistols and other-player bodies render.
+Root independently spot-checked owner2 bazooka and owner0 binocular images.
+This is model/selection/regular-fire evidence, not MG deployment or bazooka
+firing, full animation/mission acceptance, a production registry, GUID-bound
+kit selection or save/load testing. The original mission naturally writes its
+startup autosave; the driver issues no save/load command and makes no saved
+world correctness claim. This successful run overlapped independent installer
+I/O and had slow loading; no FPS or loading-performance acceptance is inferred.
+
+### Noville four-owner extension: native crash, separate GMI producer gap
+
+The serial Noville extension on the same immutablebb02 Core/universal overlay,
+fresh QA plan and normal resource-bootstrap v2 **FAILS**. No borrowed-tree or
+additional MT/barrier experiment is enabled. Join1 logs real access violation
+`c0000005` at engine`0045fd50`, registers eax`ff000002`, ebx/ecx`0000cc00`,
+edx7, with stack starting`00433230`; the parent independently identifies this
+as the native XAnimFreeTree→MT_FreeIndex path. A causal Core caller/ownership
+trace remains required. It must not be described as a model-capacity failure,
+mere timeout, successful four-role map load or a reason to waive the allocator.
+
+Evidence is preserved in
+`run/qa-cod1-four/history/1795320581657023310`, proof SHA256
+`f3d8a087904e92299bf36a452a43c95f9c77bd7aa157314f29c6d3300aaea6fa`.
+The `noville-native-crash-before-cleanup/` directory captures Host/three-peer
+Core logs and raw states before normal quit requests. Generic harness cleanup
+then ends the exclusively owned prefix; no owned live game remains. The
+generic result reports exit during connection after cleanup, while the explicit
+native-crash sidecar preserves the actual failing cause. Foy four-owner testing
+has not started because the Noville gate failed.
+
+A separate source audit explains why this Noville run cannot claim distinct
+kits even before that crash: its raw plan inputs execute, but PLAN_VALIDATED
+and application receipts never appear and Native Host-loadout fallback repeats.
+Pinned UF `maps/noville.gsc` and `maps/foy.gsc` call
+`maps\\_load_gmi::main()`, whereas the current adapter and shared compatibility
+startup injection only modify `maps/_load.gsc`. UF `_load_gmi.gsc` SHA256 is
+`1062d0435eb6bfa4c3020b27ddb7fb2f6a8c1241f1339d675034b8ef5b76baff`.
+Its original order binds the protagonist, runs `_tank_gmi`, UF give_loadout and
+UF_mod; its authored speed/environment resets must be preserved. A separately
+pinned GMI-loader adaptation needs source/compile/runtime verification. This
+producer omission is independent of the native tree-free crash and does not
+justify inventing a kit or changing original special-role guards. No GMI
+behavior or Core source is changed as part of this read-only finding.
+
+### Separately pinned GMI startup adaptation: source/fixture stage only
+
+The next source candidate adds `transform_uf_gmi_load` with the independent
+UF1062d043 source pin. It reuses only the existing small startup insertion after
+the original player binding: mount/media, mine/air resources and the scoped
+player observer. Under explicit `qa_gmi=True` plus `qa_kits=True`, its kit Start
+call follows the original UF give_loadout and precedes the original UF_mod main.
+The UO `_tank_gmi` call, g_speed190 and authored environment/reset code remain
+byte-identical outside these two bounded insertions. Missing/duplicate expected
+binding patterns and unknown source hashes fail closed.
+
+This build mode is explicitly QA-only: `build(..., qa_gmi=False)` remains the
+default; CLI `--qa-gmi` requires the UF QA-kit overlay mode. The fresh-role runner
+exposes `--experimental-gmi-loader`, also default false. Production staging and
+the original Noville causal trace therefore keep their old payload. A focused
+test proves disabled mode reproduces the archived failing Noville overlay
+**byte for byte**, while the enabled mode adds only `maps/_load_gmi.gsc` plus
+explicit experimental metadata; all other package entries are unchanged.
+
+Four focused tests pass for original ordering/world-rule preservation, unknown
+revision and prefix-shape rejection, option gating, deterministic real pinned
+archive composition and disabled-byte parity. The44 existing campaign patch
+tests also pass. Reproduce with
+`/usr/bin/python3 -m unittest discover -s tests -p 'test_uf_gmi_loader.py'`.
+No native game has compiled or executed this GMI-adapted candidate yet. The
+parent's unchanged-old-payload tree-free causal trace must run first; neither
+this source fix nor future kit receipts explain or waive the archived native
+XAnimFreeTree crash.
+
+### Unchanged-payload native tree trace: connectivity FAIL, crash not reproduced
+
+Immutable Core9f86261d's optional read-only `CODCOOP_QA_TREE_FREE_TRACE=1`
+is enabled through the separate runner `--trace-tree-free` flag. The GMI option
+remains off, as do borrowed-tree/MT/barrier experiments. Actual overlay SHA256
+`dde752845fc22cb23a67535c1c01154d6ff4f854e8958d804e9eed1f9a74934f`
+matches the archived bb02 Noville failure payload byte for byte.
+
+This four-process attempt ends **FAIL** at the unchanged180-second connection
+deadline, with no native crash reproduced. Only join3 attaches as native slot1;
+join1/join2 repeatedly queue the same map before owned-tree creation. The
+independent read-only bootstrap audit identifies earlier registered-bit
+differences despite matching Game/CG weapon names: springfield98 expected0/
+actual1 on join1, thompson28 index111 expected0/actual1 on join2. Its separate
+snapshot is `run/noville9f-bootstrap-diagnostic/1795328608465252512/report.json`.
+This is neither four-owner acceptance nor evidence that the original tree-free
+crash has been fixed.
+
+The joined peer does record complete normal free sequences. For example
+entity334/tree00963400 starts with definition3016a9a0,988 nodes, refs17/mark1;
+server free keeps those fields, client sync clears mark, info release reduces
+refs to0, and immediately before native tree free definition/nodes remain
+unchanged. After native free the readable allocation has definition0/nodes0.
+Other recorded frees similarly retain their definition through native entry.
+These observed normal phases do not identify the corruption in the prior
+crashing run. The prototype's `notify` field reads16 bytes before the actual
+native info field and must **not** be interpreted as an actual SL handle; the
+parent identified this read-only diagnostic limitation independently.
+
+The failed run, complete traces, runtime/source and byte-identical old overlays
+are archived at `run/qa-cod1-four/history/1795328672428275680`, proof SHA256
+`0020a28400818cc7e753be3236be5889cfdfa0b7c50139bf5ed994cbfe992c1f`,
+harness result SHA256
+`ebf59c7f4af081626735d21d0e40cb6bcd834262411b5a8a06d26982ca2bd63b`.
+All owned processes are stopped. No guards or free behavior were changed,
+no GMI-adapted native game ran, and the original native crash remains open.
