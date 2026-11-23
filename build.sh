@@ -36,10 +36,13 @@ if ! command -v "$CXX" >/dev/null 2>&1; then
 fi
 
 OPT="-std=c++17 -O2 -s -shared -static -static-libgcc -static-libstdc++ -Wl,--no-insert-timestamp"
+# version del arbol en el log: sin esto el reporte de un jugador no dice que build corrio
+VERSION=$(git describe --always --dirty 2>/dev/null || echo local)
+BUILD_DEF="-DCOOP_BUILD=\"$VERSION\""
 mkdir -p build
 
 echo "== ddraw.dll"
-"$CXX" $OPT -o build/ddraw.dll src/loader.cpp src/ddraw.def
+"$CXX" $OPT $BUILD_DEF -o build/ddraw.dll src/loader.cpp src/ddraw.def
 echo "== codcoop_core.dll"
 "$CXX" $OPT -o build/codcoop_core.dll src/core.cpp -lws2_32 -ladvapi32
 echo "== suite-check.exe"

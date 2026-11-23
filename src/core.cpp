@@ -191,7 +191,7 @@ struct State {
 State* S;
 struct Reader;struct Writer;
 bool BootEnabled();bool BootType(uint8_t);bool BootPeerJoinAllowed();bool BootHostJoinAllowed(const sockaddr_in&);
-bool BootInterceptMap(const char*);bool BootControl(uint8_t,Reader,const sockaddr_in&);
+bool BootInterceptMap(const char*);bool BootNativeWorldReady(const char*);bool BootControl(uint8_t,Reader,const sockaddr_in&);
 void BootPreInit();void BootBeforeEnd();void BootTick();void BootShutdown();void BootStop();
 void BootWriteReady(Writer&);bool BootAcceptReady(Reader);
 void BootForgetEndpoint(const sockaddr_in&);void BootCancelPeer();void BootInvalidatePeer();
@@ -1601,10 +1601,29 @@ bool XAnimLoaded(const uint8_t* xanim)
     return false;
 }
 
-// UO: al recargar el mapa los arboles propios no se liberan con el DObj (el servidor local corre un frame mas y
-// los usa), pero tampoco los suelta el motor. Se sueltan sus infos ya, y el bloque con el mapa nuevo cargado
-// (JoinerHijack); el tamano se toma ahora, porque despues el XAnim del arbol ya no existe.
-struct OldTree { int index, bytes; uint32_t mtEpoch; };
+// Los arboles propios (DObj copiados del host en el que se une) y los cuerpos que el host crea van al heap y no a la
+// memoria de los scripts: un soldado son ~9 KB que el asignador redondea a 16 KB, y en foy el que se une se quedo sin
+// esa memoria al recargar el checkpoint ("MT_AllocIndex: failed allocation of 45 bytes"); el host, con siete cuerpos
+// vivos, se quedo sin ella al cargar la mision ("... of 9494 bytes"). El juego no los libera ni los guarda: solo los
+// usa por el DObj. El ledger de cuerpos del host sigue validando el dueno antes de liberar; su guard es la red de
+// seguridad para los bloques que el propio host creo.
+uint8_t* CreateOwnTree(uint8_t* xanim)
+{
+    uint8_t* tree = (uint8_t*)calloc(1, g::TreeBytes(xanim));
+    if (tree) *(uint8_t**)tree = xanim;
+    return tree;
+}
+// Con el XAnim ya descargado (el juego recargo los assets al volver a entrar tras un checkpoint) sus infos ya no
+// existen: solo se suelta la memoria.
+void FreeOwnTree(uint8_t* tree)
+{
+    if (tree && !IsBadReadPtr(tree, 4) && XAnimLoaded(*(uint8_t**)tree)) FreeTreeInfos(tree);
+    free(tree);
+}
+// Al recargar el mapa los arboles propios no se liberan con el DObj (el servidor local corre un frame mas y los usa):
+// se guardan y se liberan con el mapa nuevo cargado (JoinerHijack). UO suelta sus infos ya (CoD1 las limpia al
+// cargar el mapa).
+struct OldTree { uint8_t* tree; int bytes; };
 OldTree g_oldTrees[g::MAX_GENTITIES];
 int g_oldTreeCount;
 void KeepOldTrees()
@@ -1613,9 +1632,11 @@ void KeepOldTrees()
     for (auto& owner : g_qaNativeOwners) owner = {};
     for (int e = 0; e < g::MAX_GENTITIES; ++e) {
         uint8_t* tree = S->ownTree[e];
-        if (!tree || !XAnimLoaded(*(uint8_t**)tree) || g_oldTreeCount >= g::MAX_GENTITIES) continue;
-        FreeTreeInfos(tree);
-        g_oldTrees[g_oldTreeCount++] = {(int)(((uintptr_t)tree - g::UO_TREE_BASE) >> 3), g::TreeBytes(*(uint8_t**)tree), qa_mt_epoch::counter.value};
+        if (!tree || g_oldTreeCount >= g::MAX_GENTITIES) continue;
+        bool usable = !IsBadReadPtr(tree, 4) && XAnimLoaded(*(uint8_t**)tree);
+        int bytes = usable ? g::TreeBytes(*(uint8_t**)tree) : 0;
+        if (g::uo && usable) FreeTreeInfos(tree);
+        g_oldTrees[g_oldTreeCount++] = {tree, bytes};
     }
 }
 void QAMTReset(uint32_t epoch)
@@ -1677,12 +1698,8 @@ void FreeOldTrees()
 {
     if (g_oldTreeCount) Log("joiner: libero %d arboles del mapa anterior", g_oldTreeCount);
     for (int i = 0; i < g_oldTreeCount; ++i) {
-        const auto& old = g_oldTrees[i];
-        if (qa_mt_epoch::enabled && !mt_epoch::MayFree(old.mtEpoch,qa_mt_epoch::counter.value,(unsigned)old.index,(unsigned)old.bytes)) {
-            Log("QA MT discard old tree index=%d bytes=%d epoch=%u current=%u",old.index,old.bytes,old.mtEpoch,qa_mt_epoch::counter.value);
-            continue;
-        }
-        g::UO_FreeTreeBlock(old.index,old.bytes);
+        Log("joiner: arbol del mapa anterior %p bytes=%d", g_oldTrees[i].tree, g_oldTrees[i].bytes);
+        free(g_oldTrees[i].tree);
     }
     g_oldTreeCount = 0;
 }
@@ -1738,27 +1755,32 @@ void JoinerFreeDObj(int e)
     QATreeTrace("after-server-free",e,tree);
     g::Com_SyncClientDObjs();
     QATreeTrace("after-client-sync",e,tree);
-    // un arbol hecho con un XAnim que ya no esta en la tabla (el juego recargo los assets al volver a entrar tras un
-    // checkpoint) vive en memoria ya liberada: liberarlo de nuevo rompia el juego (0x45b8f0). Se olvida.
+    // un arbol propio con un XAnim que ya no esta en la tabla (el juego recargo los assets al volver a entrar tras un
+    // checkpoint): sus infos ya no existen, solo se suelta el bloque del heap. Se olvidaba entero cuando el bloque
+    // vivia en la memoria de los scripts, porque liberarlo despues rompia el juego (0x45b8f0).
     if (tree && (IsBadReadPtr(tree, 4) || !XAnimLoaded(*(uint8_t**)tree))) {
-        Log("dobj %d: arbol de antes de la recarga, se olvida", e);
+        Log("dobj %d: arbol de antes de la recarga, se libera solo el bloque", e);
+        free(tree);
         return;
     }
-    // El motor llena la definicion compartida con 0xff durante el teardown del mapa. Liberar un arbol propio
-    // despues lee esa cuenta de nodos corrupta y MT_FreeIndex revienta en 0x45fd50. Se compara con la cuenta
-    // observada al crear el arbol y se olvida el bloque si ya no coincide.
+    // El motor llena la definicion compartida con 0xff durante el teardown del mapa. Liberar las infos de un arbol
+    // propio despues lee esa cuenta de nodos corrupta. Se compara con la cuenta observada al crear el arbol y, si ya
+    // no coincide, se suelta solo el bloque del heap (las infos del pool quedan como estan).
     if (tree && expectedNodes > 0) {
         uint8_t* definition = *(uint8_t**)tree;
         int currentNodes = IsBadReadPtr(definition, 8) ? -1 : *(int*)(definition + 4);
         if (currentNodes != expectedNodes) {
-            Log("dobj %d: definicion del arbol cambio (nodes %d -> %d), se olvida", e, expectedNodes, currentNodes);
+            Log("dobj %d: definicion del arbol cambio (nodes %d -> %d), se libera solo el bloque", e, expectedNodes, currentNodes);
+            free(tree);
             return;
         }
     }
     if (g_qaBorrowEnabled) {
+        bool ownHeap = tree && tree != (uint8_t*)nativeReference.tree;
         tree_owner::Reference reference = tree_owner::Reference{(uintptr_t)tree, g_qaInitCount, tree_owner::Owner::Core};
         if (!tree || nativeReference.tree == (uintptr_t)tree) reference = nativeReference;
         tree_owner::ReleaseReference(reference, g_qaInitCount, true, reference.tree != 0, [&](uintptr_t address) {
+            if (ownHeap) { FreeOwnTree((uint8_t*)address); return; }
             auto* owned = (uint8_t*)address;
             FreeTreeInfos(owned); g::XAnimFreeTree(owned);
         });
@@ -1766,10 +1788,9 @@ void JoinerFreeDObj(int e)
     }
     if (tree) {
         QATreeTrace("before-free-infos",e,tree);
-        FreeTreeInfos(tree);
         QATreeTrace("after-free-infos",e,tree);
         QATreeTrace("before-native-tree-free",e,tree);
-        g::XAnimFreeTree(tree);
+        FreeOwnTree(tree);
         QATreeTrace("after-native-tree-free",e,tree);
     }
 }
@@ -1858,10 +1879,21 @@ uintptr_t NativeTreeSlot(int e)
 }
 void QACaptureNativeTrees()
 {
-    for (auto& owner : g_qaNativeOwners) owner = {};
-    if (!g::uo) return;
+    if (!g::uo) {
+        for (auto& owner : g_qaNativeOwners) owner = {};
+        return;
+    }
     uintptr_t base = (uintptr_t)GetModuleHandleA(g::GameDll());
     if (!base || (g_qaGameBase && base != g_qaGameBase)) return;
+    // Un rejoin sin recarga vuelve a pasar por aca con el mundo nativo ya atachado: los tipos locales ya fueron
+    // reemplazados por los paquetes del host, asi que la reconstruccion encuentra menos duenos (o ninguno) y limpiar
+    // perderia la propiedad valida capturada antes del atachado. Se conserva cada dueno cuyo slot siga apuntando al
+    // arbol capturado en esta misma generacion, y se descarta lo que el slot ya no confirma.
+    for (auto& owner : g_qaNativeOwners) {
+        bool valid = owner.slot && owner.generation == g_qaInitCount && !IsBadReadPtr((void*)owner.slot, 4) &&
+                     *(uintptr_t*)owner.slot == owner.tree;
+        if (!valid) owner = {};
+    }
     unsigned captured = 0;
     for (int e = 0; e < g::MAX_GENTITIES; ++e) {
         uintptr_t slot = NativeTreeSlot(e);
@@ -1877,7 +1909,10 @@ void QACaptureNativeTrees()
         }
         g_qaNativeOwners[e] = {slot, (uintptr_t)tree, g_qaInitCount}; ++captured;
     }
-    Log("native ownership captured before attach: %u entity owners (verified=%d)", captured, g_qaGameBase != 0);
+    unsigned kept = 0;
+    for (auto& owner : g_qaNativeOwners) if (owner.slot) ++kept;
+    Log("native ownership captured before attach: %u entity owners (verified=%d), %u kept from the previous capture",
+        captured, g_qaGameBase != 0, kept > captured ? kept - captured : 0);
 }
 uint8_t* QANativeTree(int entity)
 {
@@ -2004,7 +2039,7 @@ void JoinerApplyDObj(Reader r)
         // Match the proven QA borrow semantics: the tree was validated before
         // the free and the engine's owner slot, not the DObj, holds it.
         uint8_t* adopted = candidate;
-        uint8_t* tree = borrowed ? borrowed : adopted ? adopted : (xanim ? g::XAnimCreateTree(xanim) : nullptr);
+        uint8_t* tree = borrowed ? borrowed : adopted ? adopted : (xanim ? CreateOwnTree(xanim) : nullptr);
         if (borrowed || adopted) {
             g_nativeTreeRefs[e] = {(uintptr_t)tree, g_qaInitCount, tree_owner::Owner::Native};
             if (borrowed) {
@@ -2191,7 +2226,7 @@ void HostCreateBody(int n)
         models[count++].flags = (uint16_t)-ModelIndex(weapon);
     }
     uint8_t* xanim = FindXAnim("generic_human.atr");
-    uint8_t* tree = xanim ? g::XAnimCreateTree(xanim) : nullptr;
+    uint8_t* tree = xanim ? CreateOwnTree(xanim) : nullptr;
     DObjCreate(models, count, tree, n, 0);
     S->bodyTree[n] = tree;
     QATrackHostBody(n,tree);
@@ -2217,10 +2252,7 @@ void HostFreeBody(int n)
     S->bodyTree[n] = nullptr;
     if (g::serverObjMap[n]) g::Com_ServerDObjFree(n, true);
     g::Com_SyncClientDObjs();
-    if (tree) {
-        FreeTreeInfos(tree);
-        g::XAnimFreeTree(tree);
-    }
+    if (tree) FreeOwnTree(tree);
     Log("cuerpo %d: borrado", n);
 }
 
@@ -2652,6 +2684,26 @@ void SetDowned(int n, bool downed)
     DownedMessage(n, downed, 0);
 }
 
+// Recien levantado: unos segundos sin daño y sin que la IA le apunte, para que pueda cubrirse. Sin esto volvia a
+// caer a los pocos segundos en el mismo lugar.
+constexpr DWORD REVIVE_GRACE_MS = 3000;
+DWORD g_revivedAt[g::MAX_CLIENTS];
+bool InReviveGrace(int n) { return g_revivedAt[n] && GetTickCount() - g_revivedAt[n] < REVIVE_GRACE_MS; }
+
+// Daño a jugadores en el registro, como mucho una linea por segundo por jugador: cuanto y de donde.
+struct DamageLog { DWORD last; int sum, count; } g_damageLog[g::MAX_CLIENTS];
+void LogDamage(int n, uint8_t* attacker, int damage, int mod, int left)
+{
+    DamageLog& d = g_damageLog[n];
+    d.sum += damage;
+    ++d.count;
+    DWORD now = GetTickCount();
+    if (now - d.last < 1000) return;
+    int a = attacker && g::sv_gentities && g::sv_gentitySize ? (int)(attacker - g::sv_gentities) / g::sv_gentitySize : -1;
+    Log("dano al jugador %d: %d en %d golpes (ultimo: atacante %d, medio %d) -> vida %d", n, d.sum, d.count, a, mod, left);
+    d = {now, 0, 0};
+}
+
 void __cdecl Hook_GDamage(uint8_t* targ, uint8_t* inflictor, uint8_t* attacker, float* dir, float* point, int damage,
                           int dflags, int mod, int hitLoc)
 {
@@ -2672,7 +2724,7 @@ void __cdecl Hook_GDamage(uint8_t* targ, uint8_t* inflictor, uint8_t* attacker, 
         g_origDamage(targ, inflictor, attacker, dir, point, damage, dflags, mod, hitLoc);
         return;
     }
-    if (S->downed[n]) return;  // caido: ya no recibe daño
+    if (S->downed[n] || InReviveGrace(n)) return;  // caido o recien levantado: no recibe daño
     // El daño final depende de la zona del golpe (G_Damage lo escala): se aplica con la vida inflada para que
     // no muera adentro, se mide cuanto bajo y recien ahi se decide entre herido, caido o muerto.
     constexpr int BOOST = 100000;
@@ -2680,6 +2732,7 @@ void __cdecl Hook_GDamage(uint8_t* targ, uint8_t* inflictor, uint8_t* attacker, 
     SetHealth(n, health + BOOST);
     g_origDamage(targ, inflictor, attacker, dir, point, damage, dflags, mod, hitLoc);
     int left = *(int*)(targ + g::GE_HEALTH) - BOOST;
+    LogDamage(n, attacker, health - left, mod, left);
     if (left > 0) {
         SetHealth(n, left);
     } else if (AnyOtherStanding(n)) {
@@ -2787,6 +2840,10 @@ void HostDownedFrame(float dt)
 {
     int reviving[g::MAX_CLIENTS] = {-1, -1, -1, -1};  // a quien esta levantando cada jugador
     for (int n = 0; n < g::MAX_CLIENTS; ++n) {
+        if (g_revivedAt[n] && !InReviveGrace(n)) {  // termino la gracia: la IA lo vuelve a ver
+            g_revivedAt[n] = 0;
+            if (!S->downed[n]) *(int*)(g::Entity(n) + g::GE_FLAGS) &= ~FL_NOTARGET;
+        }
         if (!S->downed[n]) continue;
         bool savedHostWaiting=n==0&&WaitingSavedAlivePeer();
         if (!PlayerInGame(n) || (!CoopActive()&&!savedHostWaiting)) { SetDowned(n, false); continue; }
@@ -2807,6 +2864,8 @@ void HostDownedFrame(float dt)
         if (S->reviveTime[n] >= REVIVE_SECONDS) {
             SetDowned(n, false);
             SetHealth(n, *(int*)(PlayerState(n) + g::PS_MAXHEALTH) / 2);
+            g_revivedAt[n] = GetTickCount();
+            *(int*)(g::Entity(n) + g::GE_FLAGS) |= FL_NOTARGET;  // hasta que termine la gracia
             AnnounceDowned(n, false);
         } else if (reviver >= 0) {
             reviving[reviver] = n;
@@ -2945,18 +3004,29 @@ void HostVehicles()
         uint8_t* link = *(uint8_t**)(ent + g::GE_LINK);
         // pasajero con las manos vacias (tanques: el host no tiene arma de infanteria): un arma del nivel
         int& held = *(int*)(PlayerState(n) + g::PS_WEAPON);
-        if (parent && (!held || VehicleWeapon(held)) && g_weaponTried[n] != parent) {
+        // Al empezar el nivel el script todavia no le dio un arma al host: no se copia el arma del nivel.
+        bool hostArmed = *(int*)(PlayerState(0) + g::PS_WEAPON) != 0;
+        if (parent && hostArmed && (!held || VehicleWeapon(held)) && g_weaponTried[n] != parent) {
             if (held) {  // el cañón copiado del host antes de este arreglo: fuera de la mano y de la lista
                 *(uint32_t*)(PlayerState(n) + g::PS_WEAPONS + held / 32 * 4) &= ~(1u << (held % 32));
                 held = 0;
             }
             g_weaponTried[n] = parent;
-            if (int w = PickLoadedWeapon(game)) GiveWeapon(game, n, w);
-            else Log("jugador %d: el nivel no tiene armas de infanteria cargadas", n);
+            GiveHostLoadout(n);  // jeep o camion: el host lleva su arma (antes daba el arma del nivel)
+            if (!held) {
+                if (int w = PickLoadedWeapon(game)) GiveWeapon(game, n, w);
+                else Log("jugador %d: el nivel no tiene armas de infanteria cargadas", n);
+            }
         }
         if ((link ? *(uint8_t**)link : nullptr) == parent) continue;
         if (link) {
             EntUnlink(game + g::G_ENTUNLINK, ent);
+            if (!parent) {  // el host se bajo: el pasajero aparece a su lado, no trabado en el asiento
+                const float* h = (const float*)(PlayerState(0) + 0x14);
+                memcpy(PlayerState(n) + 0x14, h, 12);
+                memset(PlayerState(n) + 0x20, 0, 12);  // velocidad
+                memcpy(ent + g::GE_ORIGIN, h, 12);
+            }
             Log("jugador %d: se baja del vehiculo", n);
         }
         if (!parent || g_linkFailed[n] == parent) continue;
@@ -3594,11 +3664,32 @@ void JoinerSendJoin()
 
 void QueueJoinerMap(const char* map)
 {
-    if(BootInterceptMap(map))return;
+    // A queued map load always ends timeout recovery, including the paths the
+    // native bootstrap intercepts. Otherwise the joiner stays in recovery while
+    // the already prepared world answers the late M_MAP, and reload/connect
+    // loops forever (observed on foy after a load stall). The keep-alive tick
+    // resends M_JOIN once joined is false again.
+    bool recovering = S->recoveringConnection;
+    if (recovering) {
+        S->recoveringConnection = false;
+        S->joined = S->gamestateReady = false;
+        Log("joiner: recovery ends with the queued load of %s", map);
+    }
+    if(BootInterceptMap(map)) {
+        if (recovering && BootNativeWorldReady(map)) {
+            // Reusing the prepared world still goes through the normal attach,
+            // which the first join enters with the local server unfrozen.
+            S->frozen = false;
+            Log("joiner: prepared native world %s is current; rejoining without a reload", map);
+        }
+        return;
+    }
     S->selection.peer={};S->selection.acceptedTicket=0;
     // All reload entry paths, including timeout recovery, hand ownership to
     // normal native world loading in the same way as an explicit host reload.
-    if (g::uo) KeepOldTrees();
+    // Own trees now live on the heap in both games, so every reload path keeps
+    // them for the next world instead of leaving CoD1's ones to the engine.
+    KeepOldTrees();
     memset(S->ownTree, 0, sizeof S->ownTree);
     memset(S->ownTreeNodes, 0, sizeof S->ownTreeNodes);
     S->recoveringConnection = false;
@@ -3896,8 +3987,13 @@ void JoinerControl(uint8_t type, Reader r)
     }
 }
 
-// Remoto conectado: M_PING al host cada segundo (con el menu abierto no salen usercmds) y, si el host no manda
-// nada en HOST_TIMEOUT (se cerro o se corto), vuelta al menu principal.
+// Remoto conectado: M_PING al host cada segundo y, si el host no manda nada en HOST_TIMEOUT (se cerro o se corto),
+// vuelta al menu principal.
+//
+// Se llama desde el bombeo de paquetes (Coop_GetPacket) y no solo desde Coop_FrozenFrame: una carga nativa larga
+// (Foy tarda decenas de segundos en modelos y sombras) deja el cgame sin cuadros y el host, que no recibe nada
+// durante 8 s, libera el lugar. El jugador reconectaba en bucle y la partida no llegaba a observarse. El ping es
+// red, no dibujo: el bombeo sigue corriendo aunque el cuadro del cliente este detenido.
 void JoinerKeepAlive()
 {
     if (!S->joined) return;
@@ -4814,7 +4910,10 @@ EXPORT int __cdecl Coop_GetPacket(int sock, msg_t* msg, netadr_t* from)
     UiPausedFrame();
     MainlineContinue();
     MainlineStartMission();
-    if (S->sock == INVALID_SOCKET) return 0;
+    if (S->sock == INVALID_SOCKET) {  // sin coop: los jugadores guardados de una partida coop se van enseguida
+        if (sock == NS_SERVER && S->role == NONE) HostDropGhosts();
+        return 0;
+    }
     FlushDelayed();
     if (S->role == HOST && sock == NS_SERVER) {  // corre aunque el juego este en pausa
         HostCheckReload();
@@ -4823,6 +4922,7 @@ EXPORT int __cdecl Coop_GetPacket(int sock, msg_t* msg, netadr_t* from)
     const bool waitingReload = S->role == NONE && S->waitingForMap && sock == NS_CLIENT;
     if (!((S->role == HOST && sock == NS_SERVER) || (S->role == JOINER && sock == NS_CLIENT) || waitingReload)) return 0;
     if (S->role == JOINER && !S->joined && GetTickCount() - S->lastJoinTry > 1000) JoinerSendJoin();
+    if (S->role == JOINER) JoinerKeepAlive();
 
     static uint8_t buf[0x10000];
     for (;;) {
@@ -5025,7 +5125,9 @@ EXPORT void __cdecl Coop_HostFrame()
     if (dt < 0 || dt > 0.2f) dt = 0;
     HostUpdateBodies();
     if(S->role!=HOST) return; // ownership failure stopped this session visibly
-    HostAnimateBodies(dt);
+    // Solo en los frames del servidor, como el motor con la IA: entre uno y otro el cgame avanza el lado cliente de
+    // cada DObj del snapshot (trap 147). Copiarlo del servidor en cada frame dejaba los cuerpos a 20 cuadros por segundo.
+    if (dt > 0) HostAnimateBodies(dt);
     HostDownedFrame(dt);
     HostVehicles();
     if (CoopActive()) HostCatchUp(dt);
@@ -5108,8 +5210,12 @@ EXPORT int __cdecl Coop_FrozenFrame(int msec)
     else if (t > latest) t = latest;   // nunca adelante del ultimo snapshot
     else if (t < target - 10) t += 1;  // se acerca de a poco
     g::sv_time = t;
-    // El reloj del servidor del host manda: si esta en pausa (o el host no manda nada), t no
-    // avanza y las animaciones se quedan quietas. Si corre, avanzan a la tasa del cliente.
+    // SV_Frame no corre en el joiner, asi que este contador quedaba en 0 y el cliente no avanzaba las animaciones
+    // entre M_ANIM: soldados y jugadores se movian a 20 cuadros por segundo. Con el avance del reloj, el cgame
+    // interpola esos 20 Hz.
+    g::sv_animFrametime = t > prev && t - prev < 300 ? t - prev : 0;
+    // El reloj del servidor del host manda: si esta en pausa (o el host no manda nada), t no avanza y las
+    // animaciones se quedan quietas. Si corre, avanzan a la tasa del cliente.
     float dt = (t - prev) / 1000.0f;
     if (dt < 0.0f || dt > 0.2f) dt = 0.0f;
     JoinerAdvanceAnims(dt);

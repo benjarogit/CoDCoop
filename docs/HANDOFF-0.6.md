@@ -134,6 +134,231 @@ This addendum supersedes pending statements below. Nothing has been published.
   ohne vorab erfassten Native-Owner (spät gespawnte Panzer/Menschen,
   `owner=0`); der M4-Guard bleibt Backstop. Windows/Steam und weitere Karten
   offen.
+- **M6 join recovery after a load stall / M6 Rejoin nach einem Ladestock:**
+  Foy exposed a reconnect loop. A joiner whose verified native world was already
+  prepared answered the timeout-recovery `M_MAP` through `QueueJoinerMap`, but
+  `BootInterceptMap` returned `true` before the recovery state was cleared, so
+  the joiner neither reloaded nor rejoined; the host then freed the slot after
+  8 s of silence and the joiner repeated the loop every second. `QueueJoinerMap`
+  now ends recovery before the boot interception and, when the prepared native
+  world is current (`BootNativeWorldReady`, one source for that condition),
+  unfreezes the local server and rejoins that world without a reload — the same
+  attach path the first join uses, including `M_WORLD_READY`. Negatives:
+  `run/qa-foy-m5-adopt1` (no fix, host drops slot 1) and
+  `run/qa-foy-m5-adopt2` (recovery ends, but `frozen` still blocked
+  `JoinerHijack`, so `joined` never became true). The QA liveness gate measured a
+  single 2-second window and reported a false stall while three Foy clients were
+  still loading; `qa.wait_liveness` keeps the strict predicate (host advancing,
+  every remote active with an advancing command clock) and allows a bounded
+  20-second window instead. `run/qa-foy-m5-adopt4` then caught a harness bug in
+  that helper (it indexed a transiently incomplete connect state instead of
+  waiting for it); the helper now treats an incomplete state as "not yet".
+  `run/qa-foy-m5-adopt5` passed connect and liveness and exposed the next
+  Foy-specific fact: a peer that reaches the host before its own map is ready is
+  dropped during that load (host slot timeout 8 s) and rejoins into the
+  `PRESERVED` disposition of the same native identity. The fixture accepts
+  `FRESH` or `PRESERVED` for the same identity and still proves the current-epoch
+  kit through `coop_qa_kit_applied_N` plus the concrete per-slot inventory check.
+  / Foy hat eine Reconnect-Schleife aufgedeckt. Ein Joiner, dessen verifizierte
+  native Welt bereits vorbereitet war, beantwortete das Recovery-`M_MAP` über
+  `QueueJoinerMap`, aber `BootInterceptMap` gab `true` zurück, bevor der
+  Recovery-Zustand gelöscht war: kein Reload, kein Rejoin, Host gibt den Slot
+  nach 8 s Stille frei, Schleife im Sekundentakt. `QueueJoinerMap` beendet die
+  Recovery jetzt vor der Boot-Interception und nutzt bei aktueller vorbereiteter
+  Welt (`BootNativeWorldReady`) den normalen Attach-Pfad ohne Reload, inklusive
+  `M_WORLD_READY`. Negative: `qa-foy-m5-adopt1` (ohne Fix, Host gibt Slot 1
+  frei) und `qa-foy-m5-adopt2` (Recovery endet, aber `frozen` blockierte
+  `JoinerHijack`, `joined` wurde nie wahr). Das Liveness-Gate maß zusätzlich nur
+  ein starres 2-s-Fenster und meldete einen falschen Stall, während drei
+  Foy-Clients noch luden; `qa.wait_liveness` behält die strenge Bedingung und
+  erlaubt ein begrenztes 20-s-Fenster. `qa-foy-m5-adopt5` passierte Connect und
+  Liveness und zeigte den nächsten Foy-Effekt: Ein Peer, der den Host erreicht,
+  bevor seine eigene Karte fertig ist, wird während dieses Ladens gedroppt
+  (Host-Slot-Timeout 8 s) und kommt danach in der `PRESERVED`-Disposition
+  derselben nativen Identität zurück. Die Fixture akzeptiert `FRESH` oder
+  `PRESERVED` bei gleicher Identität und belegt das Kit der aktuellen Epoche
+  weiterhin über `coop_qa_kit_applied_N` plus die konkrete Inventarprüfung je
+  Slot.
+- **M7 Foy own-tree ceiling, capture merge / M7 Foy-Eigenbaum-Grenze und Capture-Zusammenführung:**
+  `run/qa-foy-m5-adopt6` reached the checkpoint reload and failed inside the
+  joiner with `MT_AllocIndex: failed allocation of 45 bytes for script usage`.
+  The pool was not exhausted by adoptions (`active 16`) but by own trees
+  (`own_trees` 189/91/77); join1 carried the most because its recovery rejoin
+  re-ran `QACaptureNativeTrees`, which cleared the table and therefore lost the
+  ownership captured before the first attach, so every soldier it met again
+  became an own tree. `QACaptureNativeTrees` now keeps each owner whose slot
+  still points at the captured tree in the same world generation and only drops
+  what the slot no longer confirms (a real reload still clears everything
+  through the generation change). This is the same diagnosis upstream fixes in
+  `1435a93` by moving own trees to the heap; M9 closes the pool ceiling by
+  moving joiner own trees and host body trees to the heap, so Foy is the map
+  that needed them.
+  / `run/qa-foy-m5-adopt6` erreichte den Checkpoint-Reload und scheiterte im
+  Joiner mit `MT_AllocIndex: failed allocation of 45 bytes for script usage`.
+  Der Pool war nicht durch Übernahmen (`active 16`), sondern durch Eigenbäume
+  erschöpft (`own_trees` 189/91/77); join1 hatte die meisten, weil sein
+  Recovery-Rejoin `QACaptureNativeTrees` erneut ausführte, die Tabelle leerte
+  und damit die vor dem ersten Attach erfasste Ownership verlor — jeder erneut
+  getroffene Soldat wurde zum Eigenbaum. `QACaptureNativeTrees` behält jetzt
+  jeden Owner, dessen Slot in derselben Weltgeneration noch auf den erfassten
+  Baum zeigt, und verwirft nur, was der Slot nicht mehr bestätigt (ein echter
+  Reload leert weiterhin alles über den Generationswechsel). Es ist dieselbe
+  Diagnose, die Upstream in `1435a93` mit Heap-Bäumen behebt; M9 schließt die
+  Pool-Grenze mit Heap-Bäumen für Joiner-Eigenbäume und Host-Körper, Foy war
+  die Karte, die sie braucht.
+- **M8 Brecourt four-player pass / M8 Brecourt mit vier Spielern:**
+  `run/qa-brecourt-m5-adopt1` PASSes on the first attempt with the same flags as
+  Foy: four players, no borrow, `active 15` adoptions per joiner, 11 own trees
+  each, no `MT_AllocIndex` failure, no guard hit, checkpoint reload restored the
+  world for all three joiners (movement 106.2/50.3/170.0 after the reload,
+  268.6/177.7/120.3 in the observation phase) and every process shut down
+  cleanly. It ran the pre-M7 binary (`build/codcoop_core.dll` 677376 B), so the
+  capture merge and the heap trees are not part of this pass.
+  / `run/qa-brecourt-m5-adopt1` besteht im ersten Versuch mit denselben Flags wie
+  Foy: vier Spieler, kein Borrow, `active 15` Übernahmen je Joiner, je 11
+  Eigenbäume, kein `MT_AllocIndex`-Fehler, kein Guard-Treffer, der
+  Checkpoint-Reload stellt die Welt für alle drei Joiner wieder her (Bewegung
+  106,2/50,3/170,0 nach dem Reload, 268,6/177,7/120,3 in der Beobachtungsphase)
+  und alle Prozesse fahren sauber herunter. Er lief mit der Binärdatei von vor
+  M7 (`build/codcoop_core.dll` 677376 B), Capture-Merge und Heap-Bäume sind also
+  nicht Teil dieses Laufs.
+- **M9 Foy four-player pass, keep-alive in the packet pump / M9 Foy-Vier-Spieler-PASS, Keep-Alive im Paket-Pump:**
+  `run/qa-foy-m9-keepalive1` PASSes four-player Foy with the full 0.6 path:
+  production native-tree adoption, heap own trees, heap host bodies and the
+  upstream ports. Every gate passes (real connect, liveness, four
+  FRESH/PRESERVED kits, movement, own-ammo fire, authoritative body scope,
+  MG/bazooka and pistol/binocular selection, native checkpoint reload, clean
+  shutdown). 32 adoptions per joiner (16 per attach) and 7 own trees each after
+  the reload; no `MT_AllocIndex` failure and no `ERROR:` line in any of the four
+  consoles. Host bodies: 19 created, 11 replaced; the `9494 bytes` checkpoint
+  failure needed heap host bodies, not only joiner trees. Checkpoint reload:
+  joiners free 43/38/34 old trees, rejoin at 09:53:05-08 with restored
+  pose/health/inventory and then move 306.7/239.7/279.9 units (observation
+  110.5/178.2/378.3); `QACaptureNativeTrees` logs `0 kept from the previous
+  capture`, so the reload really rebuilt the world. The decisive liveness fix:
+  Foy's native load leaves the joiner's cgame at 0 frames/s for ~10-20 s while
+  `M_PING` was sent only from `Coop_FrozenFrame`; the host freed the slot after
+  8 s, the joiner recovered and the loop repeated (`qa-foy-m8-heapbody1`: drops
+  at 09:41:25/32, `host silent for 15005 ms`, liveness gate failed). The ping now
+  also runs from `Coop_GetPacket`, the packet pump that keeps running while the
+  client frame is stopped; in m9 no joiner logs `host silent` and all three stay
+  attached through the loads. Unit tests 382 OK / 46 skips; build 679936 B.
+  Evidence `run/qa-foy-m9-keepalive1/evidence/` (8.3 MB), runtime copies deleted.
+  / `run/qa-foy-m9-keepalive1` besteht vier Spieler auf Foy mit dem vollen
+  0.6-Pfad: Produktions-Übernahme nativer Bäume, Heap-Eigenbäume,
+  Heap-Host-Körper und die Upstream-Ports. Alle Gates bestehen (echter Connect,
+  Liveness, vier FRESH/PRESERVED-Kits, Bewegung, eigener Munitionsverbrauch,
+  autoritativer Körperumfang, MG/Bazooka- und Pistole/Fernglas-Auswahl,
+  nativer Checkpoint-Reload, sauberer Shutdown). 32 Übernahmen je Joiner
+  (16 pro Attach), je 7 Eigenbäume nach dem Reload; kein `MT_AllocIndex`-Fehler
+  und keine `ERROR:`-Zeile in einer der vier Konsolen. Host-Körper: 19 erzeugt,
+  11 ersetzt; der `9494-Byte`-Checkpoint-Fehler brauchte Heap-Host-Körper, nicht
+  nur Joiner-Bäume. Checkpoint-Reload: Joiner geben 43/38/34 alte Bäume frei,
+  kommen 09:53:05-08 mit Pose/Leben/Inventar zurück und bewegen sich danach
+  306,7/239,7/279,9 Einheiten (Beobachtung 110,5/178,2/378,3);
+  `QACaptureNativeTrees` meldet `0 kept from the previous capture`, der Reload
+  hat die Welt also wirklich neu aufgebaut. Entscheidender Liveness-Fix: Foys
+  nativer Ladevorgang lässt das cgame des Joiners ~10-20 s bei 0 Bildern/s,
+  während `M_PING` nur aus `Coop_FrozenFrame` kam; der Host gab den Slot nach
+  8 s frei, der Joiner erholte sich, die Schleife wiederholte sich
+  (`qa-foy-m8-heapbody1`: Freigaben 09:41:25/32, `host silent for 15005 ms`,
+  Liveness-Gate scheiterte). Der Ping läuft jetzt auch aus `Coop_GetPacket`,
+  dem Paket-Pump, der weiterläuft, während der Client-Frame steht; in m9 meldet
+  kein Joiner `host silent` und alle drei bleiben durch die Ladevorgänge
+  verbunden. Unit-Tests 382 OK / 46 Skips; Build 679936 B. Evidenz
+  `run/qa-foy-m9-keepalive1/evidence/` (8,3 MB), Laufzeitkopien gelöscht.
+- **U1 upstream comparison TheTiranix/CoDCoop / U1 Upstream-Abgleich:**
+  `upstream/master` = `52dd2bc` (fetched read-only), merge base `21eae10`;
+  upstream has 8 commits we do not, we have 78 it does not. Verdicts:
+  `1435a93` heap own trees — **PORT (highest value)**: identical diagnosis
+  (pool exhausted after the Bastogne jeep), it replaces the two
+  `g::XAnimCreateTree` call sites in `src/core.cpp` with `calloc`/`free` and
+  keeps `FreeTreeInfos` behind an `XAnimLoaded` check; our M4 guard stays in
+  front of that call because it is the proven backstop. `3386c4f` crash/error
+  logs — **ADOPT** (`src/crashlog.h` does not exist here; touches `loader.cpp`,
+  `cod2.cpp`, installers, isolated from the coop paths). `c1da93f` coop save
+  load + host-only triggers — **PORT SELECTIVELY** (`Hook_LoadGame`,
+  `SaveLocalStates`, `Hook_Trigger`, `RemoteActivator`, `PlaceJoined`,
+  `InJoinGrace`, `MoveRemote` are all absent; we already have our own `HookLoad`
+  with the mis-match skip and ghost cleanup, so the 451-line commit does not
+  cherry-pick). `fa87f10` leave vehicles at the host + revive protection —
+  **PORT SELECTIVELY** (35 lines, independent of adoption). `c827372` host
+  weapon in vehicles / late models / body interpolation — **EVALUATE** (its
+  late-model part is superseded by `BootPeerModelAllowed` and the plan-scoped
+  union media). `1ab6391` smoother joiner animations — **ADOPT** (5 lines,
+  frozen joiner frametime). `ab6cd25` joiners load host models —
+  **REJECT AS-IS**: it disables `r_errorOnConflicts` globally for the attach,
+  which would bypass our plan-scoped model policy; only the strictness knob is
+  reusable if a plan-approved model is genuinely missing. `52dd2bc` solo save
+  load — **EVALUATE** (our `HostDropGhosts()` has no `wait` parameter and no
+  non-coop path yet). Order: `1435a93` → `3386c4f` → `1ab6391` → the
+  `fa87f10`/`c1da93f` fragments, each with unit tests plus a four-player run.
+  / `upstream/master` = `52dd2bc` (nur lesend geholt), Merge-Basis `21eae10`;
+  Upstream hat 8 Commits, die wir nicht haben, wir 78, die es nicht hat.
+  Der Abgleich ist ein expliziter Schritt: `tools/upstream_check.sh` holt
+  `upstream/master` lesend und listet die fehlenden Commits samt Dateistatistik
+  (`--log` zeigt die Betreffzeilen). Es gibt keinen Automatismus und keinen
+  Hintergrunddienst dafuer; Orqen hat fuer CoDCoop keinen Adapter und beobachtet
+  keinen Upstream, die Entscheidung bleibt beim nativen Harness.
+  Bewertung: `1435a93` Heap-Eigenbäume — **PORTIEREN (höchster Nutzen)**:
+  gleiche Diagnose (Pool nach dem Bastogne-Jeep erschöpft), ersetzt die beiden
+  `g::XAnimCreateTree`-Aufrufstellen in `src/core.cpp` durch `calloc`/`free` und
+  legt `FreeTreeInfos` hinter eine `XAnimLoaded`-Prüfung; unser M4-Guard bleibt
+  davor, weil er der bewiesene Backstop ist. `3386c4f` Crash-/Fehlerlogs —
+  **ÜBERNEHMEN** (`src/crashlog.h` fehlt hier; betrifft `loader.cpp`,
+  `cod2.cpp`, Installer, unabhängig von den Coop-Pfaden). `c1da93f`
+  Coop-Save-Laden + Trigger nur vom Host — **SELEKTIV PORTIEREN**
+  (`Hook_LoadGame`, `SaveLocalStates`, `Hook_Trigger`, `RemoteActivator`,
+  `PlaceJoined`, `InJoinGrace`, `MoveRemote` fehlen alle; unser eigener
+  `HookLoad` mit Mis-match-Skip und Ghost-Cleanup existiert schon, daher kein
+  Cherry-Pick der 451 Zeilen). `fa87f10` Aussteigen am Host +
+  Revive-Schutz — **SELEKTIV PORTIEREN** (35 Zeilen, unabhängig von der
+  Übernahme). `c827372` Host-Waffe im Fahrzeug / späte Modelle / Körper-
+  Interpolation — **PRÜFEN** (der Modell-Teil wird von `BootPeerModelAllowed`
+  und den plan-gebundenen Union-Medien abgelöst). `1ab6391` weichere
+  Joiner-Animationen — **ÜBERNEHMEN** (5 Zeilen, Frametime des eingefrorenen
+  Joiners). `ab6cd25` Joiner laden Host-Modelle — **NICHT SO ÜBERNEHMEN**: es
+  schaltet `r_errorOnConflicts` für den Attach global ab und würde unsere
+  plan-gebundene Modellpolitik umgehen; nur der Strictness-Schalter ist
+  wiederverwendbar, falls ein plan-freigegebenes Modell wirklich fehlt.
+  `52dd2bc` Solo-Save-Laden — **PRÜFEN** (unser `HostDropGhosts()` hat keinen
+  `wait`-Parameter und keinen Nicht-Coop-Pfad). Reihenfolge: `1435a93` →
+  `3386c4f` → `1ab6391` → die Fragmente aus `fa87f10`/`c1da93f`, jeweils mit
+  Unit-Tests plus Vier-Spieler-Lauf.
+- **U1 update after M9 / U1-Nachtrag nach M9:** landed with `./build.sh` and the
+  382-test suite (46 environment skips): `1435a93` joiner own trees **and**
+  host body trees on the heap (`CreateOwnTree`/`FreeOwnTree`, `calloc`/`free`;
+  `TreeBytes` uses the per-game `TREE_INFO`; host-body ledger records `heap=1`
+  and frees heap entries by pointer, script-pool entries still through
+  `MT_FreeIndex`); `1ab6391` `sv_animFrametime` from the client clock advance;
+  `c827372` body interpolation (`HostAnimateBodies(dt)` only on server frames)
+  and the vehicle loadout (`hostArmed` plus `GiveHostLoadout`); `fa87f10` 3 s
+  revive grace (`FL_NOTARGET`), per-player damage log and the vehicle exit at
+  the host's spot; `52dd2bc` solo ghost drop without a coop socket; and part of
+  `3386c4f` (`CodeAddress` for every module including UO below `0x10000000`,
+  build version from `git describe`, previous session as `*_previous.log`).
+  Still open: the full `3386c4f` `crashlog.h` refactor, the selective
+  `c1da93f` fragments (native trigger/activator placement, join grace) and the
+  `52dd2bc` `wait` parameter. `ab6cd25` stays rejected as-is. The next
+  `tools/upstream_check.sh` run decides whether anything newer than `52dd2bc`
+  changes these verdicts.
+  / Mit `./build.sh` und der 382-Test-Suite (46 Umgebungs-Skips) umgesetzt:
+  `1435a93` Joiner-Eigenbäume **und** Host-Körperbäume im Heap
+  (`CreateOwnTree`/`FreeOwnTree`, `calloc`/`free`; `TreeBytes` nutzt das
+  spielspezifische `TREE_INFO`; das Host-Körper-Ledger speichert `heap=1` und
+  gibt Heap-Einträge per Zeiger frei, Script-Pool-Einträge weiter über
+  `MT_FreeIndex`); `1ab6391` `sv_animFrametime` aus dem Clientuhr-Fortschritt;
+  `c827372` Körper-Interpolation (`HostAnimateBodies(dt)` nur in
+  Server-Frames) und Fahrzeug-Loadout (`hostArmed` plus `GiveHostLoadout`);
+  `fa87f10` 3-s-Revive-Grace (`FL_NOTARGET`), Schadenslog je Spieler und
+  Aussteigen am Host; `52dd2bc` Solo-Ghost-Drop ohne Coop-Socket; und ein Teil
+  von `3386c4f` (`CodeAddress` für jedes Modul, auch UO unter `0x10000000`,
+  Build-Version aus `git describe`, voriger Lauf als `*_previous.log`). Offen:
+  der volle `3386c4f`-`crashlog.h`-Umbau, die selektiven `c1da93f`-Fragmente
+  (native Trigger-/Aktivierer-Platzierung, Join-Grace) und der
+  `52dd2bc`-`wait`-Parameter. `ab6cd25` bleibt so abgelehnt. Der nächste
+  `tools/upstream_check.sh`-Lauf entscheidet, ob etwas nach `52dd2bc` diese
+  Bewertung ändert.
 - **Latest worker checkpoint / Neuester Worker-Stand:** local source `277fc47`
   fixes actual Windows/Wine atomic-replace sharing failures and physical-link
   rejection. Fresh immutable worker source graph

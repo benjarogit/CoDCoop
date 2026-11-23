@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """EXPERIMENTAL four real fresh UF roles/body/fire; optional native checkpoint reload; no GUID-kit or production-registry acceptance."""
-import argparse,hashlib,json,os,re,shutil,subprocess,time
+import argparse,hashlib,json,os,re,shutil,subprocess,sys,time
+
+# Der Lauf wird nach run/<tag>.log umgeleitet; ohne Zeilenpuffer bleibt der Fortschritt dort bis zum
+# Ende unsichtbar. Mit -u (oder dieser Zeile) sieht man die Phasen live.
+try: sys.stdout.reconfigure(line_buffering=True)
+except Exception: pass
 from pathlib import Path
 import qa_coop as qa
 from qa_uf_kits import kit_fixture,cgame_selection_matches
@@ -51,7 +56,12 @@ def host_plan_receipts_match(native,submitted):
   if not ticket.isdigit() or int(ticket)<=0:return False
   identity='|'.join(session+[str(slot),ticket,world])
   if native.get('coop_qa_kit_identity_%d'%slot)!=identity or native.get('coop_qa_kit_applied_%d'%slot)!=identity+'|'+submitted['coop_qa_kit_epoch']:return False
-  if native.get('coop_inventory_%d_state'%slot)!='FRESH' or native.get('coop_inventory_%d_identity'%slot)!=identity:return False
+  # A peer that reached the host before its own map was ready is dropped during
+  # that load (host slots time out after 8 s of silence) and rejoins into the
+  # PRESERVED disposition of the same native identity. The current-epoch kit
+  # receipt and capture()'s concrete per-slot inventory still prove the fresh
+  # plan, so PRESERVED is accepted here; any other disposition is not.
+  if native.get('coop_inventory_%d_state'%slot) not in ('FRESH','PRESERVED') or native.get('coop_inventory_%d_identity'%slot)!=identity:return False
  return True
 
 def require_body_models(host, observers):
@@ -241,14 +251,14 @@ def main():
    time.sleep(2)
    recovered=checkpoint_connected()
    if not recovered:raise RuntimeError('remote disconnected during checkpoint recovery')
-   qa.assess_liveness(reloaded[0],recovered[0],4)
+   qa.wait_liveness(reloaded[0],checkpoint_connected,processes,4)
    for peer_number,folder in enumerate(folders[1:]):
     slot=qa.read_state(folder)['slot']
     action=('+forward','+back','+moveleft')[peer_number]
     distance=qa.move_remote(folders[0],folder,slot,processes,a.timeout,action)
     report.setdefault('checkpoint_reloads',[]).append({'iteration':iteration+1,'peer':folder.name,'slot':slot,'moved':distance})
   report['status']='PASS'
-  return {'scope':__doc__,'checks':['four actual fresh independent kits/current CG owners','normal resource-bootstrap v2; no offline plan/media on peers','all remotes moved via genuine owner input','all four consumed own firearm ammo','Host authoritative all4 server bodies and every observer other3 client/shadow bodies match native worldModel+negative actualclient/SV CS IDs; own first-person body presence recorded separately','MG/bazooka and pistol/binocular selection through actual weaponslot input; no firing/deployment claim for special weapons']+(['native checkpoint reload restored the world and every joiner rejoined'] if a.checkpoint_reloads else []), 'evidence':{'proof':'uf-fresh-roles-proof.json','map':a.map,'no_explicit_QA_save_or_load':not a.checkpoint_reloads}}
+  return {'scope':__doc__,'checks':['four actual independent kits from the current QA epoch with concrete per-slot inventory (FRESH or PRESERVED native identity)','normal resource-bootstrap v2; no offline plan/media on peers','all remotes moved via genuine owner input','all four consumed own firearm ammo','Host authoritative all4 server bodies and every observer other3 client/shadow bodies match native worldModel+negative actualclient/SV CS IDs; own first-person body presence recorded separately','MG/bazooka and pistol/binocular selection through actual weaponslot input; no firing/deployment claim for special weapons']+(['native checkpoint reload restored the world and every joiner rejoined'] if a.checkpoint_reloads else []), 'evidence':{'proof':'uf-fresh-roles-proof.json','map':a.map,'no_explicit_QA_save_or_load':not a.checkpoint_reloads}}
  subprocess.Popen=launch
  code=1
  try:code=qa.main(base,scenario=scenario)

@@ -6,6 +6,12 @@
 
 **Unreleased. No full-campaign or native-Windows certification yet.**
 
+- Foy four-player Co-op passes on the production path: native tree adoption,
+  own trees and host player-body trees on the heap (no script-pool exhaustion),
+  checkpoint reload for every joiner, and the upstream fixes for smoother joiner
+  animations, the host's weapon in vehicles, revive protection and teammates
+  leaving vehicles next to the host. Keep-alive now runs in the packet pump, so
+  a long native load no longer drops a joiner's slot after 8 s.
 - Fix atomic lobby-file exchange when a Windows/Wine reader temporarily blocks
   replacement; keep bounded retries, prior-file preservation and link rejection.
   Fresh frozen Linux and Windows/Wine workers pass signed party transactions,
@@ -106,6 +112,13 @@ mechanics remain acceptance gates. See [handoff](docs/HANDOFF-0.6.md).
 
 **Noch nicht veröffentlicht. Keine Bestätigung vollständiger Kampagnen oder nativer Windows-Läufe.**
 
+- Foy besteht mit vier Spielern auf dem Produktionspfad: Übernahme der nativen
+  Bäume, Eigenbäume und Host-Körperbäume im Heap (keine Erschöpfung des
+  Script-Pools), Checkpoint-Reload für jeden Joiner und die Upstream-Fixes für
+  weichere Joiner-Animationen, die Host-Waffe im Fahrzeug, Revive-Schutz und
+  Mitfahrer, die neben dem Host aussteigen. Das Keep-Alive läuft jetzt im
+  Paket-Pump, damit ein langer nativer Ladevorgang den Joiner-Slot nicht mehr
+  nach 8 s freigibt.
 - Atomaren Lobby-Dateiaustausch bei vorübergehend blockierenden Windows-/Wine-
   Lesern korrigieren; begrenzte Wiederholungen, Erhalt der vorherigen Datei und
   Link-Abweisung beibehalten. Neu gebaute Linux- und Windows/Wine-Worker bestehen

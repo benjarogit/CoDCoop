@@ -9,7 +9,7 @@ void QATrackHostBody(int player,uint8_t* tree)
     auto* xanim = *(uint8_t**)tree;
     unsigned nodes = *(unsigned*)(xanim+4);
     host_body_owner::Record record{(uintptr_t)tree,(uintptr_t)xanim,qa_mt_epoch::counter.value,
-        (unsigned)(((uintptr_t)tree-g::UO_TREE_BASE)>>3),nodes*8+14,nodes,player};
+        0,nodes*8+14,nodes,player,1};
     if (!host_body_owner::Valid(record)) { BodyMemoryFailure("Invalid player-body allocation provenance; restart from launcher.");return; }
     for(unsigned i=0;i<S->hostBodies.count;++i) {
         const auto& old=S->hostBodies.records[i];
@@ -56,12 +56,12 @@ void QAHostBodySweep(bool beforeInit,const char* reason)
         bool referenced=validEpoch&&QAHostBodyReferenced(record.tree);
         auto decision=host_body_owner::Release(record,qa_mt_epoch::counter.value,referenced,animationValid,
             [&](const host_body_owner::Record& owned){
-                // No Game-owned HUNK tree enters this path. This is an exact
-                // Core MT allocation, with no remaining server/client DObj refs.
+                // Bloque propio en el heap: no entra en la memoria de los scripts ni en su asignador.
                 QAClearTreeBothSides((uint8_t*)owned.tree);
-                g::UO_FreeTreeBlock(owned.index,owned.bytes);
+                if (owned.heap) FreeOwnTree((uint8_t*)owned.tree);
+                else g::UO_FreeTreeBlock(owned.index,owned.bytes);
                 ++S->hostBodies.freed;
-                Log("body memory: free player=%d index=%u bytes=%u epoch=%u reason=%s",owned.player,owned.index,owned.bytes,owned.epoch,reason);
+                Log("body memory: free player=%d index=%u bytes=%u epoch=%u heap=%u reason=%s",owned.player,owned.index,owned.bytes,owned.epoch,(unsigned)owned.heap,reason);
             });
         if(decision==host_body_owner::Decision::Hold) { ++i; continue; }
         if(decision==host_body_owner::Decision::Forget) {

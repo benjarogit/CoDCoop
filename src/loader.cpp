@@ -15,6 +15,29 @@ static FILE* g_log;
 static char g_dir[MAX_PATH];  // carpeta del exe, con barra final
 static HMODULE g_yap;         // process lifetime; never hot-reloaded with the coop core
 
+#ifndef COOP_BUILD
+#define COOP_BUILD "local"
+#endif
+
+// direccion dentro del codigo de un modulo como "nombre+desplazamiento". El modulo de juego de UO puede cargar por
+// debajo de 0x10000000, asi que un filtro por rango dejaba afuera justo las direcciones que importan.
+static bool CodeAddress(uint32_t v, char* out, size_t size)
+{
+    HMODULE m;
+    if (!v || !GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                                  (LPCSTR)(uintptr_t)v, &m))
+        return false;
+    auto* dos = (IMAGE_DOS_HEADER*)m;
+    auto* nt = (IMAGE_NT_HEADERS*)((uint8_t*)m + dos->e_lfanew);
+    uintptr_t code = (uintptr_t)m + nt->OptionalHeader.BaseOfCode;
+    if (v < code || v >= code + nt->OptionalHeader.SizeOfCode) return false;
+    char path[MAX_PATH];
+    if (!GetModuleFileNameA(m, path, MAX_PATH)) return false;
+    const char* slash = strrchr(path, '\\');
+    snprintf(out, size, "%s+%x", slash ? slash + 1 : path, (unsigned)(v - (uintptr_t)m));
+    return true;
+}
+
 static void LogLine(const char* s)
 {
     if (!g_log) return;
@@ -348,21 +371,19 @@ static bool InstallHooks()
 static LONG WINAPI CrashLog(EXCEPTION_POINTERS* ep)
 {
     CONTEXT* c = ep->ContextRecord;
-    Log("CRASH %08lx en %08lx (eax=%08lx ebx=%08lx ecx=%08lx edx=%08lx esi=%08lx edi=%08lx)",
-        ep->ExceptionRecord->ExceptionCode, (unsigned long)(uintptr_t)ep->ExceptionRecord->ExceptionAddress, c->Eax,
-        c->Ebx, c->Ecx, c->Edx, c->Esi, c->Edi);
-    char line[512] = "";
+    char at[160];
+    if (!CodeAddress((uint32_t)(uintptr_t)ep->ExceptionRecord->ExceptionAddress, at, sizeof at)) snprintf(at, sizeof at, "?");
+    Log("CRASH %08lx en %s (eax=%08lx ebx=%08lx ecx=%08lx edx=%08lx esi=%08lx edi=%08lx)",
+        ep->ExceptionRecord->ExceptionCode, at, (unsigned long)c->Eax,
+        (unsigned long)c->Ebx, (unsigned long)c->Ecx, (unsigned long)c->Edx, (unsigned long)c->Esi, (unsigned long)c->Edi);
+    char line[1024] = "";
     int len = 0, found = 0;
     const uint32_t* sp = (const uint32_t*)c->Esp;
     for (int i = 0; i < 2048 && found < 16 && !IsBadReadPtr(sp + i, 4); ++i) {
-        uint32_t v = sp[i];
-        HMODULE m;
-        if ((v >= 0x401000 && v < g::A(0x533000, 0x53f000)) ||
-            (v > 0x10000000 && GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-                                                  (LPCSTR)(uintptr_t)v, &m) && m != GetModuleHandleA("kernel32.dll"))) {
-            len += snprintf(line + len, sizeof line - len, " %08x", v);
-            ++found;
-        }
+        char where[160];
+        if (!CodeAddress(sp[i], where, sizeof where)) continue;
+        len += snprintf(line + len, sizeof line - len, " %s", where);
+        ++found;
     }
     Log("  pila:%s (nucleo en %p)", line, (void*)g_core.module);
     return EXCEPTION_CONTINUE_SEARCH;
@@ -376,11 +397,17 @@ BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID)
         char p[MAX_PATH];
         // una instancia que se une escribe aparte (pruebas con 2 juegos en la misma carpeta)
         snprintf(p, sizeof p, "%s%s", g_dir, strstr(GetCommandLineA(), "+coopjoin") ? "codcoop_join.log" : "codcoop.log");
+        // el cierre anterior queda como *_previous.log: si el juego crasheo, ese log no se pierde al abrir este
+        char previous[MAX_PATH + 16];
+        snprintf(previous, sizeof previous, "%s", p);
+        strcpy(strrchr(previous, '.'), "_previous.log");
+        MoveFileExA(p, previous, MOVEFILE_REPLACE_EXISTING);
         g_log = _fsopen(p, "w", _SH_DENYWR);  // otro juego abierto desde la misma carpeta ya lo tiene: *_2.log
         if (!g_log) {
             strcpy(strrchr(p, '.'), "_2.log");
             g_log = _fsopen(p, "w", _SH_DENYWR);
         }
+        Log("codcoop build %s (%s %s)", COOP_BUILD, __DATE__, __TIME__);
         Log("codcoop cargado en %s, exe base %p", GetCommandLineA(), GetModuleHandleA(nullptr));
         char exe[MAX_PATH];
         GetModuleFileNameA(nullptr, exe, MAX_PATH);

@@ -203,6 +203,14 @@ bool BootPeerJoinAllowed() {
     if(GetTickCount()-g_bootRequestSent>=750)BootRequest(); // keeps stale-world and lost-M_MAP recovery live after byte ACK too
     return false;
 }
+// The verified transfer already produced the native world for this map in this
+// process (used by the late, identical M_MAP). Recovery must then rejoin that
+// world instead of reloading it.
+bool BootNativeWorldReady(const char* map) {
+    return BootEnabled()&&BootPeerContext()&&g_bootTransferred&&
+        !_stricmp(map,g_bootReceiver.Header().map)&&g_bootNativeReady&&BootStageCurrent()&&
+        g::cls_state==2&&g_bootReadyMap==(uint32_t)CvarInt("sv_serverid");
+}
 bool BootInterceptMap(const char* map) {
     if(!BootEnabled())return false;
     if(!BootPeerContext()||!g_bootTransferred||_stricmp(map,g_bootReceiver.Header().map)) {
@@ -212,7 +220,7 @@ bool BootInterceptMap(const char* map) {
         if(BootPeerContext()&&g_bootTransferred)BootResetPeer();
         BootRequest();return true;
     }
-    if(g_bootNativeReady&&BootStageCurrent()&&g::cls_state==2&&g_bootReadyMap==(uint32_t)CvarInt("sv_serverid"))return true; // delayed identical M_MAP must not reload a ready native world
+    if(BootNativeWorldReady(map))return true; // delayed identical M_MAP must not reload a ready native world
     if(!g_gameLifecycleReady||!g_qaEndEnabled){BootFailure("required native lifecycle/renderer hook unavailable");return true;}
     if(g_bootLoading&&!g_bootNativeReady)return true; // retransmitted M_MAP
     g_bootLoading=true;g_bootNativeReady=g_bootItemDone=g_bootEndDone=false;g_bootFailed=false;

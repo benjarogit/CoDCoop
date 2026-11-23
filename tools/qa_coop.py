@@ -125,6 +125,27 @@ def assess_liveness(before, after, count):
         raise ValueError('host simulation is frozen')
 
 
+def wait_liveness(before, connected, processes, count, timeout=20):
+    """Bounded retry of the strict liveness assessment.
+
+    Same predicate as assess_liveness (real host advancing, every remote active
+    with an advancing user-command clock). Only the observation window grows:
+    busy campaign maps can push a client's usercmd rate below one sample per
+    two seconds, and a single 2 s sample then reports a false stall. A client
+    that really stopped advancing still fails at the timeout.
+    """
+    def advanced():
+        state = connected()
+        if not state:
+            return False
+        try:
+            assess_liveness(before, state[0], count)
+            return True
+        except ValueError:
+            return False
+    wait_for(advanced, processes, timeout, 'host and every remote user-command clock advance')
+
+
 def move_remote(host, peer, slot, processes, timeout, action='+forward'):
     """Require native player movement, including after a checkpoint reconnect."""
     wait_for(lambda: (p := read_state(host)['players'][slot]) and p.get('pm_type') == 0 and not p.get('linked'),
@@ -423,8 +444,7 @@ def main(argv=None, *, scenario=None):
         states = wait_for(connected, processes, args.timeout, 'real host and all joiners connected')
         results['checks'].append('real connected host and joiners')
         before = states[0]
-        time.sleep(2)
-        assess_liveness(before, connected()[0], args.players)
+        wait_liveness(before, connected, processes, args.players)
         results['checks'].append('host and every remote user-command clock advance')
         (output / 'before.json').write_text(json.dumps(states, indent=2))
         intentional_departures=[]
@@ -471,7 +491,7 @@ def main(argv=None, *, scenario=None):
                 recovered = checkpoint_connected()
                 if not recovered:
                     raise RuntimeError('remote disconnected during checkpoint recovery')
-                assess_liveness(baseline_reload, recovered[0], args.players)
+                wait_liveness(baseline_reload, checkpoint_connected, processes, args.players)
                 if not all(s['snapshot_num'] > 0 and s['snapshot_time'] > 0 for s in recovered[1:]):
                     raise RuntimeError('checkpoint joiner has no actual rendered snapshots')
                 results['checks'].append('native checkpoint reload %d restored world and all remote command clocks' % (iteration + 1))
@@ -496,7 +516,8 @@ def main(argv=None, *, scenario=None):
             time.sleep(0.5)
         final = connected()
         if not final: raise RuntimeError('a joiner was lost during observation')
-        assess_liveness(baseline, final[0], args.players)
+        wait_liveness(baseline, connected, processes, args.players)
+        final = connected() or final
         for index,folder in enumerate(folders):
             errors=process_log_errors(folder,1 if index in intentional_departures else 0)
             if errors: raise RuntimeError(str(errors))

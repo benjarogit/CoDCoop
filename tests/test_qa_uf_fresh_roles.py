@@ -55,7 +55,11 @@ class FreshRoleBodyOracle(unittest.TestCase):
    identity='10|20|1|%d|7|3'%slot
    native.update({'coop_spawn_ticket_%d'%slot:'7','coop_qa_kit_identity_%d'%slot:identity,'coop_qa_kit_applied_%d'%slot:identity+'|epoch','coop_inventory_%d_state'%slot:'FRESH','coop_inventory_%d_identity'%slot:identity})
   self.assertTrue(host_plan_receipts_match(native,submitted))
-  for field,value in [('coop_qa_kit_applied_2','stale'),('coop_spawn_ticket_3','8'),('coop_inventory_1_state','PRESERVED'),('coop_qa_kit_verified_catalog','wrong')]:
+  # A peer dropped during its own map load returns into the PRESERVED disposition
+  # of the same native identity; only that second state is acceptable.
+  preserved=dict(native,coop_inventory_1_state='PRESERVED')
+  self.assertTrue(host_plan_receipts_match(preserved,submitted))
+  for field,value in [('coop_qa_kit_applied_2','stale'),('coop_spawn_ticket_3','8'),('coop_inventory_1_state','STALE'),('coop_qa_kit_verified_catalog','wrong')]:
    mutant=dict(native);mutant[field]=value
    with self.subTest(field=field):self.assertFalse(host_plan_receipts_match(mutant,submitted))
  def fixture(self):

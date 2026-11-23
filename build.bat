@@ -5,7 +5,11 @@ cd /d "%~dp0"
 set PATH=D:\Tools\mingw32\mingw32\bin;%PATH%
 if not exist build mkdir build
 set OPT=-std=c++17 -O2 -s -shared -static -static-libgcc -static-libstdc++ -Wl,--no-insert-timestamp
-g++ %OPT% -o build\ddraw.dll src\loader.cpp src\ddraw.def
+rem version del arbol en el log (sin esto un reporte no dice que build corrio)
+set VERSION=local
+for /f "delims=" %%v in ('git describe --always --dirty 2^>nul') do set VERSION=%%v
+set BUILD_DEF=-DCOOP_BUILD=\"%VERSION%\"
+g++ %OPT% %BUILD_DEF% -o build\ddraw.dll src\loader.cpp src\ddraw.def
 if errorlevel 1 exit /b 1
 g++ %OPT% -o build\codcoop_core.dll src\core.cpp -lws2_32 -ladvapi32
 if errorlevel 1 exit /b 1

@@ -8,6 +8,7 @@ struct Record {
     uintptr_t tree, xanim;
     uint32_t epoch, index, bytes, nodes;
     int player;
+    uint8_t heap;  // 1: bloque propio en el heap (CreateOwnTree); 0: bloque de la memoria de los scripts
 };
 constexpr unsigned MAX_RECORDS = 64;
 struct Store {
@@ -19,9 +20,10 @@ struct Store {
 static_assert(std::is_trivial<Store>::value&&std::is_standard_layout<Store>::value,"shared ownership store must remain POD");
 enum class Decision { Forget, Hold, Free };
 inline bool Valid(const Record& r) {
-    return r.player >= 0 && r.player < 4 && r.nodes > 0 && r.nodes <= 4096 &&
-        r.bytes == r.nodes * 8 + 14 && r.tree == MT_BASE + r.index * 8 &&
-        mt_epoch::MayFree(r.epoch,r.epoch,r.index,r.bytes);
+    if (r.player < 0 || r.player >= 4 || r.nodes == 0 || r.nodes > 4096) return false;
+    if (r.bytes != r.nodes * 8 + 14) return false;
+    if (r.heap) return r.tree != 0;
+    return r.tree == MT_BASE + r.index * 8 && mt_epoch::MayFree(r.epoch,r.epoch,r.index,r.bytes);
 }
 inline Decision Evaluate(const Record& r,uint32_t currentEpoch,bool referenced,bool animationValid) {
     if (!r.tree || !r.epoch || r.epoch != currentEpoch) return Decision::Forget;
