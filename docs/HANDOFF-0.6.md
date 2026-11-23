@@ -107,6 +107,33 @@ This addendum supersedes pending statements below. Nothing has been published.
   7918-Byte-Join-Allokation blockiert. Konservativer Crash-Guard, kein
   bewiesener Produktionsfix; veralteter Block wird bis zum Pool-Reset bewusst
   nicht freigegeben.
+- **M5 production native-tree adoption / M5 Produktions-Übernahme nativer Bäume:**
+  UO joiners now reuse the engine's own animation tree instead of freeing the
+  DObj and allocating a duplicate. Ownership is captured before the host
+  attaches (while the entity type is still intact), validated against the
+  native owner slot and tracked in the shared native-reference table, so
+  `JoinerAdvanceAnims`, leave and free paths treat it as Game-owned. No
+  `CODCOOP_QA_DEFER_MODELS`/borrow gate; the QA borrow remains available.
+  `run/qa-noville-m5-adopt5` PASSes four-player Noville without borrow with the
+  native checkpoint reload: 68/49/49 adoptions, all joiners rejoin and move
+  (144.7/212.2/269.0 units), no `MT_AllocIndex` failure, no guard hit and a
+  clean shutdown. Remaining own trees are limited to entities without a
+  pre-attach native owner (late-spawned tanks/humans, `owner=0`); the M4 guard
+  stays the backstop for those. Evidence secured in
+  `run/qa-noville-m5-adopt5/evidence/`. Native Windows/Steam and further map
+  coverage remain open.
+  / UO-Joiner übernehmen jetzt den nativen Animationsbaum des Motors, statt den
+  DObj zu leeren und einen zweiten Baum zu allokieren. Die Ownership wird vor
+  dem Host-Attach erfasst (Entity-Typ noch intakt), gegen den nativen
+  Owner-Slot geprüft und in der gemeinsamen Native-Referenztabelle geführt;
+  Advance-, Leave- und Free-Pfad behandeln sie als Game-eigen. Kein
+  QA-Deferred-/Borrow-Gate nötig, QA-Borrow bleibt verfügbar. `adopt5` besteht
+  vier Spieler Noville ohne Borrow inklusive Checkpoint-Reload (68/49/49
+  Übernahmen, Bewegung 144.7/212.2/269.0, kein Alloc-Fehler, kein
+  Guard-Treffer, sauberer Shutdown). Verbleibende Eigenbäume nur für Entities
+  ohne vorab erfassten Native-Owner (spät gespawnte Panzer/Menschen,
+  `owner=0`); der M4-Guard bleibt Backstop. Windows/Steam und weitere Karten
+  offen.
 - **Latest worker checkpoint / Neuester Worker-Stand:** local source `277fc47`
   fixes actual Windows/Wine atomic-replace sharing failures and physical-link
   rejection. Fresh immutable worker source graph
@@ -1292,6 +1319,27 @@ Tools and evidence / Werkzeuge und Nachweise:
 
 See [development commands](development-0.6.md), [campaign compatibility](campaign-compatibility.md),
 [YAP notes](yap-compatibility.md) and [launcher](launcher.md).
+
+### Disk hygiene / Platten-Hygiene (binding / verbindlich)
+
+Each QA run creates a full game copy under `run/<tag>/` (host, join1..3,
+prefix, runtime). `run/` is gitignored throwaway material, but it grew to
+~600 GB and filled the 916 GB volume once. Rules:
+
+- Before every build or QA run: `df -h /mnt/intern-1tb` and
+  `home-cleanup --cod-status`. Below 60 GB free: no new run; clean up first.
+  Below 20 GB free: emergency prune of old families.
+- After every run, in the same session: copy `result.json`, `provenance.json`,
+  `*.log`, `tree-watch.json` and `*-proof.json` to `run/<tag>/evidence/`, then
+  delete `run/<tag>/{host,join1,join2,join3,prefix,runtime}`. `home-cleanup
+  --cod-slim` automates this, but it skips runs younger than 12 h, so a fresh
+  run needs the manual step.
+- Run names use `run/<family><n>` (`qa-noville-m1-union1` … `union7`); the
+  prune groups by the numeric suffix.
+- Never delete while a Wine/Xvfb/QA process is active.
+- Do not touch `run/<tag>/evidence/`, documented `run/<name>` evidence,
+  `run/prepared9-uo/{host-en,joiner-de}`, `game/`, `build/` or `third_party/`
+  without asking.
 
 Build/runtime tools are under `tools/`; the source tree has no checked-in game assets.
 Use a fresh `tools/stage_suite.py` output after modifying any locked runtime/source files.

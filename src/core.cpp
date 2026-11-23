@@ -1609,7 +1609,7 @@ OldTree g_oldTrees[g::MAX_GENTITIES];
 int g_oldTreeCount;
 void KeepOldTrees()
 {
-    for (auto& borrowed : g_qaBorrowed) borrowed = {};
+    for (auto& reference : g_nativeTreeRefs) reference = {};
     for (auto& owner : g_qaNativeOwners) owner = {};
     for (int e = 0; e < g::MAX_GENTITIES; ++e) {
         uint8_t* tree = S->ownTree[e];
@@ -1690,7 +1690,7 @@ void FreeOldTrees()
 void ForgetMovieWorld()
 {
     S->movieWorldSuspended = true;
-    for (auto& borrowed : g_qaBorrowed) borrowed = {};
+    for (auto& reference : g_nativeTreeRefs) reference = {};
     for (auto& owner : g_qaNativeOwners) owner = {};
     g_animAssembler.Reset();
     memset(S->ownTree, 0, sizeof S->ownTree);
@@ -1730,8 +1730,8 @@ void JoinerFreeDObj(int e)
     uint8_t* tree = S->ownTree[e];
     int expectedNodes = S->ownTreeNodes[e];
     QATreeTraceGuard trace(e,tree);
-    auto borrowed = g_qaBorrowed[e];
-    g_qaBorrowed[e] = {}; // native Game ownership never enters the Core free path
+    auto nativeReference = g_nativeTreeRefs[e];
+    g_nativeTreeRefs[e] = {}; // native Game ownership never enters the Core free path
     S->ownTree[e] = nullptr;
     S->ownTreeNodes[e] = 0;
     if (g::serverObjMap[e]) g::Com_ServerDObjFree(e, true);
@@ -1757,7 +1757,7 @@ void JoinerFreeDObj(int e)
     }
     if (g_qaBorrowEnabled) {
         tree_owner::Reference reference = tree_owner::Reference{(uintptr_t)tree, g_qaInitCount, tree_owner::Owner::Core};
-        if (!tree || borrowed.tree == (uintptr_t)tree) reference = borrowed;
+        if (!tree || nativeReference.tree == (uintptr_t)tree) reference = nativeReference;
         tree_owner::ReleaseReference(reference, g_qaInitCount, true, reference.tree != 0, [&](uintptr_t address) {
             auto* owned = (uint8_t*)address;
             FreeTreeInfos(owned); g::XAnimFreeTree(owned);
@@ -1831,37 +1831,53 @@ bool QASyncModelShadow(unsigned id,const char* name)
         CoopStatus("Resource WAIT: live model mapping conflicts with the current native world.");
     return result==resource_model_shadow::Result::Ready;
 }
+// Native owner slot of an entity's animation tree: the actor/vehicle table
+// entry the engine uses, or the entity's own tree field. QA borrow and the
+// production adoption path both require this slot (not the DObj we are about
+// to free) to own the tree.
+uintptr_t NativeTreeSlot(int e)
+{
+    if (e < 0 || e >= g::MAX_GENTITIES || !g::sv_gentities || g::sv_gentitySize != 0x2d0) return 0;
+    uint8_t* ent = g::Entity(e);
+    if (!ent || !ent[0x11c]) return 0;
+    uintptr_t base = (uintptr_t)GetModuleHandleA(g::GameDll());
+    if (!base) return 0;
+    uintptr_t slot = (uintptr_t)ent + 0x2c8;
+    if (ent[0] == 11) {
+        uintptr_t actor = *(uintptr_t*)(ent + 0x10c), actors = *(uintptr_t*)(base + 0x307f1c);
+        if (!actors || actor < actors || (actor - actors) % 4656 || (actor - actors) / 4656 >= 32) return 0;
+        slot = base + 0x153850 + 4 * ((actor - actors) / 4656);
+    } else if (ent[0] == 13) {
+        slot = 0;
+        unsigned number = *(uint16_t*)(ent + 6);
+        for (unsigned i = 0; i < 64; ++i)
+            if (*(unsigned*)(base + 0x1538d4 + 32 * i) == number) { slot = base + 0x1538d0 + 32 * i; break; }
+        if (!slot) return 0;
+    }
+    return slot;
+}
 void QACaptureNativeTrees()
 {
     for (auto& owner : g_qaNativeOwners) owner = {};
-    if (!g_qaBorrowEnabled || (uintptr_t)GetModuleHandleA(g::GameDll()) != g_qaGameBase ||
-        !g::sv_gentities || g::sv_gentitySize != 0x2d0) return;
+    if (!g::uo) return;
+    uintptr_t base = (uintptr_t)GetModuleHandleA(g::GameDll());
+    if (!base || (g_qaGameBase && base != g_qaGameBase)) return;
     unsigned captured = 0;
     for (int e = 0; e < g::MAX_GENTITIES; ++e) {
-        uint8_t* ent = g::Entity(e);
-        if (!ent[0x11c]) continue;
-        uintptr_t slot = (uintptr_t)ent + 0x2c8;
-        if (ent[0] == 11) {
-            uintptr_t actor = *(uintptr_t*)(ent + 0x10c), actors = *(uintptr_t*)(g_qaGameBase + 0x307f1c);
-            if (!actors || actor < actors || (actor - actors) % 4656 || (actor - actors) / 4656 >= 32) continue;
-            slot = g_qaGameBase + 0x153850 + 4 * ((actor - actors) / 4656);
-        } else if (ent[0] == 13) {
-            slot = 0;
-            unsigned number = *(uint16_t*)(ent + 6);
-            for (unsigned i = 0; i < 64; ++i)
-                if (*(unsigned*)(g_qaGameBase + 0x1538d4 + 32 * i) == number) { slot = g_qaGameBase + 0x1538d0 + 32 * i; break; }
-            if (!slot) continue;
-        }
+        uintptr_t slot = NativeTreeSlot(e);
+        if (!slot) continue;
         auto* tree = *(uint8_t**)slot;
         if (!tree || IsBadReadPtr(tree, 12) || !XAnimLoaded(*(uint8_t**)tree)) continue;
-        // Verify reconstruction against the pure native getter while local
-        // entityState is still intact, before host packets replace its type.
-        uint8_t* native = ent;
-        asm volatile("call *%1" : "+a"(native) : "r"((void*)(g_qaGameBase + 0x48870)) : "ecx", "edx", "memory");
-        if (native != tree) continue;
+        if (g_qaGameBase) {
+            // Verify reconstruction against the pure native getter while local
+            // entityState is still intact, before host packets replace its type.
+            uint8_t* native = g::Entity(e);
+            asm volatile("call *%1" : "+a"(native) : "r"((void*)(g_qaGameBase + 0x48870)) : "ecx", "edx", "memory");
+            if (native != tree) continue;
+        }
         g_qaNativeOwners[e] = {slot, (uintptr_t)tree, g_qaInitCount}; ++captured;
     }
-    Log("QA native ownership captured before attach: %u exact entity owners", captured);
+    Log("native ownership captured before attach: %u entity owners (verified=%d)", captured, g_qaGameBase != 0);
 }
 uint8_t* QANativeTree(int entity)
 {
@@ -1880,17 +1896,58 @@ uint8_t* QABorrowTree(int entity, uint8_t* xanim)
     bool alias = false;
     for (int e = 0; e < g::MAX_GENTITIES && !alias; ++e) {
         if (e == entity) continue;
-        alias = QANativeTree(e) == tree || g_qaBorrowed[e].tree == (uintptr_t)tree || S->ownTree[e] == tree;
+        alias = QANativeTree(e) == tree || g_nativeTreeRefs[e].tree == (uintptr_t)tree || S->ownTree[e] == tree;
     }
     if (!tree_owner::CanBorrow((uintptr_t)tree, g_qaInitCount, true, true, alias)) return nullptr;
     return tree;
 }
-uint8_t* QACurrentBorrow(int entity)
+// Production UO adoption: the engine already maintains a tree for this
+// entity. Reuse it instead of freeing the DObj and allocating a duplicate,
+// which is what exhausts the 512 KB MT pool on Noville (71 x 7918 bytes).
+// The tree comes from the pre-attach capture, not from the DObj, because the
+// DObj still carries the local map tree at update time. Validation happens
+// before the free, exactly like the proven QA borrow path.
+uint8_t* NativeOwnedTree(int entity)
 {
-    const auto& borrowed = g_qaBorrowed[entity];
-    if (!g_qaBorrowEnabled || !borrowed.tree || borrowed.owner != tree_owner::Owner::Native || borrowed.generation != g_qaInitCount) return nullptr;
-    auto* tree = (uint8_t*)borrowed.tree;
-    if (QANativeTree(entity) != tree || IsBadReadPtr(tree, 12) || !XAnimLoaded(*(uint8_t**)tree)) return nullptr;
+    if (!g::uo || entity < 0 || entity >= g::MAX_GENTITIES) return nullptr;
+    const auto& owner = g_qaNativeOwners[entity];
+    if (!owner.slot || owner.generation != g_qaInitCount || !owner.tree) return nullptr;
+    if (IsBadReadPtr((void*)owner.slot, 4) || *(uintptr_t*)owner.slot != owner.tree) return nullptr;
+    auto* tree = (uint8_t*)owner.tree;
+    if (IsBadReadPtr(tree, 12) || !XAnimLoaded(*(uint8_t**)tree)) return nullptr;
+    // A tree we created must never be captured back as native ownership.
+    for (int other = 0; other < g::MAX_GENTITIES; ++other)
+        if (S->ownTree[other] == tree) return nullptr;
+    return tree;
+}
+uint8_t* NativeAdoptCandidate(int entity, uint8_t* xanim)
+{
+    if (!xanim) return nullptr;
+    uint8_t* tree = NativeOwnedTree(entity);
+    if (!tree || *(uint8_t**)tree != xanim) return nullptr;
+    for (int other = 0; other < g::MAX_GENTITIES; ++other) {
+        if (other == entity) continue;
+        if (S->ownTree[other] == tree || g_nativeTreeRefs[other].tree == (uintptr_t)tree) return nullptr;
+        // Same alias rule as QABorrowTree: another entity must not have this
+        // tree as its own captured native owner.
+        const auto& owner = g_qaNativeOwners[other];
+        if (owner.slot && owner.tree == (uintptr_t)tree) return nullptr;
+    }
+    return tree;
+}
+bool NativeStillOwns(int entity, uint8_t* tree)
+{
+    return tree && NativeOwnedTree(entity) == tree;
+}
+uint8_t* CurrentNativeTree(int entity)
+{
+    if (entity < 0 || entity >= g::MAX_GENTITIES) return nullptr;
+    const auto& reference = g_nativeTreeRefs[entity];
+    if (!reference.tree || reference.owner != tree_owner::Owner::Native) return nullptr;
+    auto* tree = (uint8_t*)reference.tree;
+    uint8_t* d = g::ServerDObj(entity);
+    if (!d || *(uint8_t**)d != tree || S->ownTree[entity] == tree) return nullptr;
+    if (IsBadReadPtr(tree, 12) || !XAnimLoaded(*(uint8_t**)tree)) return nullptr;
     return tree;
 }
 void JoinerApplyDObj(Reader r)
@@ -1932,20 +1989,45 @@ void JoinerApplyDObj(Reader r)
     for (int k = 0; same && k < nm; ++k) same = *(void**)(d + g::DO_MODELS + k * 4) == models[k].model;
     if (!same) {
         uint8_t* borrowed = QABorrowTree(e, xanim);
+        uint8_t* candidate = borrowed ? nullptr : NativeAdoptCandidate(e, xanim);
+        if (!borrowed && !candidate && g::uo && animName[0]) {
+            static int misses;
+            if (misses < 8) {
+                ++misses;
+                uint8_t* native = NativeOwnedTree(e);
+                const auto& owner = g_qaNativeOwners[e];
+                Log("joiner: no native tree to adopt e=%d anim=%s owner=%d native=%p nativeAnim=%s", e, animName,
+                    owner.slot != 0, native, native ? SafeStr(*(char**)native) : "-");
+            }
+        }
         JoinerFreeDObj(e);
-        uint8_t* tree = borrowed ? borrowed : (xanim ? g::XAnimCreateTree(xanim) : nullptr);
-        if (borrowed) {
-            g_qaBorrowed[e] = {(uintptr_t)tree, g_qaInitCount, tree_owner::Owner::Native};
-            ++g_qaBorrowCount;
-            Log("QA native tree borrowed entity=%d ptr=%p generation=%u", e, tree, g_qaInitCount);
-        } else {S->ownTree[e] = tree;S->ownTreeNodes[e] = tree ? *(int*)(*(uint8_t**)tree + 4) : 0;QATreeTrace("create-owned",e,tree);}
+        // Match the proven QA borrow semantics: the tree was validated before
+        // the free and the engine's owner slot, not the DObj, holds it.
+        uint8_t* adopted = candidate;
+        uint8_t* tree = borrowed ? borrowed : adopted ? adopted : (xanim ? g::XAnimCreateTree(xanim) : nullptr);
+        if (borrowed || adopted) {
+            g_nativeTreeRefs[e] = {(uintptr_t)tree, g_qaInitCount, tree_owner::Owner::Native};
+            if (borrowed) {
+                ++g_qaBorrowCount;
+                Log("QA native tree borrowed entity=%d ptr=%p generation=%u", e, tree, g_qaInitCount);
+            } else {
+                ++g_nativeAdoptCount;
+                Log("joiner: native tree adopted entity=%d ptr=%p", e, tree);
+            }
+        } else {S->ownTree[e] = tree;S->ownTreeNodes[e] = tree ? *(int*)(*(uint8_t**)tree + 4) : 0;if(tree)++g_joinerOwnTrees;QATreeTrace("create-owned",e,tree);}
         DObjCreate(models, nm, tree, e, u12);
         d = g::ServerDObj(e);
         if (!d) return;
     }
-    if (g_qaBorrowEnabled && !S->ownTree[e] && !g_qaBorrowed[e].tree) {
-        if (uint8_t* native = QABorrowTree(e, xanim))
-            if (d && *(uint8_t**)d == native) g_qaBorrowed[e] = {(uintptr_t)native, g_qaInitCount, tree_owner::Owner::Native};
+    if (!S->ownTree[e] && !g_nativeTreeRefs[e].tree && d) {
+        // A matching native tree needs the same reference as an adopted one so
+        // JoinerAdvanceAnims and the leave path treat it as Game-owned.
+        uint8_t* candidate = QABorrowTree(e, xanim);
+        if (!candidate && g::uo) candidate = NativeAdoptCandidate(e, xanim);
+        if (candidate && (*(uint8_t**)d == candidate) && (g_qaBorrowEnabled ? QANativeTree(e) == candidate : NativeStillOwns(e, candidate))) {
+            g_nativeTreeRefs[e] = {(uintptr_t)candidate, g_qaInitCount, tree_owner::Owner::Native};
+            if (g_qaBorrowEnabled) ++g_qaBorrowCount; else ++g_nativeAdoptCount;
+        }
     }
     for (int k = 0; k < nm; ++k) {
         d[g::DO_PARENTS + k] = parents[k];
@@ -2417,7 +2499,7 @@ void JoinerAdvanceAnims(float dt)
     int prevSide = g::inGameCall;
     g::inGameCall = 1;  // BodyAnimUpdate trabaja sobre el bloque servidor (+0x38..)
     for (int e = 0; e < g::MAX_GENTITIES; ++e) {
-        uint8_t* tree = S->ownTree[e] ? S->ownTree[e] : QACurrentBorrow(e);
+        uint8_t* tree = S->ownTree[e] ? S->ownTree[e] : CurrentNativeTree(e);
         uint8_t* d = g::ServerDObj(e);
         if (!tree || !d || *(uint8_t**)d != tree) continue;
         ++trees;
@@ -3853,13 +3935,13 @@ void JoinerLeave(const char* why)
     RestoreHostRules(); S->rules.received = S->rules.required = 0;
     g_animAssembler.Reset();
     for (int e = 0; e < g::MAX_GENTITIES; ++e)
-        if (S->ownTree[e] || g_qaBorrowed[e].tree) JoinerFreeDObj(e);
+        if (S->ownTree[e] || g_nativeTreeRefs[e].tree) JoinerFreeDObj(e);
     // UO disconnect reaches native MT_Init (45fab0) through full shutdown.
     // Deferred indices belong to the old allocator and must never be freed
     // after a new session has rebuilt that pool, even at identical addresses.
     if (g_oldTreeCount) Log("joiner: forget %d deferred tree indices before native disconnect", g_oldTreeCount);
     g_oldTreeCount = 0;
-    for (auto& borrowed : g_qaBorrowed) borrowed = {};
+    for (auto& reference : g_nativeTreeRefs) reference = {};
     for (auto& owner : g_qaNativeOwners) owner = {};
     S->joined = S->frozen = false;
     S->role = NONE;
@@ -4257,10 +4339,12 @@ void QATick()
     fprintf(f, "\"deferred_models\":{\"enabled\":%s,\"init_count\":%u,\"approved\":%u,\"deferred\":%u,\"bound_cumulative\":%u,\"late_bindings\":%u,\"cs_count\":%d},",
         g_qaDeferredEnabled ? "true" : "false", g_qaInitCount, (unsigned)g_qaLedger.entries.size(), g_qaLedger.deferrals,
         g_qaLedger.bindings, g_qaLedger.lateBindings, g_qaDeferredEnabled ? QAModelCount() : 0);
-    unsigned nativeBorrowed = 0;
-    for (int e = 0; e < g::MAX_GENTITIES; ++e) if (QACurrentBorrow(e)) ++nativeBorrowed;
+    unsigned nativeTrees = 0;
+    for (int e = 0; e < g::MAX_GENTITIES; ++e) if (CurrentNativeTree(e)) ++nativeTrees;
     fprintf(f, "\"native_tree_borrow\":{\"enabled\":%s,\"active\":%u,\"acquisitions\":%u},",
-        g_qaBorrowEnabled ? "true" : "false", nativeBorrowed, g_qaBorrowCount);
+        g_qaBorrowEnabled ? "true" : "false", nativeTrees, g_qaBorrowCount);
+    fprintf(f, "\"native_tree_adopt\":{\"enabled\":%s,\"active\":%u,\"acquisitions\":%u,\"own_trees\":%u},",
+        g::uo ? "true" : "false", nativeTrees, g_nativeAdoptCount, g_joinerOwnTrees);
     fprintf(f,"\"mt_epoch\":{\"enabled\":%s,\"value\":%u,\"queued_old_trees\":%d},",
         qa_mt_epoch::enabled ? "true" : "false",qa_mt_epoch::counter.value,g_oldTreeCount);
     fprintf(f,"\"world_wire\":{\"generation\":%u,\"stale_discarded\":%u,\"untagged_discarded\":%u,\"engine_sent\":%u,\"engine_received\":%u,\"stale_by_type\":{",

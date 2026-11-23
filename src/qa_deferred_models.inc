@@ -7,10 +7,12 @@ bool g_gameLifecycleReady;
 qa_deferred::Ledger g_qaLedger;
 uintptr_t g_qaGameBase;
 bool g_qaDeferredEnabled, g_qaBorrowEnabled;
-tree_owner::Reference g_qaBorrowed[2048];
+// Native Game-owned trees we currently reference: filled by the QA borrow
+// prototype and by the production UO adoption path. Core never frees them.
+tree_owner::Reference g_nativeTreeRefs[2048];
 struct QANativeOwner { uintptr_t slot = 0, tree = 0; unsigned generation = 0; };
 QANativeOwner g_qaNativeOwners[2048];
-unsigned g_qaBorrowCount;
+unsigned g_qaBorrowCount, g_nativeAdoptCount, g_joinerOwnTrees;
 std::string g_qaLedgerPath;
 unsigned g_qaInitCount, g_qaCallsBeforeEnd;
 bool g_qaImportedCached;
@@ -147,9 +149,9 @@ extern "C" void __cdecl QABeforeVM(void* vm, const int* args)
         if (!g_qaIndexTrampoline) return;
     }
     g_qaGameBase = base;
-    for (auto& borrowed : g_qaBorrowed) borrowed = {};
+    for (auto& reference : g_nativeTreeRefs) reference = {};
     for (auto& owner : g_qaNativeOwners) owner = {};
-    g_qaBorrowCount = 0;
+    g_qaBorrowCount = 0; g_nativeAdoptCount = 0; g_joinerOwnTrees = 0;
     g_qaLedger = {}; g_qaImportedCached = false; g_qaCallsBeforeEnd = 0; ++g_qaInitCount;
     std::string map = g::CvarString("mapname");
     if (map.empty() || map.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-") != std::string::npos) {
