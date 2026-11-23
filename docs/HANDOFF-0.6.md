@@ -244,6 +244,11 @@ This addendum supersedes pending statements below. Nothing has been published.
   client frame is stopped; in m9 no joiner logs `host silent` and all three stay
   attached through the loads. Unit tests 382 OK / 46 skips; build 679936 B.
   Evidence `run/qa-foy-m9-keepalive1/evidence/` (8.3 MB), runtime copies deleted.
+  The same build then passed the two earlier maps: `run/qa-noville-m10-keepalive1`
+  (44/46/47 adoptions, 17 old trees per joiner, reload movement
+  98.9/203.0/157.6, 0 `failed allocation`, 0 `ERROR:`, no `host silent`) and
+  `run/qa-brecourt-m10-keepalive1` (30 adoptions each, 11 old trees, reload
+  movement 126.3/132.1/130.7, same clean result).
   / `run/qa-foy-m9-keepalive1` besteht vier Spieler auf Foy mit dem vollen
   0.6-Pfad: Produktions-Übernahme nativer Bäume, Heap-Eigenbäume,
   Heap-Host-Körper und die Upstream-Ports. Alle Gates bestehen (echter Connect,
@@ -267,6 +272,12 @@ This addendum supersedes pending statements below. Nothing has been published.
   kein Joiner `host silent` und alle drei bleiben durch die Ladevorgänge
   verbunden. Unit-Tests 382 OK / 46 Skips; Build 679936 B. Evidenz
   `run/qa-foy-m9-keepalive1/evidence/` (8,3 MB), Laufzeitkopien gelöscht.
+  Derselbe Build bestand danach die beiden früheren Karten:
+  `run/qa-noville-m10-keepalive1` (44/46/47 Übernahmen, 17 alte Bäume je
+  Joiner, Reload-Bewegung 98,9/203,0/157,6, 0 `failed allocation`, 0 `ERROR:`,
+  kein `host silent`) und `run/qa-brecourt-m10-keepalive1` (je 30 Übernahmen,
+  11 alte Bäume, Reload-Bewegung 126,3/132,1/130,7, gleiches sauberes
+  Ergebnis).
 - **U1 upstream comparison TheTiranix/CoDCoop / U1 Upstream-Abgleich:**
   `upstream/master` = `52dd2bc` (fetched read-only), merge base `21eae10`;
   upstream has 8 commits we do not, we have 78 it does not. Verdicts:
