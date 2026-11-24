@@ -795,5 +795,25 @@ class CampaignPatchTests(unittest.TestCase):
         self.assertEqual(patch.uf_actor_weapon_loop_yield(b'main() {}'), b'main() {}')
 
 
+    def test_axis_swap_precache_guards_each_sparse_weapon_array(self):
+        package = patch.ROOT / 'run/campaign-host/UnitedFronts/ZUnitedFronts_1.1_beta.pk3'
+        if not package.is_file():
+            self.skipTest('Owned original UF package unavailable; pinned source check only')
+        with zipfile.ZipFile(package) as source:
+            original = source.read('maps/_UF_mod.gsc')
+        patched = patch.uf_axis_swap_precache_guards(original)
+        kinds = ('rifle', 'smg', 'lmg', 'sniper', 'pistol', 'grenade')
+        old_block = ''.join('\tfor (i=0; i<%s.size; i++)\r\n\tprecacheItem(%s[i]);\r\n' % (k, k)
+                            for k in kinds)
+        self.assertIn(old_block.encode(), original)
+        self.assertNotIn(old_block.encode(), patched)
+        for kind in kinds:
+            self.assertEqual(patched.count(('\t\tif (isdefined(%s[i]))\r\n\t\t\tprecacheItem(%s[i]);\r\n'
+                                            % (kind, kind)).encode()), 1)
+        with self.assertRaisesRegex(ValueError, 'Unknown UF axis weapon precache revision'):
+            patch.uf_axis_swap_precache_guards(original + old_block.encode())
+        self.assertEqual(patch.uf_axis_swap_precache_guards(b'main() {}'), b'main() {}')
+
+
 if __name__ == '__main__':
     unittest.main()

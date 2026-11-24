@@ -85,6 +85,23 @@ passed.
   and the authored AI weapon pass yields every eight actors so four native
   clients do not trip the engine's script watchdog. Those are product fixes,
   not map rules. Evidence: `run/qa-afrika2-m14-yield1`.
+- `pavlov` (Russian winter sample, passed `run/qa-pavlov-m15-sample3`): the map
+  triggered a stock United Fronts defect, fixed in the overlay, and keeps two
+  named content warnings. `Axis_Swap` leaves a hole in its per-year weapon
+  tables (`ger_heer`/1942 sets no `sniper[1]`, a map spawner sets
+  `sniper[2]`), and the unguarded `precacheItem` loop aborted the thread, so the
+  remaining precache and the map's weapon assignment never ran
+  (`run/qa-pavlov-m15-sample1`). The overlay now guards every entry with
+  `isdefined` and the same map passes four-player Coop. Rule: the fixture
+  allows exactly two console lines, `ERROR: Cannot precache
+  'xmodel/head_blane'` and `ERROR: Cannot precache
+  'xmodel/gear_german_headwrap'`, matched by exact text and recorded in the
+  proof; the first model does not exist because the base game ships it as
+  `Blane1` while `maps/pavlov.gsc` precaches the other name, the second is
+  United Fronts' winter German table for `sewer`/`pavlov` only. Every other
+  `ERROR:` line and every script runtime error stays fatal. Evidence:
+  `run/qa-pavlov-m15-sample2` (all gameplay gates passed, final console gate
+  failed on those two lines) and `run/qa-pavlov-m15-sample3`.
 
 Der Vier-Spieler-Sampler deckt ein bis zwei Schlüsselmissionen je Kapitel ab.
 Verletzt eine Karte eine Annahme der Fixture, bekommt sie hier eine benannte,
@@ -96,7 +113,18 @@ nur den Host mit dem mod-eigenen `coopgod 0 1` fest und protokolliert das als
 QA-Liveness-Eingabe. Bizerte bleibt Inhaltsgrenze (kein alliiertes
 Spielermodell), `carride`/`tankdrivecountry` bleiben On-Rails-Ausnahmen,
 Bastogne1 wartet auf gerenderte Snapshots der wiederhergestellten Welt und
-prüft alle vier Laufrichtungen.
+prüft alle vier Laufrichtungen. Pavlov deckte einen Stock-Fehler von United
+Fronts auf: `Axis_Swap` hinterlässt in den Waffentabellen je Jahr eine Lücke
+(`ger_heer`/1942 setzt kein `sniper[1]`, ein Karten-Spawner setzt `sniper[2]`),
+und die ungeprüfte `precacheItem`-Schleife brach den Thread ab, sodass der Rest
+der Precache-Schleife und die Waffenzuweisung der Karte ausfielen. Der Overlay
+sichert jede dieser sechs Schleifen jetzt mit `isdefined` ab; die Karte besteht
+danach mit vier Spielern. Zwei Konsolenzeilen bleiben als benannte
+Inhaltswarnungen erlaubt (fehlendes `xmodel/head_blane`, das die Basis als
+`Blane1` ausliefert, und `xmodel/gear_german_headwrap` aus der winterlichen
+deutschen Tabelle für `sewer`/`pavlov`), exakt im Text verglichen und im Proof
+protokolliert; jede andere `ERROR:`-Zeile und jeder Script-Runtime-Fehler bleibt
+fatal.
 
 ## Mission progression
 

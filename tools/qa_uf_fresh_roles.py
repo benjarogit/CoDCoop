@@ -16,6 +16,32 @@ from stage_suite import laa_bytes,UOSP_LAA
 
 def normalized(name):return name.lower().removeprefix('xmodel/')
 
+# Engine lines for a named map's stock content defects, matched by exact text.
+# They are recorded in the proof instead of being silently dropped. Every other
+# ERROR: line stays fatal. See docs/campaign-compatibility.md, "Per-map sample
+# rules": pavlov's own map script precaches xmodel/head_blane although the base
+# game ships the model as Blane1, and UF's winter German table precaches
+# xmodel/gear_german_headwrap for sewer/pavlov only, which no shipped pak
+# contains.
+KNOWN_CONTENT_ERRORS = {
+ 'pavlov': (
+  "ERROR: Cannot precache 'xmodel/head_blane'",
+  "ERROR: Cannot precache 'xmodel/gear_german_headwrap'",
+ ),
+}
+
+def content_errors(folder,map_name,report):
+ """Unexpected engine errors for this folder; allowlisted stock warnings are counted in the proof."""
+ errors=qa.process_log_errors(folder)
+ allowed=KNOWN_CONTENT_ERRORS.get(map_name,())
+ if not allowed:return errors
+ unexpected=[line for line in errors if not any(marker in line for marker in allowed)]
+ known=[line for line in errors if any(marker in line for marker in allowed)]
+ if known:
+  bucket=report.setdefault('known_content_warnings',{}).setdefault(folder.name,{})
+  for line in known:bucket[line.strip()]=bucket.get(line.strip(),0)+1
+ return unexpected
+
 def owned_game_environment(inherited, *, trace_tree_free=False, borrow_trees=False, all_weapon_media=False, plan_union_media=False):
  env=dict(inherited)
  for key in tuple(env):
@@ -170,6 +196,8 @@ def main():
  subprocess.run(['i686-w64-mingw32-g++',str(source),'-o',str(helper),'-static','-O2','-std=c++17'],check=True)
  report={'status':'FAIL','scope':__doc__,'map':a.map,'players':4,'world_policy':a.world_policy,'hunk_megabytes':512,'inputs':inputs,'host_only_QA_plan_cvars':values,'network_resources':'normal resource-bootstrap v2; no peer-plan/offline media injection','experimental_defer_models':True,'experimental_borrow_trees':a.experimental_borrow_trees,'phases':[],'known_open':['No saved-world or GUID equipment binding proof','Experimental legacy registry globals not production promoted']}
  report['host_god_mode']={'enabled':True,'command':'coopgod 0 1','scope':'QA liveness pin for mission starts inside a live firefight; no damage or death claim'} if a.host_god else {'enabled':False}
+ if a.map in KNOWN_CONTENT_ERRORS:
+  report['known_content_warnings_allowed']={'map':a.map,'lines':list(KNOWN_CONTENT_ERRORS[a.map]),'scope':'stock content warnings matched by exact text; every other ERROR: line stays fatal'}
  report['experimental_gmi_loader']=a.experimental_gmi_loader
  report['readonly_tree_free_trace']=a.trace_tree_free
  report['experimental_all_weapon_media']={'enabled':a.experimental_all_weapon_media,
@@ -214,7 +242,7 @@ def main():
    deadline=time.monotonic()+35;last_error=None
    while time.monotonic()<deadline:
     for folder in folders:
-     errors=qa.process_log_errors(folder)
+     errors=content_errors(folder,a.map,report)
      if errors:raise RuntimeError('Native error during '+phase+': '+errors[0])
     host=[native(folders[0],slot) for slot in range(4)]
     observers={folder.name:native(folder,0,True) for folder,slot in controls}
@@ -271,7 +299,7 @@ def main():
    qa.wait_for(lambda: qa.read_state(folders[0])['server_time']<old_time-1000,processes,a.timeout,'native checkpoint restores earlier world time')
    def checkpoint_connected():
     for folder in folders:
-     errors=qa.process_log_errors(folder)
+     errors=content_errors(folder,a.map,report)
      if errors:raise RuntimeError('checkpoint engine error: '+errors[0])
     states=[qa.read_state(folder) for folder in folders]
     if not all(states):return None
@@ -299,7 +327,7 @@ def main():
   return {'scope':__doc__,'checks':['four actual independent kits from the current QA epoch with concrete per-slot inventory (FRESH or PRESERVED native identity)','normal resource-bootstrap v2; no offline plan/media on peers','all remotes moved via genuine owner input','all four consumed own firearm ammo','Host authoritative all4 server bodies and every observer other3 client/shadow bodies match native worldModel+negative actualclient/SV CS IDs; own first-person body presence recorded separately','MG/bazooka and pistol/binocular selection through actual weaponslot input; no firing/deployment claim for special weapons']+(['native checkpoint reload restored the world and every joiner rejoined'] if a.checkpoint_reloads else []), 'evidence':{'proof':'uf-fresh-roles-proof.json','map':a.map,'no_explicit_QA_save_or_load':not a.checkpoint_reloads}}
  subprocess.Popen=launch
  code=1
- try:code=qa.main(base,scenario=scenario)
+ try:code=qa.main(base,scenario=scenario,allowed_error_markers=KNOWN_CONTENT_ERRORS.get(a.map,()))
  except Exception as error:report['error']=str(error);code=1
  finally:
   subprocess.Popen=original

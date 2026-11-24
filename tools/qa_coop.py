@@ -169,8 +169,17 @@ def move_remote(host, peer, slot, processes, timeout, action='+forward'):
     return distance
 
 
-def process_log_errors(folder, intentional_departures=0):
+def process_log_errors(folder, intentional_departures=0, allowed=()):
+    """Fatal engine lines for one game copy.
+
+    `allowed` holds exact stock console texts that a named map is known to print
+    (docs/campaign-compatibility.md, "Per-map sample rules"). Matching is by
+    substring because the engine appends the next console output to the same
+    physical line when it writes without a line break. Everything else stays
+    fatal, and the calling scenario records which markers it allowed.
+    """
     errors = []
+    allowed = tuple(marker for marker in allowed if marker)
     departures=0
     paths = list(folder.glob('codcoop*.log'))
     paths += [folder / root / 'console.log' for root in ('Main', 'main', 'uo', 'sp_improved', 'UnitedFronts')
@@ -186,6 +195,8 @@ def process_log_errors(folder, intentional_departures=0):
                     any(previous.strip()=='^3COOP: You left the co-op game.'
                         for previous in lines[max(0,index-8):index])):
                 departures+=1
+                continue
+            if allowed and any(marker in line for marker in allowed):
                 continue
             if ('CRASH ' in line or 'MT_AllocIndex: failed' in line or
                     'script runtime error' in line.lower() or 'Server time went backwards' in line or
@@ -238,8 +249,9 @@ def validate_scenario_result(value):
     return value
 
 
-def main(argv=None, *, scenario=None):
+def main(argv=None, *, scenario=None, allowed_error_markers=()):
     if scenario is not None and not callable(scenario): raise ValueError('scenario is a trusted Python callable only')
+    allowed = tuple(marker for marker in allowed_error_markers if marker)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--source', required=True, type=Path)
     parser.add_argument('--run', required=True, type=Path, help='new or reusable isolated output directory')
@@ -447,7 +459,7 @@ def main(argv=None, *, scenario=None):
             rejected = wait_for(rejected_protocol, processes, args.timeout, 'readable protocol incompatibility before slot allocation')
             (output / 'rejected.json').write_text(json.dumps(rejected, indent=2))
             for folder in folders:
-                if process_log_errors(folder):
+                if process_log_errors(folder,allowed=allowed):
                     raise RuntimeError('native error during protocol rejection')
             for n, folder in enumerate(folders):
                 command(folder, 'quit', joiner=n != 0)
@@ -498,7 +510,7 @@ def main(argv=None, *, scenario=None):
                          processes, args.timeout, 'native checkpoint restores earlier world time')
                 def checkpoint_connected():
                     for folder in folders:
-                        errors = process_log_errors(folder)
+                        errors = process_log_errors(folder,allowed=allowed)
                         if errors: raise RuntimeError('checkpoint engine error: ' + errors[0])
                     return connected()
                 states = wait_for(checkpoint_connected, processes, args.timeout, 'all players rejoin restored checkpoint')
@@ -535,7 +547,7 @@ def main(argv=None, *, scenario=None):
         wait_liveness(baseline, connected, processes, args.players)
         final = connected() or final
         for index,folder in enumerate(folders):
-            errors=process_log_errors(folder,1 if index in intentional_departures else 0)
+            errors=process_log_errors(folder,1 if index in intentional_departures else 0,allowed)
             if errors: raise RuntimeError(str(errors))
         (output / 'after.json').write_text(json.dumps(final, indent=2))
         results['checks'].append('stable observation with unallocated packet rejected')

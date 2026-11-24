@@ -814,6 +814,35 @@ def uf_actor_weapon_loop_yield(data):
     return text.replace(anchor, replacement, 1).encode('latin-1')
 
 
+def uf_axis_swap_precache_guards(data):
+    """Skip holes in Axis_Swap's sparse weapon arrays before precaching.
+
+    Axis_Swap fills rifle/smg/lmg/sniper/pistol/grenade per nation and year. For
+    German army maps in 1942 the sniper table only sets index 0, but a pavlov
+    sniper spawner later sets index 2. The array is then sparse, `sniper.size`
+    also covers the undefined index 1, and precacheItem() aborts the whole
+    thread with "cannot cast undefined to string"
+    (run/qa-pavlov-m15-sample1), skipping the remaining precache and the map's
+    weapon assignment. Guarding each entry with isdefined() keeps the authored
+    sparse layout and precaches every defined weapon.
+
+    Synthetic build fixtures without the authored block pass through unchanged.
+    """
+    text = data.decode('latin-1')
+    kinds = ('rifle', 'smg', 'lmg', 'sniper', 'pistol', 'grenade')
+    anchor = ''.join('\tfor (i=0; i<%s.size; i++)\r\n\tprecacheItem(%s[i]);\r\n' % (kind, kind)
+                     for kind in kinds)
+    if anchor not in text:
+        return data
+    if text.count(anchor) != 1:
+        raise ValueError('Unknown UF axis weapon precache revision')
+    replacement = ''.join(
+        '\tfor (i=0; i<{0}.size; i++)\r\n\t{{\r\n\t\tif (isdefined({0}[i]))\r\n'
+        '\t\t\tprecacheItem({0}[i]);\r\n\t}}\r\n'.format(kind)
+        for kind in kinds)
+    return text.replace(anchor, replacement, 1).encode('latin-1')
+
+
 def build(source, output, profile, qa=False, world_policy="universal", qa_kits=False, qa_gmi=False):
     if qa_kits and profile != 'united_fronts':
         raise ValueError('QA individual-kit adapter requires United Fronts')
@@ -832,7 +861,7 @@ def build(source, output, profile, qa=False, world_policy="universal", qa_kits=F
         pathfinder = z.read('maps/pathfinder.gsc') if profile == 'united_fronts' else None
         aliases = uf_asset_aliases(z) if profile == 'united_fronts' else []
         kit_adapter = uf_actor_kit_adapter(z.read('maps/_UF_loadout.gsc')) if profile == 'united_fronts' and qa_kits else None
-        airborne_fix = uf_actor_weapon_loop_yield(uf_airborne_missing_load(z.read('maps/_UF_mod.gsc'))) if profile == 'united_fronts' else None
+        airborne_fix = uf_axis_swap_precache_guards(uf_actor_weapon_loop_yield(uf_airborne_missing_load(z.read('maps/_UF_mod.gsc')))) if profile == 'united_fronts' else None
         if profile == 'united_fronts':
             alias = z.read('xmodelalias/helmet_us_airborne_82nd.gsc')
             if hashlib.sha256(alias).hexdigest() != UF_HELMET_ALIAS_HASH:
@@ -890,6 +919,7 @@ def build(source, output, profile, qa=False, world_policy="universal", qa_kits=F
         metadata['changes'].append('uf-brolio-owned-greasegun-model-alias')
         metadata['changes'].append('uf-foy-noville-authored-airborne-load1-early-precache')
         metadata['changes'].append('uf-axis-weapon-loop-yield')
+        metadata['changes'].append('uf-axis-swap-sparse-precache-guard')
         metadata['source_uf_mod_sha256'] = '4be5bb5c6849f7c2b762ccdd27c2020b8c99a70cf64e8e8be98acc387ec698cf'
         metadata['airborne_load1_source'] = {'package': 'Main/pak0.pk3', 'member': 'xmodel/gear_US_load1', 'sha256': 'a7fdc7e73b0fdff95e2c79492f60542e908ef237245fc7b867258af603a23607'}
         metadata['model_aliases'] = {'xmodel/world_greasegun': {'source': 'xmodel/weapon_greasegun', 'sha256': UF_GREASE_MODEL_HASH}}

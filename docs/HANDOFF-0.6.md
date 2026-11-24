@@ -485,6 +485,52 @@ This addendum supersedes pending statements below. Nothing has been published.
   Situation, das Produkt löst sie noch nicht. Für 0.6.0 braucht das eine
   Entscheidung (Host schützen, bis `coop_expected_players` da ist, oder ein
   abschließender Join setzt den ausstehenden Reload fort).
+- **M16 Russian sample and the sparse Axis weapon table / M16 Russland-Stichprobe und die lückenhafte Achsen-Waffentabelle:**
+  `run/qa-pavlov-m15-sample3` PASSes four-player pavlov: four independent kits
+  of the `american` family, 10 native-tree adoptions per joiner, host bodies in
+  the Soviet winter families (`character_soviet_overcwinter`,
+  `character_soviet_coatwinter`, `character_pavlov`), initial movement
+  211.3/199.8/174.7 and post-reload movement 56.5/48.5/60.0, 0 failed
+  allocation, 0 `ERROR:` line, 0 watchdog message, no `host silent` event and a
+  clean shutdown. `run/qa-pavlov-m15-sample1` exposed a stock United Fronts
+  defect: `Axis_Swap` builds `rifle/smg/lmg/sniper/pistol/grenade` per nation and
+  year, and for `ger_heer`/1942 the sniper table sets only index 0 while a
+  pavlov sniper spawner later sets index 2. The array is sparse,
+  `sniper.size` also covers the undefined index 1, and `precacheItem` aborted
+  the thread with "cannot cast undefined to string" (original `_UF_mod.gsc`
+  line ~7168), skipping the remaining precache and the map's weapon assignment.
+  The overlay transform `uf_axis_swap_precache_guards` now wraps each of the six
+  precache loops in an `isdefined` check, so the authored sparse layout stays
+  intact and every defined weapon is still precached. The second attempt
+  `run/qa-pavlov-m15-sample2` completed every scenario gate but still failed the
+  final console gate, which was right: the two remaining lines are stock content
+  warnings, not coop defects. Both are now a named per-map allowlist matched by
+  exact console text in `qa_coop.process_log_errors` and recorded in the proof;
+  every other `ERROR:` line and every script runtime error stays fatal.
+  / `run/qa-pavlov-m15-sample3` besteht Pavlov mit vier Spielern: vier
+  unabhängige Kits der Familie `american`, 10 native Baum-Übernahmen je Joiner,
+  Host-Körper in den sowjetischen Winterfamilien (`character_soviet_overcwinter`,
+  `character_soviet_coatwinter`, `character_pavlov`), Anfangsbewegung
+  211,3/199,8/174,7 und Bewegung nach dem Reload 56,5/48,5/60,0, 0
+  fehlgeschlagene Allokation, 0 `ERROR:`-Zeile, 0 Watchdog-Meldung, kein
+  `host silent`, sauberer Shutdown. `run/qa-pavlov-m15-sample1` legte einen
+  Stock-Fehler von United Fronts offen: `Axis_Swap` füllt
+  `rifle/smg/lmg/sniper/pistol/grenade` je Nation und Jahr, und für
+  `ger_heer`/1942 setzt die Sniper-Tabelle nur Index 0, während ein
+  Pavlov-Spawner später Index 2 setzt. Das Array ist damit lückenhaft,
+  `sniper.size` umfasst auch den undefinierten Index 1, und `precacheItem`
+  brach den Thread mit „cannot cast undefined to string" ab (Original
+  `_UF_mod.gsc` Zeile ~7168), sodass der Rest der Precache-Schleife und die
+  Waffenzuweisung der Karte ausfielen. Der Overlay-Transform
+  `uf_axis_swap_precache_guards` setzt jetzt um jede der sechs
+  Precache-Schleifen eine `isdefined`-Prüfung; das gewollt lückenhafte Layout
+  bleibt erhalten, jede definierte Waffe wird weiter vorgeladen. Der zweite
+  Versuch `run/qa-pavlov-m15-sample2` erfüllte alle Szenario-Gates, scheiterte
+  aber zu Recht an der abschließenden Konsolenprüfung: Die zwei übrigen Zeilen
+  sind Stock-Inhaltswarnungen, keine Coop-Fehler. Beide sind jetzt eine
+  benannte Pro-Map-Ausnahmeliste mit exaktem Konsolentext in
+  `qa_coop.process_log_errors`, protokolliert im Proof; jede andere
+  `ERROR:`-Zeile und jeder Script-Runtime-Fehler bleibt fatal.
 - **U1 upstream comparison TheTiranix/CoDCoop / U1 Upstream-Abgleich:**
   `upstream/master` = `52dd2bc` (fetched read-only), merge base `21eae10`;
   upstream has 8 commits we do not, we have 78 it does not. Verdicts:

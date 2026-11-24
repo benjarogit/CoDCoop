@@ -37,6 +37,22 @@ class ScenarioContractTests(unittest.TestCase):
             with self.subTest(indices=indices),self.assertRaises(ValueError):
                 qa_coop.validate_scenario_result({**report,'intentional_departures':indices})
 
+    def test_allowed_marker_covers_only_its_own_console_text(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);(root/'Main').mkdir();log=root/'Main/console.log'
+            marker="ERROR: Cannot precache 'xmodel/head_blane'"
+            # the engine glues the next console output onto the same physical line
+            log.write_text(marker+"      cvar set cg_thirdPerson 0\nERROR: Cannot precache 'xmodel/other'\n")
+            self.assertEqual(len(qa_coop.process_log_errors(root)),2)
+            self.assertEqual(qa_coop.process_log_errors(root,allowed=[marker]),
+                             ["ERROR: Cannot precache 'xmodel/other'"])
+            log.write_text(marker+"\nERROR: Cannot precache 'xmodel/other'\n")
+            self.assertEqual(qa_coop.process_log_errors(root,allowed=[marker]),
+                             ["ERROR: Cannot precache 'xmodel/other'"])
+            log.write_text("CRASH native fault\n")
+            self.assertTrue(qa_coop.process_log_errors(root,allowed=[marker]))
+            self.assertEqual(qa_coop.process_log_errors(root,allowed=['']),["CRASH native fault"])
+
     def test_native_departure_banner_needs_marker_exact_count_and_explicit_scope(self):
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory);(root/'Main').mkdir();log=root/'Main/console.log'

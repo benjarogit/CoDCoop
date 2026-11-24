@@ -35,6 +35,18 @@
   never as a damage or death claim. A host death while peers are still loading
   still leaves the listen server paused; that product case is documented as
   open in the handoff.
+- Pavlov adds the Russian winter sample and exposes a stock United Fronts
+  defect: `Axis_Swap` leaves a hole in its per-year weapon tables
+  (`ger_heer`/1942 sets no `sniper[1]`, a map spawner sets `sniper[2]`), and the
+  unguarded `precacheItem` loop aborted the script thread, so the remaining
+  precache and the map's weapon assignment never ran. The overlay now guards
+  each of the six loops with `isdefined`; pavlov then passes four-player Coop
+  with 10 adoptions per joiner and 211.3/199.8/174.7 initial, 56.5/48.5/60.0
+  post-reload movement. Its two remaining console lines are named content
+  warnings (missing `xmodel/head_blane`, shipped as `Blane1`, and
+  `xmodel/gear_german_headwrap` from United Fronts' winter German table) and are
+  allowlisted by exact text, recorded in the proof; every other `ERROR:` line
+  and every script runtime error stays fatal.
 - Fix atomic lobby-file exchange when a Windows/Wine reader temporarily blocks
   replacement; keep bounded retries, prior-file preservation and link rejection.
   Fresh frozen Linux and Windows/Wine workers pass signed party transactions,
@@ -167,6 +179,20 @@ mechanics remain acceptance gates. See [handoff](docs/HANDOFF-0.6.md).
   QA-Liveness-Eingabe, nie als Damage-/Death-Aussage. Stirbt der Host, während
   Peers noch laden, bleibt der Listen-Server weiterhin pausiert; dieser
   Produktfall ist im Handoff als offen dokumentiert.
+- Pavlov ergänzt die russische Winterstichprobe und legt einen Stock-Fehler von
+  United Fronts offen: `Axis_Swap` hinterlässt in den Waffentabellen je Jahr
+  eine Lücke (`ger_heer`/1942 setzt kein `sniper[1]`, ein Karten-Spawner setzt
+  `sniper[2]`), und die ungeprüfte `precacheItem`-Schleife brach den
+  Script-Thread ab, sodass der Rest der Precache-Schleife und die
+  Waffenzuweisung der Karte ausfielen. Der Overlay sichert jede der sechs
+  Schleifen jetzt mit `isdefined` ab; Pavlov besteht danach mit vier Spielern,
+  10 Übernahmen je Joiner und Anfangsbewegung 211,3/199,8/174,7 sowie
+  56,5/48,5/60,0 nach dem Reload. Die zwei verbleibenden Konsolenzeilen sind
+  benannte Inhaltswarnungen (fehlendes `xmodel/head_blane`, das die Basis als
+  `Blane1` ausliefert, und `xmodel/gear_german_headwrap` aus der winterlichen
+  deutschen Tabelle von United Fronts) und werden exakt im Text erlaubt und im
+  Proof protokolliert; jede andere `ERROR:`-Zeile und jeder Script-Runtime-Fehler
+  bleibt fatal.
 - Atomaren Lobby-Dateiaustausch bei vorübergehend blockierenden Windows-/Wine-
   Lesern korrigieren; begrenzte Wiederholungen, Erhalt der vorherigen Datei und
   Link-Abweisung beibehalten. Neu gebaute Linux- und Windows/Wine-Worker bestehen
