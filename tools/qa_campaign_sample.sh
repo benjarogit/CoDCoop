@@ -5,6 +5,13 @@
 #
 # Disk hygiene is part of the run: refuse to start below 60 GB free, never delete
 # while a game process of this run is alive, and print run/+free before and after.
+#
+# Every sample pins the host with the mod's own coopgod command while the peers
+# load the map. Several campaign openings are live firefights (dawnville: axis
+# soldiers 500-1100 units from the spawn); an idle host dies, the engine pauses
+# the server on the death screen, and the joining peers never get a gamestate.
+# The pin is recorded in result/proof as QA liveness only, never as a damage or
+# death claim.
 set -eu
 
 tag=${1:?usage: qa_campaign_sample.sh <tag> <map> <port> [fixture args...]}
@@ -27,7 +34,7 @@ before_run=$(du -sh run | cut -f1)
 
 python3 -u tools/qa_uf_fresh_roles.py --source run/campaign-host --run "$run" --runtime-dir build \
     --map "$map" --port "$port" --timeout 240 --duration 1 --checkpoint-reloads 1 \
-    --experimental-gmi-loader --experimental-plan-union-media "$@" > "$run.log" 2>&1 || true
+    --experimental-gmi-loader --experimental-plan-union-media --host-god "$@" > "$run.log" 2>&1 || true
 
 if pgrep -af CoDUOSP.exe | grep -Fq "$tag"; then
     echo "game processes for $tag are still alive; evidence kept, runtime copies NOT deleted" >&2

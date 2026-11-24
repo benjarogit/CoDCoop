@@ -134,12 +134,13 @@ def argument_parser():
  p.add_argument('--trace-tree-free',action='store_true',help='QA-only read-only native tree ownership/free-path trace; changes no free semantics')
  p.add_argument('--experimental-all-weapon-media',action='store_true',help='QA-only existing native item/media registration; no inventory grant or native acceptance proof')
  p.add_argument('--experimental-plan-union-media',action='store_true',help='QA-only host union of the four planned kits plus the same planned indices on peers before the mapping check')
+ p.add_argument('--host-god',action='store_true',help='pin host health with coopgod while the peers load and during the scenario; for mission starts inside a live firefight, no damage/death claim')
  return p
 
 def main():
  a=argument_parser().parse_args()
  if a.map not in supported_maps():raise SystemExit('map %r is not in the United Fronts world rules'%a.map)
- out=a.run.resolve();base=['--source',str(a.source.resolve()),'--run',str(out),'--runtime-dir',str(a.runtime_dir.resolve()),'--variant','united_fronts','--map',a.map,'--players','4','--timeout',str(a.timeout),'--port',str(a.port),'--duration',str(a.duration)]
+ out=a.run.resolve();base=['--source',str(a.source.resolve()),'--run',str(out),'--runtime-dir',str(a.runtime_dir.resolve()),'--variant','united_fronts','--map',a.map,'--players','4','--timeout',str(a.timeout),'--port',str(a.port),'--duration',str(a.duration)]+(['--host-god'] if a.host_god else [])
  qa.main(base+['--prepare-only'])
  folders=[out/name for name in ('host','join1','join2','join3')];kits,expected,fire=kit_fixture(4)
  catalog=json.loads((qa.ROOT/'campaign_patches/uf_equipment_catalog.json').read_text())
@@ -168,6 +169,7 @@ def main():
  helper=out/'qa-fresh-role-observer.exe';source=out/'qa-fresh-role-observer.cpp';source.write_bytes((qa.ROOT/'campaign_patches/qa_uf_player_state.cpp').read_bytes())
  subprocess.run(['i686-w64-mingw32-g++',str(source),'-o',str(helper),'-static','-O2','-std=c++17'],check=True)
  report={'status':'FAIL','scope':__doc__,'map':a.map,'players':4,'world_policy':a.world_policy,'hunk_megabytes':512,'inputs':inputs,'host_only_QA_plan_cvars':values,'network_resources':'normal resource-bootstrap v2; no peer-plan/offline media injection','experimental_defer_models':True,'experimental_borrow_trees':a.experimental_borrow_trees,'phases':[],'known_open':['No saved-world or GUID equipment binding proof','Experimental legacy registry globals not production promoted']}
+ report['host_god_mode']={'enabled':True,'command':'coopgod 0 1','scope':'QA liveness pin for mission starts inside a live firefight; no damage or death claim'} if a.host_god else {'enabled':False}
  report['experimental_gmi_loader']=a.experimental_gmi_loader
  report['readonly_tree_free_trace']=a.trace_tree_free
  report['experimental_all_weapon_media']={'enabled':a.experimental_all_weapon_media,

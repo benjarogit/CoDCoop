@@ -51,6 +51,53 @@ revision is rejected for review instead of applying a guessed patch.
 - `uo/uomappack00.pk3` contains `maps/mp/` assets and is a multiplayer map pack,
   not an additional singleplayer campaign.
 
+## Per-map sample rules / Pro-Map-Stichprobenregeln
+
+The four-player sampler (`tools/qa_campaign_sample.sh` ->
+`tools/qa_uf_fresh_roles.py`) covers one or two key missions per chapter. A map
+that violates a fixture assumption gets a named rule here, backed by its run
+evidence; no gate is silently relaxed and no uncovered map is reported as
+passed.
+
+- `dawnville` (US, passed `run/qa-dawnville-m14-god1`): the mission opens in a
+  live firefight, with axis actors 519-1100 units from `info_player_start`. An
+  idle host died 41 s into the map while the peers were still loading; the
+  death screen paused the listen server and no peer received a gamestate
+  (`run/qa-dawnville-m14-sample1`). Rule: the sampler pins only the host with
+  the mod's own `coopgod 0 1` command (`--host-god`) and records it in result
+  and proof as a QA liveness input. Kits, ammo, bodies, movement and checkpoint
+  reload keep their strict gates. Product open item: the paused death screen
+  currently blocks pending joins.
+- `bizerte` (content limitation): the level loads no allied player model, so no
+  Coop body can be built on either side and the body gate cannot pass. Rule:
+  bizerte is not a sample; `afrika2` is the desert sample. Evidence:
+  `run/qa-bizerte-m14-sample1`.
+- `carride`, `tankdrivecountry` (on-rails starts): the mission begins with the
+  player attached to a moving vehicle, so owner-input movement cannot be
+  measured. Rule: documented exception, not sampled.
+- `bastogne1` (post-reload renderer catch-up): joiners re-enter with the
+  renderer at 2 fps and zero snapshots for seconds, and the restored pose can
+  face an obstacle. Rule: wait for fresh restored-world snapshots and probe all
+  four walk directions while keeping the strict per-direction oracle. Evidence:
+  `run/qa-bastogne1-m13-wall1`.
+- `afrika2` (desert and vehicle sample): the map runs a Sherman and supplies
+  its GIs as 3rd Infantry models; the host body lookup covers those families
+  and the authored AI weapon pass yields every eight actors so four native
+  clients do not trip the engine's script watchdog. Those are product fixes,
+  not map rules. Evidence: `run/qa-afrika2-m14-yield1`.
+
+Der Vier-Spieler-Sampler deckt ein bis zwei Schlüsselmissionen je Kapitel ab.
+Verletzt eine Karte eine Annahme der Fixture, bekommt sie hier eine benannte,
+durch Lauf-Evidenz belegte Regel; kein Gate wird still aufgeweicht und keine
+nicht abgedeckte Karte als bestanden gemeldet. Dawnville startet in einem
+laufenden Gefecht: Der Host starb nach 41 s Wartezeit, der Deathscreen pausierte
+den Listen-Server und kein Peer bekam ein Gamestate. Deshalb setzt der Sampler
+nur den Host mit dem mod-eigenen `coopgod 0 1` fest und protokolliert das als
+QA-Liveness-Eingabe. Bizerte bleibt Inhaltsgrenze (kein alliiertes
+Spielermodell), `carride`/`tankdrivecountry` bleiben On-Rails-Ausnahmen,
+Bastogne1 wartet auf gerenderte Snapshots der wiederhergestellten Welt und
+prüft alle vier Laufrichtungen.
+
 ## Mission progression
 
 SP Improved keeps separate base-game/UO mission selection and changes many

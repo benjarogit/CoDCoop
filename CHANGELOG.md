@@ -26,6 +26,15 @@
   Division model families, and the authored AI weapon pass yields every eight
   actors so four native clients on one machine no longer trip the engine's
   script watchdog and lose the remaining actors' weapons.
+- Afrika2 and Dawnville extend the four-player samples: 25 and 12 native-tree
+  adoptions per joiner, 19 host bodies each, genuine owner movement and a
+  native checkpoint reload with every joiner re-joined. Dawnville opens inside a
+  live firefight: an idle host died before the peers finished loading, and the
+  paused death screen blocked the joins. The sampler now pins only the host
+  with the mod's own `coopgod` command and records that as a QA liveness input,
+  never as a damage or death claim. A host death while peers are still loading
+  still leaves the listen server paused; that product case is documented as
+  open in the handoff.
 - Fix atomic lobby-file exchange when a Windows/Wine reader temporarily blocks
   replacement; keep bounded retries, prior-file preservation and link rejection.
   Fresh frozen Linux and Windows/Wine workers pass signed party transactions,
@@ -148,6 +157,16 @@ mechanics remain acceptance gates. See [handoff](docs/HANDOFF-0.6.md).
   der Waffendurchlauf der Mod setzt alle acht Soldaten ein `wait 0`, damit vier
   native Clients auf einer Maschine nicht mehr das Script-Watchdog der Engine
   auslösen und die Waffen der restlichen Soldaten verloren gehen.
+- Afrika2 und Dawnville erweitern die Vier-Spieler-Stichproben: 25 bzw. 12
+  native Baum-Übernahmen je Joiner, je 19 Host-Körper, echte Bewegung über
+  Eigentümer-Eingaben und ein nativer Checkpoint-Reload, bei dem alle Joiner
+  wieder beitreten. Dawnville startet in einem laufenden Gefecht: Ein untätiger
+  Host starb, bevor die Peers fertig geladen hatten, und der pausierte
+  Deathscreen blockierte die Beitritte. Der Sampler hält jetzt nur den Host mit
+  dem mod-eigenen `coopgod`-Befehl fest und protokolliert das als
+  QA-Liveness-Eingabe, nie als Damage-/Death-Aussage. Stirbt der Host, während
+  Peers noch laden, bleibt der Listen-Server weiterhin pausiert; dieser
+  Produktfall ist im Handoff als offen dokumentiert.
 - Atomaren Lobby-Dateiaustausch bei vorübergehend blockierenden Windows-/Wine-
   Lesern korrigieren; begrenzte Wiederholungen, Erhalt der vorherigen Datei und
   Link-Abweisung beibehalten. Neu gebaute Linux- und Windows/Wine-Worker bestehen

@@ -341,10 +341,11 @@ This addendum supersedes pending statements below. Nothing has been published.
   166.6/166.7/130.4 and post-reload movement 156.6/187.8/124.0 through `+back`,
   0 `failed allocation`, 0 `ERROR:` line, no `host silent` event and a clean
   shutdown. Evidence in `run/qa-bastogne1-m13-wall1/evidence/`; runtime copies
-  deleted. The per-chapter sample program is US `carride` (truck intro), desert
-  `afrika2`, British `arnhem`/`pegasusnight`, Soviet `pavlov`/`redsquare`,
+  deleted. The per-chapter sample program is US `dawnville` (done), desert
+  `afrika2` (done), British `arnhem`/`pegasusnight`, Soviet `pavlov`/`redsquare`,
   snow/urban `bastogne1` (done) and vehicles `bizerte` (see below), each with
-  the four-role fixture; CoD1, UO and SP Improved get one smoke each. The
+  the four-role fixture; `carride` and `tankdrivecountry` stay documented
+  on-rails exceptions; CoD1, UO and SP Improved get one smoke each. The
   coverage status is recorded per map, not as a campaign playthrough claim.
   `run/qa-bizerte-m14-sample1` is the first documented content exception:
   bizerte loads only `character_german_dakA/C/E/F` (273 exported models, no
@@ -363,12 +364,13 @@ This addendum supersedes pending statements below. Nothing has been published.
   156,6/187,8/124,0 über `+back`, 0 `failed allocation`, 0 `ERROR:`-Zeile, kein
   `host silent`, sauberer Shutdown. Evidenz in
   `run/qa-bastogne1-m13-wall1/evidence/`; Laufzeitkopien gelöscht. Das
-  Stichprobenprogramm je Kapitel ist US `carride` (Truck-Intro), Wüste
-  `afrika2`, Britisch `arnhem`/`pegasusnight`, Sowjet `pavlov`/`redsquare`,
-  Schnee/Stadt `bastogne1` (erledigt) und Fahrzeuge `bizerte` (siehe unten),
-  jeweils mit der Vier-Rollen-Fixture; CoD1, UO und SP Improved bekommen je
-  einen Smoke. Der Abdeckungsstand wird pro Karte festgehalten, nicht als
-  behaupteter Kampagnendurchlauf. `run/qa-bizerte-m14-sample1` ist die erste
+  Stichprobenprogramm je Kapitel ist US `dawnville` (erledigt), Wüste
+  `afrika2` (erledigt), Britisch `arnhem`/`pegasusnight`, Sowjet
+  `pavlov`/`redsquare`, Schnee/Stadt `bastogne1` (erledigt) und Fahrzeuge
+  `bizerte` (siehe unten), jeweils mit der Vier-Rollen-Fixture; `carride` und
+  `tankdrivecountry` bleiben dokumentierte On-Rails-Ausnahmen; CoD1, UO und SP
+  Improved bekommen je einen Smoke. Der Abdeckungsstand wird pro Karte
+  festgehalten, nicht als behaupteter Kampagnendurchlauf. `run/qa-bizerte-m14-sample1` ist die erste
   dokumentierte Inhaltsausnahme: Bizerte lädt nur
   `character_german_dakA/C/E/F` (273 exportierte Modelle, kein alliiertes
   Spielermodell; die `character\...::precache()`-Zeilen im GSC sind
@@ -429,6 +431,60 @@ This addendum supersedes pending statements below. Nothing has been published.
   er verteilt die Arbeit nur über einige Frames. Foy protokollierte bereits die
   nicht tödliche *Warnung* desselben Watchdogs im einmaligen
   `Precache_Characters`, der Fix ist also nicht Afrika2-spezifisch.
+- **M15 US sample, host death during the join window / M15 US-Stichprobe, Host-Tod im Join-Fenster:**
+  `run/qa-dawnville-m14-god1` PASSes four-player dawnville: 12 native-tree
+  adoptions per joiner, 6 own trees each, 19 host bodies
+  (`character_airborne`, `character_airborne_101`, `character_airborneslvup`),
+  initial movement 177.9/172.6/183.0 and post-reload movement
+  156.1/180.1/157.9, 0 `failed allocation`, 0 `ERROR:` line, 0 watchdog
+  message, no `host silent` event and a clean shutdown. The first attempt
+  `run/qa-dawnville-m14-sample1` failed before any peer connected: the host
+  stood at the mission's `info_player_start` `(924, -17018, 64)` while the
+  nearest axis actors were 519-1100 units away and the allied squad 84 units.
+  After 41.4 s of idling the host was dead (health -52, `pm_type 4`); the
+  engine's death screen set `cl_paused 1`, `ui_coop_paused 1` and
+  `g_reloading 1`, `serverMsgSeq` froze at 760, and the three joiners stayed at
+  `serverMsgSeq=1` until the timeout. That is an exposed mission opening, not a
+  regression of the body or watchdog fixes, and the fixture now handles it as a
+  named rule instead of relaxing a gate: `--host-god` sends the mod's own
+  `coopgod 0 1` directly after `coopqastart`, `qa_campaign_sample.sh` uses it
+  for every sample, and `result.json`/`uf-fresh-roles-proof.json` record
+  `host_god_mode` with the scope "QA liveness pin, no damage or death claim".
+  Kits, ammo, bodies, movement and the checkpoint reload keep their original
+  gates.
+  **Open product question:** a host that dies while peers are still loading
+  leaves the listen server paused on the death screen, so those peers cannot
+  finish joining until the host resumes. The fixture avoids the situation; the
+  product does not solve it yet. For 0.6.0 this needs a decision (protect the
+  host until `coop_expected_players` arrived, or let a completing join resume
+  the pending reload).
+  / `run/qa-dawnville-m14-god1` besteht Dawnville mit vier Spielern: 12 native
+  Baum-Übernahmen je Joiner, je 6 Eigenbäume, 19 Host-Körper
+  (`character_airborne`, `character_airborne_101`, `character_airborneslvup`),
+  Anfangsbewegung 177,9/172,6/183,0 und Bewegung nach dem Reload
+  156,1/180,1/157,9, 0 `failed allocation`, 0 `ERROR:`-Zeile, 0
+  Watchdog-Meldung, kein `host silent`, sauberer Shutdown. Der erste Versuch
+  `run/qa-dawnville-m14-sample1` scheiterte, bevor ein Peer verbunden war: Der
+  Host stand am `info_player_start` der Mission `(924, -17018, 64)`, die
+  nächsten Achsen-Soldaten 519-1100 Einheiten entfernt, das eigene Squad
+  84 Einheiten. Nach 41,4 s Leerlauf war der Host tot (Health -52, `pm_type 4`);
+  der Deathscreen der Engine setzte `cl_paused 1`, `ui_coop_paused 1` und
+  `g_reloading 1`, `serverMsgSeq` fror bei 760 ein, und die drei Joiner
+  blieben bei `serverMsgSeq=1` bis zum Timeout. Das ist eine exponierte
+  Missionseröffnung, keine Regression der Körper- oder Watchdog-Fixes, und die
+  Fixture behandelt sie jetzt als benannte Regel statt ein Gate aufzuweichen:
+  `--host-god` schickt direkt nach `coopqastart` das mod-eigene `coopgod 0 1`,
+  `qa_campaign_sample.sh` nutzt das für jede Stichprobe, und
+  `result.json`/`uf-fresh-roles-proof.json` halten `host_god_mode` mit dem
+  Geltungsbereich „QA-Liveness-Klemme, keine Damage-/Death-Aussage" fest.
+  Kits, Munition, Körper, Bewegung und der Checkpoint-Reload behalten ihre
+  ursprünglichen Gates.
+  **Offene Produktfrage:** Stirbt der Host, während Peers noch laden, bleibt
+  der Listen-Server auf dem Deathscreen pausiert; diese Peers können den
+  Beitritt erst abschließen, wenn der Host fortsetzt. Die Fixture umgeht die
+  Situation, das Produkt löst sie noch nicht. Für 0.6.0 braucht das eine
+  Entscheidung (Host schützen, bis `coop_expected_players` da ist, oder ein
+  abschließender Join setzt den ausstehenden Reload fort).
 - **U1 upstream comparison TheTiranix/CoDCoop / U1 Upstream-Abgleich:**
   `upstream/master` = `52dd2bc` (fetched read-only), merge base `21eae10`;
   upstream has 8 commits we do not, we have 78 it does not. Verdicts:

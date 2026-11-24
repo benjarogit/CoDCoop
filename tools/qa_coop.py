@@ -257,6 +257,9 @@ def main(argv=None, *, scenario=None):
     parser.add_argument('--port', type=int, default=29860)
     parser.add_argument('--prepare-only', action='store_true')
     parser.add_argument('--host-delay', type=int, default=0, help='start a joiner first and wait this many real seconds before the host')
+    parser.add_argument('--host-god', action='store_true',
+                        help='pin host player health with the mod coopgod command while peers connect and during the scenario; '
+                             'a liveness pin for missions that open inside a live firefight, no damage or death claim')
     parser.add_argument('--checkpoint-reloads', type=int, choices=range(0, 6), default=0,
                         help='save and reload a real host checkpoint this many times (0..5)')
     parser.add_argument('--chaos-checkout', type=Path, help='Co-op Anything checkout at the pinned revision; enables its UDP relay')
@@ -344,6 +347,11 @@ def main(argv=None, *, scenario=None):
     if chaos_script:
         provenance['network'] = {'tool': 'coop-anything/chaos', 'revision': COOP_ANYTHING_REVISION,
                                  'profile': args.chaos_profile, 'seed': args.chaos_seed}
+    if args.host_god:
+        provenance['host_god_mode'] = {
+            'enabled': True, 'command': 'coopgod 0 1',
+            'scope': 'QA liveness pin for missions that open inside a live firefight; keeps the host alive while peers '
+                     'load the map, no damage or death claim'}
     (output / 'provenance.json').write_text(json.dumps(provenance, indent=2))
     if args.prepare_only:
         return 0
@@ -409,7 +417,15 @@ def main(argv=None, *, scenario=None):
             processes.append(subprocess.Popen(cmd, env=env, cwd=folder, stdout=log, stderr=log))
             wait_for(lambda: read_state(folder), processes, args.timeout, 'core initialization for slot %d' % n)
             # Engine UI calls, no desktop mouse injection and no direct world-state teleport.
-            command(folder, 'coopuiclick 320 240\ncoopqastart', joiner=n != 0)
+            start = 'coopuiclick 320 240\ncoopqastart'
+            if args.host_god and n == 0:
+                # The host waits alone until every peer has loaded the map. On maps
+                # whose opening is a live firefight the idle host is shot dead, the
+                # engine pauses the server on the death screen and the joining peers
+                # never receive a gamestate. Keep only the host alive; the fixture
+                # makes no damage or death claim.
+                start += '\ncoopgod 0 1'
+            command(folder, start, joiner=n != 0)
         def connected():
             states = [read_state(f) for f in folders]
             if not all(states): return None
