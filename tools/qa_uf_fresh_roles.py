@@ -34,6 +34,13 @@ KNOWN_CONTENT_ERRORS = {
  # run/qa-arnhem-m16-sample2, docs/campaign-compatibility.md.
  'arnhem': ("ERROR: Cannot precache 'xmodel/ammo_panzerfaust_box0'",),
  'wolfheze': ("ERROR: Cannot precache 'xmodel/ammo_panzerfaust_box0'",),
+ # foy's shared script precaches two names the tested packages do not ship:
+ # maps/foy.gsc asks for xmodel/c_us_helmet_moody_winter (pakuo04 ships
+ # c_us_helmet_moody and c_us_bod_moody_winter) and maps/foy_dummies.gsc asks
+ # for xmodel/weapon_garand (Main/pak0 ships xmodel/weapon_M1Garand). Both are
+ # cosmetic and appear in the plain-UO variant; evidence run/qa-uo-smoke1.
+ 'foy': ("ERROR: Cannot precache 'xmodel/c_us_helmet_moody_winter'",
+         "ERROR: Cannot precache 'xmodel/weapon_garand'"),
 }
 
 # A named mission can replace the host's loadout after the spawn ticket even

@@ -642,6 +642,36 @@ This addendum supersedes pending statements below. Nothing has been published.
   bleibt der feste amerikanische Katalog, und eine fraktionsrichtige
   Ausrüstung wird nicht behauptet. Evidenz:
   `run/qa-pegasusnight-m17-sample1` … `-sample4`.
+- **M19 Variant smokes for CoD1, UO and SP Improved / M19 Varianten-Smokes für
+  CoD1, UO und SP Improved:** `run/qa-cod1-smoke1`, `run/qa-uo-smoke3` and
+  `run/qa-sp-improved-smoke1` PASS four-client connection, advancing
+  user-command clocks, distinct owner-input movement
+  (179.0/192.6/151.2, 195.7/165.9/180.1 and 192.9/173.8/187.5 units),
+  unallocated-packet rejection and clean shutdown on `training` with the
+  current `build/` runtime. The coverage label stays "connection/liveness/
+  movement smoke only; no campaign completion claim". Two UO attempts remain
+  as evidence: `sicily1` is an on-rails opening (`docks_boat_arrival()` links
+  the player and the squad to the fishing boat; all three remotes reported the
+  same scripted 123.2 units, `run/qa-uo-smoke2`), and `foy` prints two cosmetic
+  stock precache lines (`xmodel/c_us_helmet_moody_winter`,
+  `xmodel/weapon_garand`) although the four-player connection and movement
+  gate passed (`run/qa-uo-smoke1`); the two exact lines are now a named per-map
+  content rule.
+  / `run/qa-cod1-smoke1`, `run/qa-uo-smoke3` und
+  `run/qa-sp-improved-smoke1` bestehen mit vier Clients Verbindung,
+  fortlaufende User-Command-Uhren, unterschiedliche
+  Eigentümer-Eingabebewegung (179,0/192,6/151,2, 195,7/165,9/180,1 und
+  192,9/173,8/187,5 Einheiten), die Ablehnung nicht zugeteilter Pakete und
+  sauberen Shutdown auf `training` mit der aktuellen `build/`-Laufzeit. Das
+  Coverage-Label bleibt "connection/liveness/movement smoke only; no campaign
+  completion claim". Zwei UO-Versuche bleiben als Evidenz: `sicily1` ist ein
+  On-Rails-Auftakt (`docks_boat_arrival()` bindet Spieler und Squad an das
+  Fischerboot; alle drei Remotes meldeten dieselben gescripteten 123,2
+  Einheiten, `run/qa-uo-smoke2`), und `foy` loggt zwei kosmetische
+  Stock-Precache-Zeilen (`xmodel/c_us_helmet_moody_winter`,
+  `xmodel/weapon_garand`), obwohl das Vier-Spieler-Verbindungs- und
+  Bewegungsgate bestand (`run/qa-uo-smoke1`); die zwei exakten Zeilen sind
+  jetzt eine benannte Pro-Map-Inhaltsregel.
 - **U1 upstream comparison TheTiranix/CoDCoop / U1 Upstream-Abgleich:**
   `upstream/master` = `52dd2bc` (fetched read-only), merge base `21eae10`;
   upstream has 8 commits we do not, we have 78 it does not. Verdicts:

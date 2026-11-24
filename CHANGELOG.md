@@ -70,6 +70,25 @@
   visible-selection phases and all four owners. The four-owner ammo gate is
   unchanged and still fails a host that never consumes; the map script stays
   unmodified and the QA kit stays the fixed American catalog.
+- The plain CoD1, UO and SP Improved variant smokes pass four clients on
+  `training` with the current runtime (`run/qa-cod1-smoke1`,
+  `run/qa-uo-smoke3`, `run/qa-sp-improved-smoke1`): real connection, advancing
+  user-command clocks, distinct owner-input movement
+  (179.0/192.6/151.2, 195.7/165.9/180.1 and 192.9/173.8/187.5 units) and clean
+  shutdown. A first UO attempt on `sicily1` connected all four clients but
+  measured the mission's
+  scripted boat ride (123.2 units on every remote), because
+  `docks_boat_arrival()` links the player and the squad to the same boat; that
+  opening is an on-rails exception like carride and tankdrivecountry
+  (`run/qa-uo-smoke2`). Testing `foy` exposed two cosmetic stock precache
+  lines in the untouched UO scripts:
+  `maps/foy.gsc` asks for `xmodel/c_us_helmet_moody_winter` although the tested
+  packages ship `c_us_helmet_moody` and `c_us_bod_moody_winter`, and
+  `maps/foy_dummies.gsc` asks for `xmodel/weapon_garand` although they ship
+  `xmodel/weapon_M1Garand`. Neither asset is invented; the two exact lines are a
+  named per-map content rule (`run/qa-uo-smoke1`), and the map's full
+  four-player connection and movement gate passed before the generic smoke
+  rejected the console lines.
 - Fix atomic lobby-file exchange when a Windows/Wine reader temporarily blocks
   replacement; keep bounded retries, prior-file preservation and link rejection.
   Fresh frozen Linux and Windows/Wine workers pass signed party transactions,
@@ -242,6 +261,25 @@ mechanics remain acceptance gates. See [handoff](docs/HANDOFF-0.6.md).
   Eigentümern. Das Vier-Eigentümer-Ammo-Gate bleibt unverändert und scheitert
   weiterhin an einem Host, der nie verbraucht; das Kartenskript bleibt
   unverändert und das QA-Kit bleibt der feste amerikanische Katalog.
+- Die Varianten-Smokes für CoD1, UO und SP Improved bestehen mit vier Clients
+  auf `training` mit der aktuellen Laufzeit (`run/qa-cod1-smoke1`,
+  `run/qa-uo-smoke3`, `run/qa-sp-improved-smoke1`): echte Verbindung,
+  fortlaufende User-Command-Uhren, unterschiedliche
+  Eigentümer-Eingabebewegung (179,0/192,6/151,2, 195,7/165,9/180,1 und
+  192,9/173,8/187,5 Einheiten) und sauberer Shutdown. Ein erster
+  UO-Versuch auf `sicily1` verband alle vier Clients, maß aber die gescriptete
+  Bootsfahrt der Mission (123,2 Einheiten auf jedem Remote), weil
+  `docks_boat_arrival()` Spieler und Squad an dasselbe Boot bindet; dieser
+  Auftakt ist eine On-Rails-Ausnahme wie carride und tankdrivecountry
+  (`run/qa-uo-smoke2`). Der Test von `foy` legte zwei kosmetische
+  Stock-Precache-Zeilen in den unveränderten UO-Skripten offen: `maps/foy.gsc` verlangt
+  `xmodel/c_us_helmet_moody_winter`, obwohl die getesteten Pakete
+  `c_us_helmet_moody` und `c_us_bod_moody_winter` ausliefern, und
+  `maps/foy_dummies.gsc` verlangt `xmodel/weapon_garand`, obwohl sie
+  `xmodel/weapon_M1Garand` ausliefern. Kein Asset wird erfunden; die zwei
+  exakten Zeilen sind eine benannte Pro-Map-Inhaltsregel (`run/qa-uo-smoke1`),
+  und das vollständige Vier-Spieler-Verbindungs- und Bewegungsgate der Karte
+  bestand, bevor der generische Smoke die Konsolenzeilen ablehnte.
 - Atomaren Lobby-Dateiaustausch bei vorübergehend blockierenden Windows-/Wine-
   Lesern korrigieren; begrenzte Wiederholungen, Erhalt der vorherigen Datei und
   Link-Abweisung beibehalten. Neu gebaute Linux- und Windows/Wine-Worker bestehen

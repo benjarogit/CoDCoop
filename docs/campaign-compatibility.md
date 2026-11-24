@@ -74,7 +74,12 @@ passed.
   `run/qa-bizerte-m14-sample1`.
 - `carride`, `tankdrivecountry` (on-rails starts): the mission begins with the
   player attached to a moving vehicle, so owner-input movement cannot be
-  measured. Rule: documented exception, not sampled.
+  measured. Rule: documented exception, not sampled. `sicily1` has the same
+  property for its opening: `docks_boat_arrival()` links the player and the
+  squad to the fishing boat with `playerlinkto`, and a four-client smoke
+  measured the same scripted 123.2 units on all three remotes while every
+  connection and liveness gate passed (`run/qa-uo-smoke2`). The UO variant
+  smoke therefore uses `training`.
 - `bastogne1` (post-reload renderer catch-up): joiners re-enter with the
   renderer at 2 fps and zero snapshots for seconds, and the restored pose can
   face an obstacle. Rule: wait for fresh restored-world snapshots and probe all
@@ -136,6 +141,18 @@ passed.
   state of the first consumed round. The four-owner ammo gate is unchanged and
   still fails a host that never consumes; the map script stays unmodified and
   the QA kit stays the fixed American catalog.
+- `foy` (stock content in the tested UO packages): the untouched `maps/foy.gsc`
+  precaches `xmodel/c_us_helmet_moody_winter` and its included
+  `maps/foy_dummies.gsc` precaches `xmodel/weapon_garand`. The tested packages
+  ship `xmodel/c_us_helmet_moody` and `xmodel/c_us_bod_moody_winter` (pakuo04)
+  and `xmodel/weapon_M1Garand` (Main/pak0); no installed pak contains either
+  referenced name, and the one-file coop overlay does not replace the map
+  script. Both lines are cosmetic: the plain-UO variant smoke on `foy` passed
+  the complete four-player connection and movement gate before the generic
+  smoke rejected the map on those `ERROR:` lines (`run/qa-uo-smoke1`). Rule: the
+  two console lines are a named content rule for `foy`, matched by exact text
+  and recorded in the proof; no asset is invented. The UO variant smoke itself
+  runs on `training`, whose start is free.
 
 Der Vier-Spieler-Sampler deckt ein bis zwei Schlüsselmissionen je Kapitel ab.
 Verletzt eine Karte eine Annahme der Fixture, bekommt sie hier eine benannte,
@@ -145,7 +162,12 @@ laufenden Gefecht: Der Host starb nach 41 s Wartezeit, der Deathscreen pausierte
 den Listen-Server und kein Peer bekam ein Gamestate. Deshalb setzt der Sampler
 nur den Host mit dem mod-eigenen `coopgod 0 1` fest und protokolliert das als
 QA-Liveness-Eingabe. Bizerte bleibt Inhaltsgrenze (kein alliiertes
-Spielermodell), `carride`/`tankdrivecountry` bleiben On-Rails-Ausnahmen,
+Spielermodell), `carride`/`tankdrivecountry` bleiben On-Rails-Ausnahmen;
+`sicily1` teilt diese Eigenschaft für seinen Auftakt: `docks_boat_arrival()`
+bindet Spieler und Squad mit `playerlinkto` an das Fischerboot, und ein
+Vier-Client-Smoke maß auf allen drei Remotes dieselben gescripteten 123,2
+Einheiten, während alle Verbindungs- und Liveness-Gates bestanden
+(`run/qa-uo-smoke2`). Der UO-Varianten-Smoke nutzt deshalb `training`.
 Bastogne1 wartet auf gerenderte Snapshots der wiederhergestellten Welt und
 prüft alle vier Laufrichtungen. Pavlov deckte einen Stock-Fehler von United
 Fronts auf: `Axis_Swap` hinterlässt in den Waffentabellen je Jahr eine Lücke
@@ -198,6 +220,20 @@ den Native-Zustand der ersten verbrauchten Patrone. Das
 Vier-Eigentümer-Ammo-Gate bleibt unverändert und scheitert weiterhin an einem
 Host, der nie verbraucht; das Kartenskript bleibt unverändert und das QA-Kit
 bleibt der feste amerikanische Katalog.
+
+Foy trägt im getesteten UO-Paket zwei Stock-Inhaltswarnungen: Das unveränderte
+`maps/foy.gsc` precached `xmodel/c_us_helmet_moody_winter`, das eingebundene
+`maps/foy_dummies.gsc` precached `xmodel/weapon_garand`. Die getesteten Pakete
+liefern `xmodel/c_us_helmet_moody` mit `xmodel/c_us_bod_moody_winter`
+(pakuo04) sowie `xmodel/weapon_M1Garand` (Main/pak0); kein installiertes Pak
+enthält einen der referenzierten Namen, und der Ein-Datei-Coop-Overlay ersetzt
+das Kartenskript nicht. Beide Zeilen sind kosmetisch: Der UO-Varianten-Smoke
+auf `foy` bestand das vollständige Vier-Spieler-Verbindungs- und Bewegungsgate,
+bevor der generische Smoke die Karte an diesen `ERROR:`-Zeilen scheitern ließ
+(`run/qa-uo-smoke1`). Die zwei Konsolenzeilen sind eine benannte Inhaltsregel
+für `foy`, exakt im Text verglichen und im Proof protokolliert; es wird kein
+Asset erfunden. Der UO-Varianten-Smoke selbst läuft auf `training`, dessen
+Start frei ist.
 
 ## Mission progression
 

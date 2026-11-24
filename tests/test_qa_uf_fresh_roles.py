@@ -1,7 +1,7 @@
 import copy,sys,unittest
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).parents[1]/'tools'))
-from qa_uf_fresh_roles import require_body_models,host_plan_receipts_match,argument_parser,owned_game_environment,planned_weapon_cvars,union_extra_cvars,supported_maps,restored_world_rendered,move_with_room,SCRIPTED_HOST_LOADOUT_REARM,SCRIPTED_HOST_FIRE_RELEASE
+from qa_uf_fresh_roles import require_body_models,host_plan_receipts_match,argument_parser,owned_game_environment,planned_weapon_cvars,union_extra_cvars,supported_maps,restored_world_rendered,move_with_room,SCRIPTED_HOST_LOADOUT_REARM,SCRIPTED_HOST_FIRE_RELEASE,KNOWN_CONTENT_ERRORS
 
 class FreshRoleBodyOracle(unittest.TestCase):
  def test_cli_all_weapon_media_is_opt_in_and_changes_only_one_native_flag(self):
@@ -69,6 +69,16 @@ class FreshRoleBodyOracle(unittest.TestCase):
    self.assertLessEqual(rule['window_seconds'],60)
    self.assertIn('level.player',rule['reason'])
    self.assertIn('peer',rule['reason'])
+ def test_known_content_errors_are_exact_and_map_scoped(self):
+  self.assertLessEqual(set(KNOWN_CONTENT_ERRORS),supported_maps())
+  for map_name,markers in KNOWN_CONTENT_ERRORS.items():
+   self.assertTrue(markers,map_name)
+   for marker in markers:
+    self.assertTrue(marker.startswith("ERROR: Cannot precache '"),marker)
+    self.assertTrue(marker.endswith("'") and marker.count("'")==2,marker)
+  self.assertEqual(KNOWN_CONTENT_ERRORS['foy'],("ERROR: Cannot precache 'xmodel/c_us_helmet_moody_winter'",
+      "ERROR: Cannot precache 'xmodel/weapon_garand'"))
+  self.assertNotIn('sicily1',KNOWN_CONTENT_ERRORS)
  def test_restored_world_requires_fresh_snapshots_before_input(self):
   old=[{'snapshot_num':7,'snapshot_time':1000},{'snapshot_num':9,'snapshot_time':2000}]
   self.assertTrue(restored_world_rendered(old,[{'snapshot_num':8,'snapshot_time':1100},{'snapshot_num':10,'snapshot_time':2100}]))
