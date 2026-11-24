@@ -149,13 +149,14 @@ United Fronts still has an open resource issue in the default path: clean Foy
 and Noville startup can exhaust the engine's 255 model slots with the complete
 equipment set. The experimental deferred-registration path has passed
 four-player kits and native checkpoint reloads on Foy, Noville, Brecourt,
-Bastogne1, Afrika2, Dawnville and Pavlov, but it is not yet the production
-default and it does not certify complete missions. Coverage is being recorded
-per chapter; named limits are documented per map: bizerte loads no allied player
-model, dawnville's live-fire opening pins only the host during the QA join
-window (a liveness input, not a damage claim), and pavlov combines an
+Bastogne1, Afrika2, Dawnville, Pavlov and Arnhem, but it is not yet the
+production default and it does not certify complete missions. Coverage is being
+recorded per chapter; named limits are documented per map: bizerte loads no
+allied player model, dawnville's live-fire opening pins only the host during the
+QA join window (a liveness input, not a damage claim), pavlov combines an
 overlay-fixed stock weapon-table defect with two named, exactly matched content
-warnings. The signed equipment lobby works in frozen Linux
+warnings, and arnhem needed an authored-prefix fix plus one named missing-prop
+warning. The signed equipment lobby works in frozen Linux
 and Windows/Wine workers; its native game owner/kit binding is still unfinished.
 
 The release gate is **complete tested campaigns**, not merely successful map

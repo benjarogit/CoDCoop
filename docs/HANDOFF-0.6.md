@@ -531,6 +531,66 @@ This addendum supersedes pending statements below. Nothing has been published.
   benannte Pro-Map-Ausnahmeliste mit exaktem Konsolentext in
   `qa_coop.process_log_errors`, protokolliert im Proof; jede andere
   `ERROR:`-Zeile und jeder Script-Runtime-Fehler bleibt fatal.
+- **M17 British sample, authored model prefix and a missing crate / M17 Britische Stichprobe, Autoren-Präfix und fehlende Kiste:**
+  `run/qa-arnhem-m16-sample3` PASSes four-player arnhem: 24 native-tree
+  adoptions per joiner, the mission's own British bodies
+  (`character_british_airborneB`, `character_british_Commando_air`), initial
+  movement 159.4/175.0/148.9 and post-reload movement 178.6/149.6/206.6, 0
+  failed allocation, 0 watchdog message, no `host silent` event and a clean
+  shutdown. The first attempt `run/qa-arnhem-m16-sample1` never exported: the
+  host spun on `Resource bootstrap: unsupported renderer class/name
+  Xmodel/chair_office_d` and the joiners stayed at `serverMsgSeq=0`. Cause is
+  arnhem's own BSP: exactly one `misc_model` entity carries the authored name
+  `Xmodel/chair_office_d` (capital X; package-wide scan of all United Fronts
+  BSPs finds this single reference). The engine registry is case-insensitive and
+  loads it, but the renderer cache reports the authored spelling and the
+  bootstrap compared the prefix exactly. `BootCanonicalModel()` in
+  `src/resource_bootstrap.inc` and the same normalization in `QASafeModel()`
+  now rewrite only the `xmodel/` prefix to the spelling the pak member and the
+  peers use; `qa_preload::ValidName` stays strict. The second attempt
+  `run/qa-arnhem-m16-sample2` passed the bootstrap but stopped at a stock
+  content defect: arnhem (and wolfheze) place
+  `xmodel/ammo_panzerfaust_box0`, while retail ships only
+  `ammo_panzerfaust_box1/2/3`, so every client logs
+  `ERROR: Cannot precache 'xmodel/ammo_panzerfaust_box0'` three times and the
+  decorative crate is skipped. That line is now a named per-map content warning
+  for `arnhem` and `wolfheze`, matched by exact text and recorded in the proof;
+  no asset is invented and no gate is relaxed. The QA kit set stays the
+  fixture's fixed American catalog, so the run proves kit transport, ownership
+  and owner fire on a British mission, not a faction-correct loadout; the
+  bodies under test are the map's own British models. Evidence:
+  `run/qa-arnhem-m16-sample1`, `run/qa-arnhem-m16-sample2`,
+  `run/qa-arnhem-m16-sample3`.
+  / `run/qa-arnhem-m16-sample3` besteht Arnhem mit vier Spielern: 24 native
+  Baum-Übernahmen je Joiner, die britischen Körper der Mission selbst
+  (`character_british_airborneB`, `character_british_Commando_air`),
+  Anfangsbewegung 159,4/175,0/148,9 und Bewegung nach dem Reload
+  178,6/149,6/206,6, 0 fehlgeschlagene Allokation, 0 Watchdog-Meldung, kein
+  `host silent`, sauberer Shutdown. Der erste Versuch
+  `run/qa-arnhem-m16-sample1` exportierte nie: Der Host drehte in
+  `Resource bootstrap: unsupported renderer class/name Xmodel/chair_office_d`,
+  die Joiner blieben bei `serverMsgSeq=0`. Ursache ist das BSP von Arnhem
+  selbst: Genau eine `misc_model`-Entity trägt den Autorennamen
+  `Xmodel/chair_office_d` (großes X; ein Scan aller United Fronts-BSPs findet
+  genau diese eine Referenz). Die Engine-Registry ist fallunabhängig und lädt
+  sie, der Renderer-Cache meldet aber die Autorenschreibweise, und der Bootstrap
+  verglich das Präfix exakt. `BootCanonicalModel()` in
+  `src/resource_bootstrap.inc` und dieselbe Normalisierung in `QASafeModel()`
+  schreiben jetzt nur das Präfix `xmodel/` auf die Schreibweise um, die
+  Paketmitglied und Peers nutzen; `qa_preload::ValidName` bleibt streng. Der
+  zweite Versuch `run/qa-arnhem-m16-sample2` kam über den Bootstrap, scheiterte
+  aber an einem Stock-Inhaltsfehler: Arnhem (und Wolfheze) platzieren
+  `xmodel/ammo_panzerfaust_box0`, Retail liefert nur
+  `ammo_panzerfaust_box1/2/3`, deshalb loggt jeder Client dreimal
+  `ERROR: Cannot precache 'xmodel/ammo_panzerfaust_box0'` und die dekorative
+  Kiste entfällt. Diese Zeile ist jetzt eine benannte Pro-Map-Inhaltswarnung für
+  `arnhem` und `wolfheze`, exakt im Text verglichen und im Proof protokolliert;
+  es wird kein Asset erfunden und kein Gate aufgeweicht. Das QA-Kit bleibt der
+  feste amerikanische Katalog der Fixture, der Lauf belegt also Kit-Transport,
+  Eigentum und Eigentümer-Schuss auf einer britischen Mission, keine
+  fraktionsrichtige Ausrüstung; die geprüften Körper sind die britischen
+  Modelle der Karte. Evidenz: `run/qa-arnhem-m16-sample1`,
+  `run/qa-arnhem-m16-sample2`, `run/qa-arnhem-m16-sample3`.
 - **U1 upstream comparison TheTiranix/CoDCoop / U1 Upstream-Abgleich:**
   `upstream/master` = `52dd2bc` (fetched read-only), merge base `21eae10`;
   upstream has 8 commits we do not, we have 78 it does not. Verdicts:

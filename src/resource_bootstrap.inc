@@ -98,6 +98,15 @@ bool BootHostObjectAllowed(int slot,const uint8_t* object){
 }
 bool BootQAPlanUnionMedia();
 bool BootRegisterIndices(const int* indices,unsigned count);
+// United Fronts' arnhem BSP ships one misc_model with the authored name
+// "Xmodel/chair_office_d" (capital X). The engine registry is case-insensitive
+// and loads it, but the renderer cache then reports that authored spelling while
+// the pak member is lowercase. Canonicalize the prefix instead of rejecting the
+// map: the plan must carry the name the pak and the peers use.
+std::string BootCanonicalModel(const std::string& name) {
+    if(name.size()>7&&!_strnicmp(name.c_str(),"xmodel/",7))return "xmodel/"+name.substr(7);
+    return name;
+}
 bool BootExport(asset_bootstrap::Resources& resources) {
     if(g::sv_state!=2||g::cls_state!=2||!g::cgvm||g::currentVM==g::gvm)return false;
     const auto& init=S->preservation.init;
@@ -169,7 +178,7 @@ bool BootExport(asset_bootstrap::Resources& resources) {
     int cachedCount=*(int*)g::A(0x15384f8,0x47abb58);auto cached=(uint8_t**)g::A(0x15364f8,0x47a9b58);
     if(cachedCount<1||cachedCount>2048)return false;
     for(int i=1;i<cachedCount;++i)if(cached[i]&&!IsBadReadPtr(cached[i],0x60)&&*(int*)(cached[i]+0x40)){
-        auto name=BootString((const char*)cached[i]);
+        auto name=BootCanonicalModel(BootString((const char*)cached[i]));
         if(name.compare(0,7,"xmodel/")==0){if(!add(name.c_str()))return false;}
         else if(!name.empty()&&name[0]=='*'&&name.size()>1&&name.find_first_not_of("0123456789",1)==std::string::npos){} // inline brush media comes from the identical native BSP
         else {Log("Resource bootstrap: unsupported renderer class/name %s",name.c_str());return false;}

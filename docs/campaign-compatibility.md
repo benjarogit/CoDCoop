@@ -102,6 +102,21 @@ passed.
   `ERROR:` line and every script runtime error stays fatal. Evidence:
   `run/qa-pavlov-m15-sample2` (all gameplay gates passed, final console gate
   failed on those two lines) and `run/qa-pavlov-m15-sample3`.
+- `arnhem` (British sample, passed `run/qa-arnhem-m16-sample3`): the map needed
+  a product fix and keeps one named content warning. Its BSP carries one
+  `misc_model` with the authored name `Xmodel/chair_office_d` (capital X, the
+  only such reference in the whole United Fronts package); the renderer cache
+  reports that spelling, so the resource bootstrap rejected the map and the host
+  never exported (`run/qa-arnhem-m16-sample1`). The bootstrap now canonicalizes
+  only the `xmodel/` prefix. The map also places
+  `xmodel/ammo_panzerfaust_box0` although retail ships only
+  `ammo_panzerfaust_box1/2/3`, so every client logs `ERROR: Cannot precache
+  'xmodel/ammo_panzerfaust_box0'` and the decorative crate is skipped
+  (`run/qa-arnhem-m16-sample2`). Rule: that one line is allowed for `arnhem`
+  and `wolfheze`, matched by exact text and recorded in the proof; the missing
+  prop stays missing and no asset is invented. The fixture's kit catalog is the
+  fixed American QA set, so the run proves kit transport, ownership and owner
+  fire on a British mission, not a faction-correct loadout.
 
 Der Vier-Spieler-Sampler deckt ein bis zwei Schlüsselmissionen je Kapitel ab.
 Verletzt eine Karte eine Annahme der Fixture, bekommt sie hier eine benannte,
@@ -125,6 +140,24 @@ Inhaltswarnungen erlaubt (fehlendes `xmodel/head_blane`, das die Basis als
 deutschen Tabelle für `sewer`/`pavlov`), exakt im Text verglichen und im Proof
 protokolliert; jede andere `ERROR:`-Zeile und jeder Script-Runtime-Fehler bleibt
 fatal.
+
+Arnhem (britische Stichprobe, bestanden mit `run/qa-arnhem-m16-sample3`)
+brauchte einen Produktfix und behält eine benannte Inhaltswarnung: Sein BSP
+trägt genau eine `misc_model`-Entity mit dem Autorennamen
+`Xmodel/chair_office_d` (großes X, die einzige solche Referenz im gesamten
+United-Fronts-Paket); der Renderer-Cache meldet diese Schreibweise, deshalb
+lehnte der Ressourcen-Bootstrap die Karte ab und der Host exportierte nie
+(`run/qa-arnhem-m16-sample1`). Der Bootstrap schreibt jetzt nur das Präfix
+`xmodel/` um. Zusätzlich platziert die Karte
+`xmodel/ammo_panzerfaust_box0`, obwohl Retail nur `ammo_panzerfaust_box1/2/3`
+ausliefert; jeder Client loggt deshalb `ERROR: Cannot precache
+'xmodel/ammo_panzerfaust_box0'` und die dekorative Kiste entfällt
+(`run/qa-arnhem-m16-sample2`). Diese eine Zeile ist für `arnhem` und `wolfheze`
+erlaubt, exakt im Text verglichen und im Proof protokolliert; das fehlende
+Objekt bleibt fehlend, es wird kein Asset erfunden. Der Kit-Katalog der Fixture
+ist der feste amerikanische QA-Satz, der Lauf belegt also Kit-Transport,
+Eigentum und Eigentümer-Schuss auf einer britischen Mission, keine
+fraktionsrichtige Ausrüstung.
 
 ## Mission progression
 

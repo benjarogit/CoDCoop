@@ -28,6 +28,12 @@ KNOWN_CONTENT_ERRORS = {
   "ERROR: Cannot precache 'xmodel/head_blane'",
   "ERROR: Cannot precache 'xmodel/gear_german_headwrap'",
  ),
+ # arnhem and wolfheze place a misc_model with "xmodel/ammo_panzerfaust_box0";
+ # the retail game only ships ammo_panzerfaust_box1/2/3, so the BSP reference
+ # cannot be precached and the decorative crate is skipped. Evidence:
+ # run/qa-arnhem-m16-sample2, docs/campaign-compatibility.md.
+ 'arnhem': ("ERROR: Cannot precache 'xmodel/ammo_panzerfaust_box0'",),
+ 'wolfheze': ("ERROR: Cannot precache 'xmodel/ammo_panzerfaust_box0'",),
 }
 
 def content_errors(folder,map_name,report):

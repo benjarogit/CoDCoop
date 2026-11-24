@@ -739,7 +739,11 @@ std::string QASafeModel(const char* pointer)
     while (length < available && length < 64 && pointer[length]) ++length;
     if (length >= available || length >= 64) return {};
     std::string name(pointer, length);
-    if (name.compare(0, 7, "xmodel/")) name = "xmodel/" + name;
+    // Models can reach us with an authored prefix spelling ("Xmodel/..." in the
+    // arnhem BSP); the registry is case-insensitive, the pak member and every
+    // consumer name are lowercase, so normalize the prefix instead of nesting it.
+    if (!_strnicmp(name.c_str(), "xmodel/", 7)) name = "xmodel/" + name.substr(7);
+    else name = "xmodel/" + name;
     return qa_preload::ValidName(name) ? name : std::string{};
 }
 #include "qa_deferred_models.inc"

@@ -47,6 +47,17 @@
   `xmodel/gear_german_headwrap` from United Fronts' winter German table) and are
   allowlisted by exact text, recorded in the proof; every other `ERROR:` line
   and every script runtime error stays fatal.
+- Arnhem adds the British sample and needed a product fix: its BSP names one
+  static prop `Xmodel/chair_office_d` (capital X, the only such reference in the
+  whole United Fronts package), the renderer cache reports that spelling, and
+  the resource bootstrap rejected the map so the host never exported. The
+  bootstrap now canonicalizes only the `xmodel/` prefix to the spelling the pak
+  member and the peers use, and the map passes four-player Coop with 24
+  adoptions per joiner, the mission's own British bodies and
+  159.4/175.0/148.9 initial, 178.6/149.6/206.6 post-reload movement. One stock
+  content warning stays: arnhem and wolfheze place
+  `xmodel/ammo_panzerfaust_box0`, which retail never shipped, so the decorative
+  crate is skipped and the line is a named per-map exception.
 - Fix atomic lobby-file exchange when a Windows/Wine reader temporarily blocks
   replacement; keep bounded retries, prior-file preservation and link rejection.
   Fresh frozen Linux and Windows/Wine workers pass signed party transactions,
@@ -193,6 +204,18 @@ mechanics remain acceptance gates. See [handoff](docs/HANDOFF-0.6.md).
   deutschen Tabelle von United Fronts) und werden exakt im Text erlaubt und im
   Proof protokolliert; jede andere `ERROR:`-Zeile und jeder Script-Runtime-Fehler
   bleibt fatal.
+- Arnhem ergänzt die britische Stichprobe und brauchte einen Produktfix: Sein
+  BSP benennt eine Dekoration `Xmodel/chair_office_d` (großes X, die einzige
+  solche Referenz im gesamten United-Fronts-Paket), der Renderer-Cache meldet
+  diese Schreibweise, und der Ressourcen-Bootstrap lehnte die Karte ab, sodass
+  der Host nie exportierte. Der Bootstrap schreibt jetzt nur das Präfix
+  `xmodel/` auf die Schreibweise um, die Paketmitglied und Peers nutzen, und die
+  Karte besteht mit vier Spielern, 24 Übernahmen je Joiner, den britischen
+  Körpern der Mission und Anfangsbewegung 159,4/175,0/148,9 sowie
+  178,6/149,6/206,6 nach dem Reload. Eine Stock-Inhaltswarnung bleibt: Arnhem
+  und Wolfheze platzieren `xmodel/ammo_panzerfaust_box0`, das Retail nie
+  ausgeliefert hat; die dekorative Kiste entfällt, und die Zeile ist eine
+  benannte Pro-Map-Ausnahme.
 - Atomaren Lobby-Dateiaustausch bei vorübergehend blockierenden Windows-/Wine-
   Lesern korrigieren; begrenzte Wiederholungen, Erhalt der vorherigen Datei und
   Link-Abweisung beibehalten. Neu gebaute Linux- und Windows/Wine-Worker bestehen
