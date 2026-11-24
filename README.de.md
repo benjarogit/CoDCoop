@@ -158,15 +158,17 @@ Foy und Noville können beim sauberen Start mit dem vollständigen
 Ausrüstungsbestand die 255 Modellplätze der Engine ausschöpfen. Der
 experimentelle Pfad mit Registrierung erst bei tatsächlicher Verwendung hat
 Vier-Spieler-Ausrüstungen und native Checkpoint-Reloads auf Foy, Noville,
-Brecourt, Bastogne1, Afrika2, Dawnville, Pavlov und Arnhem bestanden; er ist aber noch nicht der
+Brecourt, Bastogne1, Afrika2, Dawnville, Pavlov, Arnhem und Pegasusnight bestanden; er ist aber noch nicht der
 Produktionsstandard und bestätigt keine vollständigen Missionen. Die Abdeckung
 wird jetzt kapitelweise festgehalten; benannte Grenzen stehen pro Karte:
 Bizerte lädt kein alliiertes Spielermodell, bei Dawnvilles Gefechtsstart
 wird im QA-Join-Fenster nur der Host festgehalten (Liveness-Eingabe, keine
 Damage-Aussage), Pavlov verbindet einen im Overlay behobenen Stock-Fehler
-der Waffentabelle mit zwei exakt verglichenen, benannten Inhaltswarnungen, und
+der Waffentabelle mit zwei exakt verglichenen, benannten Inhaltswarnungen,
 Arnhem brauchte einen Fix für ein Autoren-Präfix plus eine benannte Warnung über
-eine fehlende Dekoration. Die signierte Ausrüstungslobby funktioniert in gebauten
+eine fehlende Dekoration, und Pegasusnights Gleiter-Intro gehört dem Host-Körper,
+weshalb die Feuerbereitschaft des Hosts in einem begrenzten Pro-Map-Fenster
+abgewartet wird. Die signierte Ausrüstungslobby funktioniert in gebauten
 Linux- und Windows/Wine-Workern; ihre native Spieler-/Ausrüstungsbindung im
 Spiel ist noch nicht fertig.
 

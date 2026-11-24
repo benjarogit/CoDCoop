@@ -1,7 +1,7 @@
 import copy,sys,unittest
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).parents[1]/'tools'))
-from qa_uf_fresh_roles import require_body_models,host_plan_receipts_match,argument_parser,owned_game_environment,planned_weapon_cvars,union_extra_cvars,supported_maps,restored_world_rendered,move_with_room
+from qa_uf_fresh_roles import require_body_models,host_plan_receipts_match,argument_parser,owned_game_environment,planned_weapon_cvars,union_extra_cvars,supported_maps,restored_world_rendered,move_with_room,SCRIPTED_HOST_LOADOUT_REARM,SCRIPTED_HOST_FIRE_RELEASE
 
 class FreshRoleBodyOracle(unittest.TestCase):
  def test_cli_all_weapon_media_is_opt_in_and_changes_only_one_native_flag(self):
@@ -57,6 +57,18 @@ class FreshRoleBodyOracle(unittest.TestCase):
   self.assertLessEqual({'brecourt','noville','foy','bastogne1','bizerte'},maps)
   self.assertNotIn('not_a_map',maps)
   self.assertEqual(argument_parser().parse_args(['--source','/a','--run','/b','--runtime-dir','/c']).map,'brecourt')
+ def test_scripted_host_loadout_rearm_is_named_per_map_only(self):
+  self.assertEqual(set(SCRIPTED_HOST_LOADOUT_REARM),{'pegasusnight'})
+  self.assertLessEqual(set(SCRIPTED_HOST_LOADOUT_REARM),supported_maps())
+  self.assertTrue(all(isinstance(rule,str) and rule for rule in SCRIPTED_HOST_LOADOUT_REARM.values()))
+ def test_scripted_host_fire_release_is_bounded_and_named_per_map_only(self):
+  self.assertEqual(set(SCRIPTED_HOST_FIRE_RELEASE),{'pegasusnight'})
+  self.assertLessEqual(set(SCRIPTED_HOST_FIRE_RELEASE),supported_maps())
+  for rule in SCRIPTED_HOST_FIRE_RELEASE.values():
+   self.assertGreater(rule['window_seconds'],0)
+   self.assertLessEqual(rule['window_seconds'],60)
+   self.assertIn('level.player',rule['reason'])
+   self.assertIn('peer',rule['reason'])
  def test_restored_world_requires_fresh_snapshots_before_input(self):
   old=[{'snapshot_num':7,'snapshot_time':1000},{'snapshot_num':9,'snapshot_time':2000}]
   self.assertTrue(restored_world_rendered(old,[{'snapshot_num':8,'snapshot_time':1100},{'snapshot_num':10,'snapshot_time':2100}]))

@@ -36,6 +36,27 @@ KNOWN_CONTENT_ERRORS = {
  'wolfheze': ("ERROR: Cannot precache 'xmodel/ammo_panzerfaust_box0'",),
 }
 
+# A named mission can replace the host's loadout after the spawn ticket even
+# though the QA plan was applied. The fixture re-commits the same plan once and
+# records both native inventories; the map script itself stays unchanged and
+# every later gate still runs. See docs/campaign-compatibility.md.
+SCRIPTED_HOST_LOADOUT_REARM = {
+ 'pegasusnight': 'the glider-ride intro captures the pre-kit loadout and re-gives it after takeallweapons()',
+}
+
+# The glider crash calls level.player shellshock("groggy", 20); on a listen
+# server level.player is the host body, so only slot 0 sits inside the scripted
+# crash window while the peers are already free. The host still has to consume
+# its own ammunition: this rule only repeats the same host +attack burst inside
+# a bounded window and records the native state of the first consumed round.
+# The ammo gate afterwards is unchanged, and a host that never consumes fails.
+SCRIPTED_HOST_FIRE_RELEASE = {
+ 'pegasusnight': {
+  'window_seconds': 40,
+  'reason': 'the glider crash applies shellshock("groggy", 20) to level.player and releases controls after the 16.1 s voice sequence; peers are never shellshocked',
+ },
+}
+
 def content_errors(folder,map_name,report):
  """Unexpected engine errors for this folder; allowlisted stock warnings are counted in the proof."""
  errors=qa.process_log_errors(folder)
@@ -236,9 +257,11 @@ def main():
   controls=[(folder,0 if folder==folders[0] else qa.read_state(folder)['slot']) for folder in folders]
   if sorted(slot for folder,slot in controls)!=list(range(4)):raise RuntimeError('Four unique actual native owner slots required')
   report['actual_owner_slots']={folder.name:slot for folder,slot in controls}
-  def plan_ready():
+  def native_cvars():
    console=(folders[0]/'UnitedFronts/console.log').read_text(errors='replace')
-   native=dict(re.findall(r'^[ \t]*cvar set (coop_[a-z0-9_]+)[ \t]*(.*?)\r?$',console,re.M))
+   return dict(re.findall(r'^[ \t]*cvar set (coop_[a-z0-9_]+)[ \t]*(.*?)\r?$',console,re.M))
+  def plan_ready():
+   native=native_cvars()
    report['last_native_plan_cvars']=native
    status=native.get('coop_qa_kit_status','')
    if status.startswith(('FAIL_','BLOCKED_')):raise RuntimeError('Actual host kit producer rejected plan: '+status)
@@ -267,11 +290,48 @@ def main():
   for folder,slot in controls:
    if slot:report.setdefault('real_movement',{})[str(slot)]=qa.move_remote(folders[0],folder,slot,processes,a.timeout)
   time.sleep(.8)
+  # The mission script, not the coop layer, replaces the host loadout here.
+  # Detect that native state first, then re-commit the same QA plan as explicit
+  # input; the map script and the joiners' kits are untouched.
+  if a.map in SCRIPTED_HOST_LOADOUT_REARM:
+   def host_kit_replaced():
+    state=native(folders[0],0)
+    return state if any(state['inventory'][key]!=value for key,value in expected[0].items()) else None
+   replaced=qa.wait_for(host_kit_replaced,processes,a.timeout,'mission script replaces the host loadout')
+   plan=report['validated_native_host_plan']
+   identity='|'.join(plan[key] for key in ('coop_spawn_session_a','coop_spawn_session_b','coop_spawn_session_c'))+'|0|'+plan['coop_spawn_ticket_0']
+   qa.command(folders[0],'set coop_qa_kit_reassert_0 "%s"'%identity)
+   qa.wait_for(lambda: native_cvars().get('coop_qa_kit_reassert_count_0')=='1',
+               processes,a.timeout,'host kit reassert request receipt')
+   capture('reasserted_after_scripted_host_rearm')
+   receipt=native_cvars().get('coop_qa_kit_reasserted_0','')
+   expected_receipt=identity+'|'+plan['coop_spawn_world']+'|'+plan['coop_qa_kit_epoch']
+   report['scripted_host_rearm']={'map':a.map,'rule':SCRIPTED_HOST_LOADOUT_REARM[a.map],
+       'replaced_inventory':replaced['inventory'],'reassert_identity':identity,
+       'expected_receipt':expected_receipt,'native_receipt':receipt,
+       'scope':'QA input only; the map script is not modified, the reassert is recorded and every later gate still runs'}
+   if receipt!=expected_receipt:
+    raise RuntimeError('Host kit reassert receipt does not name the current identity/world/epoch')
   for folder,slot in controls:qa.command(folder,'weaponslot '+fire[slot],joiner=slot!=0)
   before=capture('actual_firearm_selection',[expected[slot][fire[slot]] for slot in range(4)],body=True)
   for folder,slot in controls:qa.command(folder,'+attack',joiner=slot!=0)
   time.sleep(.4)
   for folder,slot in controls:qa.command(folder,'-attack',joiner=slot!=0)
+  if a.map in SCRIPTED_HOST_FIRE_RELEASE:
+   rule=SCRIPTED_HOST_FIRE_RELEASE[a.map];minimum=before['host'][0]['slot_ammo'][fire[0]]['clip']
+   samples=[];started=time.monotonic();released=None
+   while time.monotonic()-started<rule['window_seconds']:
+    state=native(folders[0],0);clip=state['slot_ammo'][fire[0]]['clip']
+    samples.append({'attempt':len(samples),'server_time':state['cgame'].get('snapshot_server_time'),
+        'clip':clip,'pm_flags':state['pm_flags'],'e_flags':state.get('e_flags'),
+        'view_locked':state.get('view_locked'),'shellshock':state.get('shellshock')})
+    if clip<minimum:released=samples[-1];break
+    qa.command(folders[0],'+attack');time.sleep(.4);qa.command(folders[0],'-attack');time.sleep(.6)
+   report['scripted_host_fire_release']={'map':a.map,'rule':rule['reason'],
+       'window_seconds':rule['window_seconds'],'baseline_clip':minimum,
+       'scope':'host +attack bursts only; the four-owner ammo gate below is unchanged and still fails a host that never consumes',
+       'released':released is not None,'released_state':released,'samples':samples}
+   if released is None:raise RuntimeError('Scripted host intro never released host fire inside the bounded window')
   after=capture('actual_four_owner_fire',[expected[slot][fire[slot]] for slot in range(4)],body=True)
   if any(after['host'][slot]['slot_ammo'][fire[slot]]['clip']>=before['host'][slot]['slot_ammo'][fire[slot]]['clip'] for slot in range(4)):raise RuntimeError('Actual attack must consume owned ammunition for every player')
   for phase,weapon_slot in (('MG_and_bazooka_visible','primary'),('pistol_and_binoculars_visible','pistol')):

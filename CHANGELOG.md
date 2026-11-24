@@ -58,6 +58,18 @@
   content warning stays: arnhem and wolfheze place
   `xmodel/ammo_panzerfaust_box0`, which retail never shipped, so the decorative
   crate is skipped and the line is a named per-map exception.
+- Pegasusnight adds the second British sample and exposes a host-only scripted
+  state: the glider crash calls `level.player freezeControls(true)` and
+  `shellshock("groggy", 20)` on the host body, and the fade-in re-gives the
+  loadout captured before the QA kit. The fixture detects that native swap,
+  re-commits the same plan once with an `identity|world|epoch` receipt, and
+  repeats only the host `+attack` burst in a bounded 40 s window because the
+  host stayed at `pm_flags=0x03000002` until about 108 s while the peers were
+  already free. The map passes four-player Coop with 63.1/117.4/64.9 initial
+  and 66.6/116.4/109.4 post-reload movement, clips 30/5/20/8→25/4/15/7, both
+  visible-selection phases and all four owners. The four-owner ammo gate is
+  unchanged and still fails a host that never consumes; the map script stays
+  unmodified and the QA kit stays the fixed American catalog.
 - Fix atomic lobby-file exchange when a Windows/Wine reader temporarily blocks
   replacement; keep bounded retries, prior-file preservation and link rejection.
   Fresh frozen Linux and Windows/Wine workers pass signed party transactions,
@@ -216,6 +228,20 @@ mechanics remain acceptance gates. See [handoff](docs/HANDOFF-0.6.md).
   und Wolfheze platzieren `xmodel/ammo_panzerfaust_box0`, das Retail nie
   ausgeliefert hat; die dekorative Kiste entfällt, und die Zeile ist eine
   benannte Pro-Map-Ausnahme.
+- Pegasusnight ergänzt die zweite britische Stichprobe und legt einen
+  host-spezifischen Skriptzustand offen: Der Gleiterabsturz ruft
+  `level.player freezeControls(true)` und `shellshock("groggy", 20)` auf dem
+  Host-Körper auf, und das Fade-in gibt die vor dem QA-Kit festgehaltene
+  Ausrüstung erneut aus. Die Fixture erkennt diesen nativen Tausch, setzt
+  denselben Plan einmal mit einer `identity|world|epoch`-Quittung erneut durch
+  und wiederholt nur den Host-`+attack`-Burst in einem begrenzten 40-s-Fenster,
+  weil der Host bis etwa 108 s bei `pm_flags=0x03000002` blieb, während die
+  Peers schon frei waren. Die Karte besteht mit vier Spielern,
+  Anfangsbewegung 63,1/117,4/64,9 und 66,6/116,4/109,4 nach dem Reload,
+  Magazinen 30/5/20/8→25/4/15/7, beiden Sichtwahl-Phasen und allen vier
+  Eigentümern. Das Vier-Eigentümer-Ammo-Gate bleibt unverändert und scheitert
+  weiterhin an einem Host, der nie verbraucht; das Kartenskript bleibt
+  unverändert und das QA-Kit bleibt der feste amerikanische Katalog.
 - Atomaren Lobby-Dateiaustausch bei vorübergehend blockierenden Windows-/Wine-
   Lesern korrigieren; begrenzte Wiederholungen, Erhalt der vorherigen Datei und
   Link-Abweisung beibehalten. Neu gebaute Linux- und Windows/Wine-Worker bestehen

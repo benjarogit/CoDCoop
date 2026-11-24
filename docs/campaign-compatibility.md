@@ -117,6 +117,25 @@ passed.
   prop stays missing and no asset is invented. The fixture's kit catalog is the
   fixed American QA set, so the run proves kit transport, ownership and owner
   fire on a British mission, not a faction-correct loadout.
+- `pegasusnight` (second British sample, passed
+  `run/qa-pegasusnight-m17-sample4`): the glider intro owns the host body.
+  `blackout()` calls `level.player freezeControls(true)`, teleports the player
+  and calls `level.player shellshock("groggy", 20)` directly after
+  `glider ride finished`; 16.1 s of crash voices later `intro_fadein()` releases
+  the controls and re-gives the loadout captured at map start
+  (`level.playerWeapon`, before the QA kit was applied), which is why a plain
+  spawn kit disappears again (`run/qa-pegasusnight-m17-sample1`). On a listen
+  server `level.player` is the host body, so only slot 0 is inside that window:
+  the native observer recorded `shellshock{index=1,time=78050,duration=20000}`
+  and host `pm_flags=0x03000002`, while all three peers stayed at `pm_flags=0`
+  and consumed ammo on the first burst. The host kept `0x03000002` until about
+  108 s, then `pm_flags=0x2` and its first consumed round (30→25). The bits
+  above `0x2` are not named here; the raw values are recorded. Rule: after the
+  scripted rearm the fixture repeats only the host's `+attack` burst inside a
+  bounded 40 s window (`SCRIPTED_HOST_FIRE_RELEASE`) and records the native
+  state of the first consumed round. The four-owner ammo gate is unchanged and
+  still fails a host that never consumes; the map script stays unmodified and
+  the QA kit stays the fixed American catalog.
 
 Der Vier-Spieler-Sampler deckt ein bis zwei Schlüsselmissionen je Kapitel ab.
 Verletzt eine Karte eine Annahme der Fixture, bekommt sie hier eine benannte,
@@ -158,6 +177,27 @@ Objekt bleibt fehlend, es wird kein Asset erfunden. Der Kit-Katalog der Fixture
 ist der feste amerikanische QA-Satz, der Lauf belegt also Kit-Transport,
 Eigentum und Eigentümer-Schuss auf einer britischen Mission, keine
 fraktionsrichtige Ausrüstung.
+
+Pegasusnight (zweite britische Stichprobe, bestanden mit
+`run/qa-pegasusnight-m17-sample4`) gehört dem Gleiter-Intro: `blackout()` ruft
+`level.player freezeControls(true)` auf, versetzt den Spieler und ruft direkt
+nach `glider ride finished` `level.player shellshock("groggy", 20)`; 16,1 s
+Absturzstimmen später löst `intro_fadein()` die Kontrolle und gibt die beim
+Kartenstart festgehaltene Ausrüstung (`level.playerWeapon`, vor dem QA-Kit)
+erneut aus, weshalb ein normales Spawn-Kit wieder verschwindet
+(`run/qa-pegasusnight-m17-sample1`). Im Listen-Server ist `level.player` der
+Host-Körper, also liegt nur Slot 0 in diesem Fenster: Der native Observer las
+`shellshock{index=1,time=78050,duration=20000}` und Host-`pm_flags=0x03000002`,
+während alle drei Peers bei `pm_flags=0` blieben und schon im ersten Burst
+Munition verbrauchten. Der Host behielt `0x03000002` bis etwa 108 s, dann
+`pm_flags=0x2` und seine erste verbrauchte Patrone (30→25). Die Bits oberhalb
+von `0x2` werden hier nicht benannt; die Rohwerte stehen im Proof. Regel: Nach
+dem gescripteten Rearm wiederholt die Fixture nur den Host-`+attack`-Burst in
+einem begrenzten 40-s-Fenster (`SCRIPTED_HOST_FIRE_RELEASE`) und protokolliert
+den Native-Zustand der ersten verbrauchten Patrone. Das
+Vier-Eigentümer-Ammo-Gate bleibt unverändert und scheitert weiterhin an einem
+Host, der nie verbraucht; das Kartenskript bleibt unverändert und das QA-Kit
+bleibt der feste amerikanische Katalog.
 
 ## Mission progression
 

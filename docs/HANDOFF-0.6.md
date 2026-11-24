@@ -591,6 +591,57 @@ This addendum supersedes pending statements below. Nothing has been published.
   fraktionsrichtige Ausrüstung; die geprüften Körper sind die britischen
   Modelle der Karte. Evidenz: `run/qa-arnhem-m16-sample1`,
   `run/qa-arnhem-m16-sample2`, `run/qa-arnhem-m16-sample3`.
+- **M18 Second British sample and the scripted host crash state / M18 Zweite
+  britische Stichprobe und der gescriptete Host-Crashzustand:**
+  `run/qa-pegasusnight-m17-sample4` PASSes four-player pegasusnight with the
+  QA kit, reassert and both visible-selection phases. The mission's own intro
+  owns the host body: `blackout()` calls `level.player freezeControls(true)`
+  and, right after `glider ride finished`, `level.player shellshock("groggy",
+  20)`; 16.1 s later `intro_fadein()` releases the controls and re-gives the
+  loadout it captured at map start, so the spawn kit disappears again
+  (`run/qa-pegasusnight-m17-sample1`). On a listen server `level.player` is the
+  host body, so only slot 0 is affected. The fixture now detects that native
+  swap, re-commits the same plan once through `coop_qa_kit_reassert_0` and
+  checks the `identity|world|epoch` receipt (`sample2` proved the reassert and
+  exposed my wrong receipt comparison), and it repeats only the host `+attack`
+  burst inside a bounded 40 s window (`SCRIPTED_HOST_FIRE_RELEASE`) because the
+  host recorded `shellshock{index=1,time=78050,duration=20000}` and
+  `pm_flags=0x03000002` until about 108 s while the peers were at `pm_flags=0`
+  and fired immediately (`sample3`: reassert and selection passed, host clip
+  stayed 30). At about 108 s the host dropped to `pm_flags=0x2` and consumed
+  30→25; the four-owner gate itself is unchanged. Real movement is
+  63.1/117.4/64.9 initially and 66.6/116.4/109.4 after the checkpoint reload,
+  clips 30/5/20/8→25/4/15/7, and both selection phases captured all four
+  owners. The bits above `0x2` are not named, only the raw values are recorded;
+  the map script stays unmodified, the QA kit stays the fixed American catalog
+  and no faction-correct loadout is claimed. Evidence:
+  `run/qa-pegasusnight-m17-sample1` … `-sample4`.
+  / `run/qa-pegasusnight-m17-sample4` besteht Pegasusnight mit vier Spielern,
+  QA-Kit, Reassert und beiden Sichtwahl-Phasen. Das Intro der Mission gehört
+  dem Host-Körper: `blackout()` ruft `level.player freezeControls(true)` und
+  direkt nach `glider ride finished` `level.player shellshock("groggy", 20)`
+  auf; 16,1 s später löst `intro_fadein()` die Kontrolle und gibt die beim
+  Kartenstart festgehaltene Ausrüstung erneut aus, weshalb das Spawn-Kit wieder
+  verschwindet (`run/qa-pegasusnight-m17-sample1`). Im Listen-Server ist
+  `level.player` der Host-Körper, also ist nur Slot 0 betroffen. Die Fixture
+  erkennt diesen nativen Tausch jetzt, setzt denselben Plan einmal über
+  `coop_qa_kit_reassert_0` erneut durch und prüft die Quittung
+  `identity|world|epoch` (`sample2` belegte den Reassert und deckte meinen
+  falschen Quittungsvergleich auf); außerdem wiederholt sie nur den
+  Host-`+attack`-Burst in einem begrenzten 40-s-Fenster
+  (`SCRIPTED_HOST_FIRE_RELEASE`), weil der Host bis etwa 108 s
+  `shellshock{index=1,time=78050,duration=20000}` und `pm_flags=0x03000002`
+  zeigte, während die Peers bei `pm_flags=0` sofort feuerten (`sample3`:
+  Reassert und Auswahl bestanden, Host-Clip blieb 30). Bei etwa 108 s fiel der
+  Host auf `pm_flags=0x2` und verbrauchte 30→25; das
+  Vier-Eigentümer-Gate selbst bleibt unverändert. Die echte Bewegung ist
+  anfangs 63,1/117,4/64,9 und nach dem Checkpoint-Reload 66,6/116,4/109,4, die
+  Magazine 30/5/20/8→25/4/15/7, und beide Auswahlphasen fingen alle vier
+  Eigentümer ein. Die Bits oberhalb von `0x2` werden nicht benannt, nur die
+  Rohwerte protokolliert; das Kartenskript bleibt unverändert, das QA-Kit
+  bleibt der feste amerikanische Katalog, und eine fraktionsrichtige
+  Ausrüstung wird nicht behauptet. Evidenz:
+  `run/qa-pegasusnight-m17-sample1` … `-sample4`.
 - **U1 upstream comparison TheTiranix/CoDCoop / U1 Upstream-Abgleich:**
   `upstream/master` = `52dd2bc` (fetched read-only), merge base `21eae10`;
   upstream has 8 commits we do not, we have 78 it does not. Verdicts:

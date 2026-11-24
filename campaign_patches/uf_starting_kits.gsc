@@ -126,7 +126,23 @@ WatchPlayers()
                 continue; // No Apply, Give, Refill or player-field mutation.
             }
             if (getcvar("coop_qa_kit_" + slot + "_mode") != "manual") continue;
-            if (getcvar(identity_key) == native_identity) continue;
+            if (getcvar(identity_key) == native_identity)
+            {
+                // A named mission can replace the host actor's loadout after
+                // the spawn ticket (pegasusnight's glider ride ends by
+                // re-giving the loadout it captured before the QA kit
+                // existed). The fixture names this exact actor/world as QA
+                // input; only then are the receipts dropped for one more
+                // plan application.
+                if (getcvar("coop_qa_kit_reassert_" + slot) != identity) continue;
+                setcvar("coop_qa_kit_reassert_" + slot, "");
+                setcvar("coop_qa_kit_reassert_count_" + slot,
+                    "" + (getcvarint("coop_qa_kit_reassert_count_" + slot) + 1));
+                player.coop_kit_applying = undefined;
+                setcvar(identity_key, "");
+                setcvar(key, "");
+                println("COOP_UF_KIT_REASSERT_REQUESTED ", slot, " ", native_identity);
+            }
             // A restored world's old plan must not select Alice's kit for Bob.
             // Validate once per immutable plan epoch, not once per actor/frame.
             if (getcvar("coop_qa_kit_epoch") != level.coop_kit_epoch || getcvar("coop_qa_kit_verified_epoch") != level.coop_kit_epoch)
@@ -150,6 +166,8 @@ WatchPlayers()
             player.coop_kit_epoch = receipt;
             setcvar(key, receipt);
             setcvar(identity_key, native_identity);
+            if (getcvarint("coop_qa_kit_reassert_count_" + slot) > 0)
+                setcvar("coop_qa_kit_reasserted_" + slot, receipt);
             println("COOP_UF_KIT_APPLIED ", slot, " ", level.coop_kits[slot].family);
         }
         wait 0.1;

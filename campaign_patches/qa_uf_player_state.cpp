@@ -47,17 +47,25 @@ int main(int argc, char** argv) {
         } while (Module32Next(modules, &me));
         CloseHandle(modules);
         unsigned client=0, state=0, weaponstate=0, clientnum=999, weapon=0, viewmodel=0, flags=0, ads=0, hint=0, buttons=0;
+        unsigned eflags=0, shockindex=0, shocktime=0, shockduration=0, viewlocked=0;
         bool valid = module && read32(process, module+0x1549c0+slot*0x2d0+0x108, client) && client &&
             read32(process, client+0x614, state) && read32(process, client+0xcc, weaponstate) && read32(process, client+0xc4, clientnum) &&
             read32(process, client+0xc8, weapon) && read32(process, client+0xd4, viewmodel);
         if (valid) {
             read32(process, client+0xc, flags); read32(process, client+0xd0, ads);
             read32(process, client+0x5b8, hint); read32(process, client+0x8230, buttons);
+            // UO 1.51 playerState (notes/uo_playerstate.txt): eFlags +0x74,
+            // viewlocked +0x5a0, shellshockIndex/Time/Duration +0x61c/620/624.
+            read32(process, client+0x74, eflags); read32(process, client+0x5a0, viewlocked);
+            read32(process, client+0x61c, shockindex); read32(process, client+0x620, shocktime);
+            read32(process, client+0x624, shockduration);
         }
         float fraction=0; std::memcpy(&fraction, &ads, sizeof(fraction));
         if (valid) {
             std::printf("{\"pid\":%lu,\"slot\":%u,\"clientnum\":%u,\"weapon\":%u,\"viewmodel\":%u,\"weapon_state\":%u,\"raw_weapon_anim\":%u,\"weapon_anim\":%u,\"pm_flags\":%u,\"ads_fraction\":%.5f,\"cursor_hint\":%u,\"buttons\":%u",
                 entry.th32ProcessID, slot, clientnum, weapon, viewmodel, weaponstate, state, state & ~0x200u, flags, fraction, hint, buttons);
+            std::printf(",\"e_flags\":%u,\"view_locked\":%u,\"shellshock\":{\"index\":%u,\"time\":%u,\"duration\":%u}",
+                eflags, viewlocked, shockindex, shocktime, shockduration);
             unsigned definitions=0; read32(process, module+0x151f34, definitions);
             unsigned selecteddef=0, selectednameptr=0; char selectedname[128]={}; SIZE_T selectedread=0;
             if (weapon && definitions && read32(process,definitions+weapon*4,selecteddef) && selecteddef && read32(process,selecteddef+4,selectednameptr) && selectednameptr)
