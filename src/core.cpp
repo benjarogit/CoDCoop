@@ -2200,7 +2200,13 @@ void HostCreateBody(int n)
         {"character_airborne_101", "basehead2_02", "gear_US_helmet"},
         {"character_airborneslvup", "basehead3_03", "gear_US_helmet_scrim"},
     };
-    static const char* const kBodies[] = {"character_airborne", "character_british", "character_soviet", nullptr};
+    // United Fronts maps do not all load the airborne models: Afrika2 supplies
+    // its GIs as character_3rd_clean/dirty/straps, and the mod also ships
+    // character_3rdmarne* and character_29thdivi*. Keep the airborne look first,
+    // then the other allied families, so a missing division is not reported as a
+    // missing ally.
+    static const char* const kBodies[] = {"character_airborne", "character_3rd", "character_29th",
+                                          "character_british", "character_soviet", nullptr};
     static const char* const kHeads[] = {"basehead", nullptr};
     static const char* const kHelmets[] = {"gear_US_helmet", nullptr};
     int parts[3] = {LoadedModel(kParts[n][0], kBodies), LoadedModel(kParts[n][1], kHeads, "axis"), 0};
@@ -2210,7 +2216,10 @@ void HostCreateBody(int n)
         lastWarn = GetTickCount();
         return;
     }
-    if (!_strnicmp(ModelName(parts[0]), "character_airborne", 18)) parts[2] = LoadedModel(kParts[n][2], kHelmets);
+    const char* bodyName = ModelName(parts[0]);
+    if (!_strnicmp(bodyName, "character_airborne", 18) || !_strnicmp(bodyName, "character_3rd", 13) ||
+        !_strnicmp(bodyName, "character_29th", 14))
+        parts[2] = LoadedModel(kParts[n][2], kHelmets);
     ModelEntry models[4] = {};
     int count = 0;
     for (int index : parts) {

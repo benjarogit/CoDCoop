@@ -381,6 +381,54 @@ This addendum supersedes pending statements below. Nothing has been published.
   benannte Einschränkung, und `afrika2`, das
   `character\airborne1f_garand` und `character\airborne1w_garand` vorlädt, ist
   stattdessen die Wüstenstichprobe.
+- **M14 desert sample, body families and script watchdog / M14 Wüstenstichprobe, Körperfamilien und Script-Watchdog:**
+  `run/qa-afrika2-m14-yield1` PASSes four-player afrika2: 25 native-tree
+  adoptions per joiner, 19 host bodies, initial movement 196.1/164.2/207.5 and
+  post-reload movement 210.0/182.9/172.8, 0 `failed allocation`, 0 `ERROR:`
+  line, 0 watchdog message, no `host silent`, clean shutdown. Two real defects
+  were found on the way and fixed:
+  (1) `HostCreateBody` only knew `character_airborne`, `character_british` and
+  `character_soviet`, but afrika2 supplies its GIs as
+  `character_3rd_clean/dirty/straps` (3rd Infantry). The list now also covers
+  `character_3rd*` and `character_29th*`, and the US helmet attaches to those
+  families; the bodies in the pass are `character_3rd_dirty` with the 3rd
+  Infantry heads and helmets.
+  (2) The authored `maps/_UF_mod.gsc` weapon pass
+  (`for (i=0;i<axis.size;i++)`, line 7243) resolves the nation/year weapon table
+  for every not-yet-reset axis actor in one slice and then waits 0.5 s. Under
+  four native clients on one machine that single slice exceeded the engine's
+  cycle-based script watchdog, which killed the thread
+  (`run/qa-afrika2-m14-sample2`: `script runtime error: potential infinite loop
+  in script - killing thread`), leaving the remaining actors without their
+  weapon. The overlay patch now yields (`wait 0`) every eight actors; the pass
+  still visits every actor exactly once and in the same order, it only spreads
+  the work over a few frames. Foy already logged the non-fatal *warning* variant
+  of the same watchdog in its one-pass `Precache_Characters`, so the fix is not
+  afrika2-specific.
+  / `run/qa-afrika2-m14-yield1` besteht Afrika2 mit vier Spielern: 25 native
+  Baum-Übernahmen je Joiner, 19 Host-Körper, Anfangsbewegung 196,1/164,2/207,5
+  und Bewegung nach dem Reload 210,0/182,9/172,8, 0 `failed allocation`,
+  0 `ERROR:`-Zeile, 0 Watchdog-Meldung, kein `host silent`, sauberer Shutdown.
+  Zwei echte Fehler wurden dabei gefunden und behoben:
+  (1) `HostCreateBody` kannte nur `character_airborne`, `character_british` und
+  `character_soviet`, aber Afrika2 liefert seine GIs als
+  `character_3rd_clean/dirty/straps` (3rd Infantry). Die Liste deckt jetzt auch
+  `character_3rd*` und `character_29th*` ab, und der US-Helm hängt an diesen
+  Familien; die Körper im Lauf sind `character_3rd_dirty` mit den Köpfen und
+  Helmen der 3rd Infantry.
+  (2) Der Waffendurchlauf in `maps/_UF_mod.gsc`
+  (`for (i=0;i<axis.size;i++)`, Zeile 7243) löst für jeden noch nicht
+  zurückgesetzten Achsen-Soldaten die Nation-/Jahres-Waffentabelle auf und
+  wartet danach 0,5 s. Mit vier nativen Clients auf einer Maschine überschritt
+  dieser eine Durchlauf das zyklusbasierte Script-Watchdog der Engine, das den
+  Thread killte (`run/qa-afrika2-m14-sample2`:
+  `script runtime error: potential infinite loop in script - killing thread`),
+  sodass die restlichen Soldaten ihre Waffe nicht erhielten. Der
+  Overlay-Patch setzt jetzt alle acht Soldaten ein `wait 0`; der Durchlauf
+  besucht weiterhin jeden Soldaten genau einmal und in derselben Reihenfolge,
+  er verteilt die Arbeit nur über einige Frames. Foy protokollierte bereits die
+  nicht tödliche *Warnung* desselben Watchdogs im einmaligen
+  `Precache_Characters`, der Fix ist also nicht Afrika2-spezifisch.
 - **U1 upstream comparison TheTiranix/CoDCoop / U1 Upstream-Abgleich:**
   `upstream/master` = `52dd2bc` (fetched read-only), merge base `21eae10`;
   upstream has 8 commits we do not, we have 78 it does not. Verdicts:

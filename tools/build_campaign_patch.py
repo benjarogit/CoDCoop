@@ -787,6 +787,33 @@ def uf_airborne_missing_load(data):
     return (text[:start] + prefix + text[start:]).encode('latin-1')
 
 
+def uf_actor_weapon_loop_yield(data):
+    """Yield inside the per-frame axis weapon pass.
+
+    The loop visits every not-yet-reset axis actor once and then waits 0.5 s.
+    Each visit also resolves the nation/year weapon table, so one pass over a
+    large Afrika battle exceeds the engine's cycle-based script watchdog when
+    four native clients share the machine. The engine then kills the thread
+    ("potential infinite loop"), and the remaining actors never get their
+    weapon. The same pass already runs once per actor, so yielding every eight
+    actors preserves order and outcome; it only spreads the work over a few more
+    frames. run/qa-afrika2-m14-sample2 is the evidence for this exact loop.
+
+    The caller validates the pinned source hash (uf_airborne_missing_load), so
+    this step only needs a unique anchor. Synthetic build fixtures without the
+    authored script pass through unchanged.
+    """
+    text = data.decode('latin-1')
+    anchor = '\t\tfor (i=0;i<axis.size;i++)\r\n\t\t{\r\n'
+    if anchor not in text:
+        return data
+    if text.count(anchor) != 1:
+        raise ValueError('Unknown UF axis weapon loop revision')
+    replacement = ('\t\tchunk = 0;\r\n' + anchor +
+                   '\t\t\tchunk++;\r\n\t\t\tif (chunk == 8) { chunk = 0; wait 0; }\r\n')
+    return text.replace(anchor, replacement, 1).encode('latin-1')
+
+
 def build(source, output, profile, qa=False, world_policy="universal", qa_kits=False, qa_gmi=False):
     if qa_kits and profile != 'united_fronts':
         raise ValueError('QA individual-kit adapter requires United Fronts')
@@ -805,7 +832,7 @@ def build(source, output, profile, qa=False, world_policy="universal", qa_kits=F
         pathfinder = z.read('maps/pathfinder.gsc') if profile == 'united_fronts' else None
         aliases = uf_asset_aliases(z) if profile == 'united_fronts' else []
         kit_adapter = uf_actor_kit_adapter(z.read('maps/_UF_loadout.gsc')) if profile == 'united_fronts' and qa_kits else None
-        airborne_fix = uf_airborne_missing_load(z.read('maps/_UF_mod.gsc')) if profile == 'united_fronts' else None
+        airborne_fix = uf_actor_weapon_loop_yield(uf_airborne_missing_load(z.read('maps/_UF_mod.gsc'))) if profile == 'united_fronts' else None
         if profile == 'united_fronts':
             alias = z.read('xmodelalias/helmet_us_airborne_82nd.gsc')
             if hashlib.sha256(alias).hexdigest() != UF_HELMET_ALIAS_HASH:
@@ -862,6 +889,7 @@ def build(source, output, profile, qa=False, world_policy="universal", qa_kits=F
         metadata['changes'].append('uf-pathfinder-existing-helmet-precaches')
         metadata['changes'].append('uf-brolio-owned-greasegun-model-alias')
         metadata['changes'].append('uf-foy-noville-authored-airborne-load1-early-precache')
+        metadata['changes'].append('uf-axis-weapon-loop-yield')
         metadata['source_uf_mod_sha256'] = '4be5bb5c6849f7c2b762ccdd27c2020b8c99a70cf64e8e8be98acc387ec698cf'
         metadata['airborne_load1_source'] = {'package': 'Main/pak0.pk3', 'member': 'xmodel/gear_US_load1', 'sha256': 'a7fdc7e73b0fdff95e2c79492f60542e908ef237245fc7b867258af603a23607'}
         metadata['model_aliases'] = {'xmodel/world_greasegun': {'source': 'xmodel/weapon_greasegun', 'sha256': UF_GREASE_MODEL_HASH}}

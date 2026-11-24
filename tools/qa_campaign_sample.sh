@@ -40,7 +40,7 @@ cp "$run"/*-proof.json "$run/evidence/" 2>/dev/null || true
 cp "$run.log" "$run/evidence/" 2>/dev/null || true
 for d in host join1 join2 join3; do
     mkdir -p "$run/evidence/$d"
-    cp "$run/$d"/codcoop*.log "$run/$d"/qa-state.json "$run/$d"/UnitedFronts/console.log "$run/evidence/$d/" 2>/dev/null || true
+    cp "$run/$d"/codcoop*.log "$run/$d"/qa-state.json "$run/$d"/process*.log "$run/$d"/UnitedFronts/console.log "$run/evidence/$d/" 2>/dev/null || true
 done
 evidence=$(du -sh "$run/evidence" | cut -f1)
 rm -rf "$run/host" "$run/join1" "$run/join2" "$run/join3" "$run/prefix" "$run/runtime"

@@ -773,5 +773,27 @@ class CampaignPatchTests(unittest.TestCase):
             self.assertIn('coop_uf_probe_result FAIL_', read_new_log(path, offset))
 
 
+    def test_axis_weapon_loop_gets_a_bounded_yield(self):
+        package = patch.ROOT / 'run/campaign-host/UnitedFronts/ZUnitedFronts_1.1_beta.pk3'
+        if not package.is_file():
+            self.skipTest('Owned original UF package unavailable; pinned source check only')
+        with zipfile.ZipFile(package) as source:
+            original = source.read('maps/_UF_mod.gsc')
+        patched = patch.uf_actor_weapon_loop_yield(original)
+        self.assertEqual(original.count(b'for (i=0;i<axis.size;i++)'),
+                         patched.count(b'for (i=0;i<axis.size;i++)'))
+        self.assertIn(b'chunk = 0;', patched)
+        self.assertEqual(patched.count(b'if (chunk == 8) { chunk = 0; wait 0; }'), 1)
+        # The yield sits inside the loop, after its opening brace.
+        loop = patched.index(b'\t\tfor (i=0;i<axis.size;i++)\r\n\t\t{\r\n')
+        self.assertLess(loop, patched.index(b'if (chunk == 8) { chunk = 0; wait 0; }'))
+        with self.assertRaisesRegex(ValueError, 'Unknown UF axis weapon loop revision'):
+            patch.uf_actor_weapon_loop_yield(
+                b'\t\tfor (i=0;i<axis.size;i++)\r\n\t\t{\r\n'
+                b'\t\tfor (i=0;i<axis.size;i++)\r\n\t\t{\r\n')
+        # Synthetic build fixtures without the authored script pass through.
+        self.assertEqual(patch.uf_actor_weapon_loop_yield(b'main() {}'), b'main() {}')
+
+
 if __name__ == '__main__':
     unittest.main()

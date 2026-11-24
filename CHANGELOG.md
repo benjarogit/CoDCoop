@@ -20,7 +20,12 @@
   four walk directions while keeping the strict per-direction movement oracle.
   bizerte is the first named content limitation: the level loads no allied
   player model, so Coop bodies cannot be built there and the desert sample moves
-  to afrika2.
+  to afrika2, which passes four-player Coop with 25 adoptions per joiner and
+  210.0/182.9/172.8 reload movement. Afrika2 also exposed two real defects that
+  are now fixed: the host body lookup now covers the 3rd Infantry and 29th
+  Division model families, and the authored AI weapon pass yields every eight
+  actors so four native clients on one machine no longer trip the engine's
+  script watchdog and lose the remaining actors' weapons.
 - Fix atomic lobby-file exchange when a Windows/Wine reader temporarily blocks
   replacement; keep bounded retries, prior-file preservation and link rejection.
   Fresh frozen Linux and Windows/Wine workers pass signed party transactions,
@@ -136,7 +141,13 @@ mechanics remain acceptance gates. See [handoff](docs/HANDOFF-0.6.md).
   Laufrichtungen, während das strenge Bewegungs-Orakel je Richtung bleibt.
   Bizerte ist die erste benannte Inhaltsgrenze: Das Level lädt kein alliiertes
   Spielermodell, deshalb können dort keine Coop-Körper entstehen, und die
-  Wüstenstichprobe wechselt zu afrika2.
+  Wüstenstichprobe wechselt zu afrika2, das mit vier Spielern besteht (25
+  Übernahmen je Joiner, Reload-Bewegung 210,0/182,9/172,8). Afrika2 hat zudem
+  zwei echte Fehler aufgedeckt, die jetzt behoben sind: Die Host-Körpersuche
+  deckt auch die Modellfamilien der 3rd Infantry und der 29th Division ab, und
+  der Waffendurchlauf der Mod setzt alle acht Soldaten ein `wait 0`, damit vier
+  native Clients auf einer Maschine nicht mehr das Script-Watchdog der Engine
+  auslösen und die Waffen der restlichen Soldaten verloren gehen.
 - Atomaren Lobby-Dateiaustausch bei vorübergehend blockierenden Windows-/Wine-
   Lesern korrigieren; begrenzte Wiederholungen, Erhalt der vorherigen Datei und
   Link-Abweisung beibehalten. Neu gebaute Linux- und Windows/Wine-Worker bestehen
