@@ -153,14 +153,18 @@ Weitere Einzelheiten: [Linux / Proton](docs/linux.md).
 
 ## Entwicklungsstand
 
-United Fronts hat weiterhin einen blockierenden Ressourcenfehler: Foy und
-Noville können beim sauberen Start mit dem vollständigen Ausrüstungsbestand
-die 255 Modellplätze der Engine ausschöpfen. Eine Registrierung erst bei
-tatsächlicher Verwendung wird experimentell geprüft. Vier individuelle
-Ausrüstungen, Checkpoint-Wiederherstellung und vollständige Missionen sind
-damit noch nicht bestätigt. Die signierte Ausrüstungslobby funktioniert in
-gebauten Linux- und Windows/Wine-Workern; ihre native Spieler-/Ausrüstungsbindung
-im Spiel ist noch nicht fertig.
+United Fronts hat weiterhin einen offenen Ressourcenfehler im Standardpfad:
+Foy und Noville können beim sauberen Start mit dem vollständigen
+Ausrüstungsbestand die 255 Modellplätze der Engine ausschöpfen. Der
+experimentelle Pfad mit Registrierung erst bei tatsächlicher Verwendung hat
+Vier-Spieler-Ausrüstungen und native Checkpoint-Reloads auf Foy, Noville,
+Brecourt und Bastogne1 bestanden; er ist aber noch nicht der
+Produktionsstandard und bestätigt keine vollständigen Missionen. Die Abdeckung
+wird jetzt kapitelweise festgehalten; eine Inhaltsgrenze ist bereits benannt:
+Bizerte lädt kein alliiertes Spielermodell, deshalb können dort keine
+Coop-Körper entstehen. Die signierte Ausrüstungslobby funktioniert in gebauten
+Linux- und Windows/Wine-Workern; ihre native Spieler-/Ausrüstungsbindung im
+Spiel ist noch nicht fertig.
 
 Für die stabile Veröffentlichung zählen **vollständig geprüfte Kampagnen**,
 nicht nur geladene Karten. Native Windows-10/11-Tests, Steam mit getrennten

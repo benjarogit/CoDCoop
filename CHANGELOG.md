@@ -6,13 +6,21 @@
 
 **Unreleased. No full-campaign or native-Windows certification yet.**
 
-- Foy, Noville and Brecourt pass four-player Co-op on the production path:
-  native tree adoption, own trees and host player-body trees on the heap (no
-  script-pool exhaustion), checkpoint reload for every joiner, and the upstream
-  fixes for smoother joiner animations, the host's weapon in vehicles, revive
-  protection and teammates leaving vehicles next to the host. Keep-alive now
-  runs in the packet pump, so a long native load no longer drops a joiner's
+- Foy, Noville, Brecourt and Bastogne1 pass four-player Co-op on the production
+  path: native tree adoption, own trees and host player-body trees on the heap
+  (no script-pool exhaustion), checkpoint reload for every joiner, and the
+  upstream fixes for smoother joiner animations, the host's weapon in vehicles,
+  revive protection and teammates leaving vehicles next to the host. Keep-alive
+  now runs in the packet pump, so a long native load no longer drops a joiner's
   slot after 8 s.
+- Record campaign coverage chapter by chapter instead of claiming a playthrough.
+  Both bastogne1 failures that preceded the pass are retained as evidence: the
+  rejoin renderer catches up at 2 fps and the restored pose can face an
+  obstacle, so the fixture now waits for restored-world snapshots and probes the
+  four walk directions while keeping the strict per-direction movement oracle.
+  bizerte is the first named content limitation: the level loads no allied
+  player model, so Coop bodies cannot be built there and the desert sample moves
+  to afrika2.
 - Fix atomic lobby-file exchange when a Windows/Wine reader temporarily blocks
   replacement; keep bounded retries, prior-file preservation and link rejection.
   Fresh frozen Linux and Windows/Wine workers pass signed party transactions,
@@ -113,13 +121,22 @@ mechanics remain acceptance gates. See [handoff](docs/HANDOFF-0.6.md).
 
 **Noch nicht veröffentlicht. Keine Bestätigung vollständiger Kampagnen oder nativer Windows-Läufe.**
 
-- Foy, Noville und Brecourt bestehen mit vier Spielern auf dem Produktionspfad:
+- Foy, Noville, Brecourt und Bastogne1 bestehen mit vier Spielern auf dem Produktionspfad:
   Übernahme der nativen Bäume, Eigenbäume und Host-Körperbäume im Heap (keine
   Erschöpfung des Script-Pools), Checkpoint-Reload für jeden Joiner und die
   Upstream-Fixes für weichere Joiner-Animationen, die Host-Waffe im Fahrzeug,
   Revive-Schutz und Mitfahrer, die neben dem Host aussteigen. Das Keep-Alive
   läuft jetzt im Paket-Pump, damit ein langer nativer Ladevorgang den
   Joiner-Slot nicht mehr nach 8 s freigibt.
+- Kampagnenabdeckung kapitelweise festhalten statt einen Durchlauf zu
+  behaupten. Beide Bastogne1-Fehler vor dem Bestehen bleiben als Evidenz
+  erhalten: Der Renderer holt beim Rejoin mit 2 Bildern/s auf, und die
+  wiederhergestellte Pose kann auf ein Hindernis zeigen; deshalb wartet die
+  Fixture jetzt auf Snapshots der wiederhergestellten Welt und probiert die vier
+  Laufrichtungen, während das strenge Bewegungs-Orakel je Richtung bleibt.
+  Bizerte ist die erste benannte Inhaltsgrenze: Das Level lädt kein alliiertes
+  Spielermodell, deshalb können dort keine Coop-Körper entstehen, und die
+  Wüstenstichprobe wechselt zu afrika2.
 - Atomaren Lobby-Dateiaustausch bei vorübergehend blockierenden Windows-/Wine-
   Lesern korrigieren; begrenzte Wiederholungen, Erhalt der vorherigen Datei und
   Link-Abweisung beibehalten. Neu gebaute Linux- und Windows/Wine-Worker bestehen

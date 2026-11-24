@@ -145,12 +145,15 @@ See [Linux / Proton details](docs/linux.md).
 
 ## Development status
 
-United Fronts still has a blocking resource issue: clean Foy and Noville startup
-can exhaust the engine's 255 model slots with the complete equipment set.
-Deferred registration is being tested; it is experimental and does not yet
-certify four individual kits, checkpoint recovery or complete missions.
-The signed equipment lobby works in frozen Linux and Windows/Wine workers;
-its native game owner/kit binding is still unfinished.
+United Fronts still has an open resource issue in the default path: clean Foy
+and Noville startup can exhaust the engine's 255 model slots with the complete
+equipment set. The experimental deferred-registration path has passed
+four-player kits and native checkpoint reloads on Foy, Noville, Brecourt and
+Bastogne1, but it is not yet the production default and it does not certify
+complete missions. Coverage is being recorded per chapter; one content
+limitation is already named: bizerte loads no allied player model, so Coop
+bodies cannot be built there. The signed equipment lobby works in frozen Linux
+and Windows/Wine workers; its native game owner/kit binding is still unfinished.
 
 The release gate is **complete tested campaigns**, not merely successful map
 loads. Native Windows 10/11 tests, Steam with separate accounts, all campaign
