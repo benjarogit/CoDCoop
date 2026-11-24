@@ -335,6 +335,52 @@ This addendum supersedes pending statements below. Nothing has been published.
   `modulo de juego cargado en 20000000` und
   `checkpoint: carga tambien a los remotos guardados` um 05:15:57, Minuten vor
   dem Verbinden des Hosts.
+- **M12 campaign sample coverage / M12 Kampagnen-Stichproben:** `run/qa-bastogne1-m13-wall1`
+  PASSes four-player bastogne1 with the widened fixture: 14 native-tree
+  adoptions per joiner, 3 own trees each, 19 host bodies, initial movement
+  166.6/166.7/130.4 and post-reload movement 156.6/187.8/124.0 through `+back`,
+  0 `failed allocation`, 0 `ERROR:` line, no `host silent` event and a clean
+  shutdown. Evidence in `run/qa-bastogne1-m13-wall1/evidence/`; runtime copies
+  deleted. The per-chapter sample program is US `carride` (truck intro), desert
+  `afrika2`, British `arnhem`/`pegasusnight`, Soviet `pavlov`/`redsquare`,
+  snow/urban `bastogne1` (done) and vehicles `bizerte` (see below), each with
+  the four-role fixture; CoD1, UO and SP Improved get one smoke each. The
+  coverage status is recorded per map, not as a campaign playthrough claim.
+  `run/qa-bizerte-m14-sample1` is the first documented content exception:
+  bizerte loads only `character_german_dakA/C/E/F` (273 exported models, no
+  allied character model; its GSC has the `character\...::precache()` lines
+  commented out), so `HostCreateBody` reports `cuerpo 0: el nivel no cargo
+  modelos de soldado aliado` and no coop body can exist on either side.
+  Movement (156.2/164.9/244.6), kits, ammo and command clocks all pass; only
+  the body gate fails, and it fails because the level has no model to build a
+  body from, not because of a coop defect. Per the agreed policy (per-map rules
+  instead of silently relaxed gates) bizerte stays a named limitation and
+  `afrika2`, which precaches `character\airborne1f_garand` and
+  `character\airborne1w_garand`, is the desert sample instead.
+  / `run/qa-bastogne1-m13-wall1` besteht Bastogne1 mit vier Spielern und der
+  erweiterten Fixture: 14 native Baum-Übernahmen je Joiner, je 3 Eigenbäume,
+  19 Host-Körper, Anfangsbewegung 166,6/166,7/130,4 und Bewegung nach dem Reload
+  156,6/187,8/124,0 über `+back`, 0 `failed allocation`, 0 `ERROR:`-Zeile, kein
+  `host silent`, sauberer Shutdown. Evidenz in
+  `run/qa-bastogne1-m13-wall1/evidence/`; Laufzeitkopien gelöscht. Das
+  Stichprobenprogramm je Kapitel ist US `carride` (Truck-Intro), Wüste
+  `afrika2`, Britisch `arnhem`/`pegasusnight`, Sowjet `pavlov`/`redsquare`,
+  Schnee/Stadt `bastogne1` (erledigt) und Fahrzeuge `bizerte` (siehe unten),
+  jeweils mit der Vier-Rollen-Fixture; CoD1, UO und SP Improved bekommen je
+  einen Smoke. Der Abdeckungsstand wird pro Karte festgehalten, nicht als
+  behaupteter Kampagnendurchlauf. `run/qa-bizerte-m14-sample1` ist die erste
+  dokumentierte Inhaltsausnahme: Bizerte lädt nur
+  `character_german_dakA/C/E/F` (273 exportierte Modelle, kein alliiertes
+  Spielermodell; die `character\...::precache()`-Zeilen im GSC sind
+  auskommentiert), deshalb meldet `HostCreateBody`
+  `cuerpo 0: el nivel no cargo modelos de soldado aliado`, und auf keiner Seite
+  kann ein Coop-Körper entstehen. Bewegung (156,2/164,9/244,6), Kits, Munition
+  und Kommandouhren bestehen; nur das Körper-Gate scheitert, und zwar weil dem
+  Level das Modell fehlt, nicht wegen eines Coop-Fehlers. Nach der vereinbarten
+  Regel (Pro-Karte-Regeln statt still aufgeweichter Gates) bleibt Bizerte eine
+  benannte Einschränkung, und `afrika2`, das
+  `character\airborne1f_garand` und `character\airborne1w_garand` vorlädt, ist
+  stattdessen die Wüstenstichprobe.
 - **U1 upstream comparison TheTiranix/CoDCoop / U1 Upstream-Abgleich:**
   `upstream/master` = `52dd2bc` (fetched read-only), merge base `21eae10`;
   upstream has 8 commits we do not, we have 78 it does not. Verdicts:
