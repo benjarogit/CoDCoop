@@ -278,6 +278,63 @@ This addendum supersedes pending statements below. Nothing has been published.
   kein `host silent`) und `run/qa-brecourt-m10-keepalive1` (je 30 Übernahmen,
   11 alte Bäume, Reload-Bewegung 126,3/132,1/130,7, gleiches sauberes
   Ergebnis).
+- **M11 campaign coverage, bastogne1 rejoin renderer / M11 Kampagnenabdeckung, Bastogne1-Renderer beim Rejoin:**
+  `run/qa-bastogne1-m11-coverage1` FAILs at the first movement after the native
+  checkpoint reload, although everything before it passes: four kits, own ammo,
+  authoritative bodies, MG/bazooka and pistol/binoculars selection, 5.4 MB of
+  observations and screenshots. The reload itself works (save 19:12:56, load
+  19:13:02, the three saved ghosts disconnected 19:13:04, all three joiners back
+  PRESERVED at 19:13:40-50) and the host keeps receiving their commands
+  (`ctrl=729` per five seconds). The joiners are simply still catching up:
+  `snaps=0` for the first five seconds after the rejoin and only 2 frames/s, so
+  `+forward` cannot reach the host inside `move_remote`'s fixed ten-second
+  window. bastogne1 is the widest map so far (303 models) and its rejoin takes
+  about 40 s instead of the few seconds on Foy. The fixture now waits for
+  `restored_world_rendered`: every joiner must advance `snapshot_num` and
+  `snapshot_time` beyond its rejoin state before input is injected. That is a
+  stronger precondition instead of a wider movement window; a joiner that never
+  renders still fails, with a precise reason. `run/qa-bastogne1-m12-render1`
+  then passed that precondition and failed the same gate for a second, unrelated
+  reason: the host recorded `forward=127` for the peer and the player moved 0.18
+  units. The restored pose is exactly where the pre-reload walk had stopped —
+  the spawn faces an obstacle and the 160-unit walk ended against it — so
+  `+forward` cannot move again. The fixture now probes the four walk directions
+  (`move_with_room`) and keeps the strict per-direction oracle (`forward>0` or
+  `back<0`, an advanced command clock and more than five units); only a peer
+  that moves in none of the four fails, with the list of blocked keys. The same
+  m12 run also shows the `52dd2bc` module-load port working before any session:
+  `modulo de juego cargado en 20000000` and `checkpoint: carga tambien a los
+  remotos guardados` at 05:15:57, minutes before the host connected.
+  / `run/qa-bastogne1-m11-coverage1` scheitert an der ersten Bewegung nach dem
+  nativen Checkpoint-Reload, obwohl alles davor besteht: vier Kits, eigener
+  Munitionsverbrauch, autoritative Körper, MG/Bazooka- und
+  Pistole/Fernglas-Auswahl, 5,4 MB Beobachtungen und Screenshots. Der Reload
+  selbst funktioniert (Speichern 19:12:56, Laden 19:13:02, die drei
+  gespeicherten Geister 19:13:04 getrennt, alle drei Joiner 19:13:40-50 als
+  PRESERVED zurück) und der Host empfängt ihre Kommandos weiter (`ctrl=729` pro
+  fünf Sekunden). Die Joiner holen nur noch auf: `snaps=0` in den ersten fünf
+  Sekunden nach dem Rejoin und nur 2 Bilder/s, deshalb erreicht `+forward` den
+  Host nicht im festen Zehn-Sekunden-Fenster von `move_remote`. Bastogne1 ist
+  die bisher größte Karte (303 Modelle) und der Rejoin dauert rund 40 s statt
+  weniger Sekunden wie auf Foy. Die Fixture wartet jetzt auf
+  `restored_world_rendered`: jeder Joiner muss `snapshot_num` und
+  `snapshot_time` gegenüber seinem Rejoin-Stand erhöhen, bevor Eingaben
+  injiziert werden. Das ist eine strengere Vorbedingung statt eines weiteren
+  Bewegungsfensters; ein Joiner, der nie rendert, scheitert weiterhin, mit
+  präzisem Grund. `run/qa-bastogne1-m12-render1` besteht diese Vorbedingung
+  danach und scheitert am selben Gate aus einem zweiten, unabhängigen Grund:
+  Der Host verzeichnet `forward=127` für den Peer, und der Spieler bewegt sich
+  0,18 Einheiten. Die wiederhergestellte Pose ist genau dort, wo der Lauf vor
+  dem Reload endete — der Spawn zeigt auf ein Hindernis, der 160-Einheiten-Lauf
+  stieß dagegen —, deshalb bewegt `+forward` nichts mehr. Die Fixture probiert
+  jetzt die vier Laufrichtungen (`move_with_room`) und behält das strenge Orakel
+  je Richtung (`forward>0` bzw. `back<0`, fortgeschrittene Kommandouhr und mehr
+  als fünf Einheiten); nur ein Peer, der in keiner der vier Richtungen läuft,
+  scheitert, mit der Liste der blockierten Tasten. Derselbe m12-Lauf zeigt auch
+  den `52dd2bc`-Modul-Port vor jeder Sitzung:
+  `modulo de juego cargado en 20000000` und
+  `checkpoint: carga tambien a los remotos guardados` um 05:15:57, Minuten vor
+  dem Verbinden des Hosts.
 - **U1 upstream comparison TheTiranix/CoDCoop / U1 Upstream-Abgleich:**
   `upstream/master` = `52dd2bc` (fetched read-only), merge base `21eae10`;
   upstream has 8 commits we do not, we have 78 it does not. Verdicts:
@@ -345,14 +402,20 @@ This addendum supersedes pending statements below. Nothing has been published.
   `c827372` body interpolation (`HostAnimateBodies(dt)` only on server frames)
   and the vehicle loadout (`hostArmed` plus `GiveHostLoadout`); `fa87f10` 3 s
   revive grace (`FL_NOTARGET`), per-player damage log and the vehicle exit at
-  the host's spot; `52dd2bc` solo ghost drop without a coop socket; and part of
-  `3386c4f` (`CodeAddress` for every module including UO below `0x10000000`,
+  the host's spot; `52dd2bc` the saved-remote patch applied on the game-module
+  load notification (`LdrRegisterDllNotification`) instead of only when hosting,
+  plus the solo ghost drop without a coop socket; and part of `3386c4f`
+  (`CodeAddress` for every module including UO below `0x10000000`,
   build version from `git describe`, previous session as `*_previous.log`).
-  Still open: the full `3386c4f` `crashlog.h` refactor, the selective
-  `c1da93f` fragments (native trigger/activator placement, join grace) and the
-  `52dd2bc` `wait` parameter. `ab6cd25` stays rejected as-is. The next
-  `tools/upstream_check.sh` run decides whether anything newer than `52dd2bc`
-  changes these verdicts.
+  One deliberate divergence from `52dd2bc`: our ghost drop disconnects a saved
+  remote player immediately instead of waiting 8 s for it to reclaim the seat,
+  because a rejoining peer rebuilds its body from the preserved inventory; the
+  module-load patch is in place but loading a coop save while playing alone has
+  not been exercised in this environment yet. Still open: the full `3386c4f`
+  `crashlog.h` refactor and the selective `c1da93f` fragments (native
+  trigger/activator placement, join grace). `ab6cd25` stays rejected as-is. The
+  next `tools/upstream_check.sh` run decides whether anything newer than
+  `52dd2bc` changes these verdicts.
   / Mit `./build.sh` und der 382-Test-Suite (46 Umgebungs-Skips) umgesetzt:
   `1435a93` Joiner-Eigenbäume **und** Host-Körperbäume im Heap
   (`CreateOwnTree`/`FreeOwnTree`, `calloc`/`free`; `TreeBytes` nutzt das
@@ -362,14 +425,20 @@ This addendum supersedes pending statements below. Nothing has been published.
   `c827372` Körper-Interpolation (`HostAnimateBodies(dt)` nur in
   Server-Frames) und Fahrzeug-Loadout (`hostArmed` plus `GiveHostLoadout`);
   `fa87f10` 3-s-Revive-Grace (`FL_NOTARGET`), Schadenslog je Spieler und
-  Aussteigen am Host; `52dd2bc` Solo-Ghost-Drop ohne Coop-Socket; und ein Teil
-  von `3386c4f` (`CodeAddress` für jedes Modul, auch UO unter `0x10000000`,
-  Build-Version aus `git describe`, voriger Lauf als `*_previous.log`). Offen:
-  der volle `3386c4f`-`crashlog.h`-Umbau, die selektiven `c1da93f`-Fragmente
-  (native Trigger-/Aktivierer-Platzierung, Join-Grace) und der
-  `52dd2bc`-`wait`-Parameter. `ab6cd25` bleibt so abgelehnt. Der nächste
-  `tools/upstream_check.sh`-Lauf entscheidet, ob etwas nach `52dd2bc` diese
-  Bewertung ändert.
+  Aussteigen am Host; `52dd2bc` der Remoten-Patch schon beim Lade-Aviso des
+  Spielmoduls (`LdrRegisterDllNotification`) statt erst beim Hosten, dazu der
+  Solo-Ghost-Drop ohne Coop-Socket; und ein Teil von `3386c4f` (`CodeAddress`
+  für jedes Modul, auch UO unter `0x10000000`, Build-Version aus
+  `git describe`, voriger Lauf als `*_previous.log`). Eine bewusste Abweichung
+  von `52dd2bc`: Unser Ghost-Drop trennt einen gespeicherten Remote-Spieler
+  sofort statt 8 s auf seine Rückkehr zu warten, weil ein zurückkehrender Peer
+  seinen Körper aus dem erhaltenen Inventar neu aufbaut; der Modul-Patch ist
+  gesetzt, das Laden eines Coop-Spielstands im Solo-Betrieb wurde in dieser
+  Umgebung aber noch nicht ausgeführt. Offen: der volle
+  `3386c4f`-`crashlog.h`-Umbau und die selektiven `c1da93f`-Fragmente (native
+  Trigger-/Aktivierer-Platzierung, Join-Grace). `ab6cd25` bleibt so abgelehnt.
+  Der nächste `tools/upstream_check.sh`-Lauf entscheidet, ob etwas nach
+  `52dd2bc` diese Bewertung ändert.
 - **Latest worker checkpoint / Neuester Worker-Stand:** local source `277fc47`
   fixes actual Windows/Wine atomic-replace sharing failures and physical-link
   rejection. Fresh immutable worker source graph

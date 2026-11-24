@@ -3190,7 +3190,9 @@ void HookLoad(uint8_t* game, bool on)
     uint8_t* jne=game+saved_remote_patch::Offset(g::uo);
     if(!saved_remote_patch::Valid(jne,(uintptr_t)game,g::uo)) {
         static uint8_t* reported;
-        if(on&&reported!=game) {
+        // A solo session hits this path from the module-load notification; the
+        // message is only meaningful once a coop session asked for the patch.
+        if(on&&reported!=game&&S&&S->role!=NONE) {
             reported=game;Log("checkpoint: native saved-player signature mismatch; joining and preservation are blocked");
             CoopStatus("Unsupported native saved-player code. Joining and equipment preservation are blocked.");
         }
@@ -3204,6 +3206,41 @@ void HookLoad(uint8_t* game, bool on)
     } else if(!on&&saved_remote_patch::CanRestore(g_loadPatch,jne,(uintptr_t)game,g::uo)) {
         const uint8_t op=0x75;
         if(hook::Write((uintptr_t)jne,&op,1))g_loadPatch={};
+    }
+}
+
+// El parche de arriba tiene que estar puesto cuando se carga la partida, no al pulsar Host: una partida guardada
+// con remotos se puede cargar jugando solo. El aviso de carga del modulo de juego lo aplica en cuanto aparece.
+struct LdrName { USHORT Length, MaximumLength; const wchar_t* Buffer; };
+struct LdrDll { ULONG Flags; const LdrName* FullDllName; const LdrName* BaseDllName; uint8_t* DllBase; ULONG Size; };
+void* g_dllCookie;
+void CALLBACK OnDllNotification(ULONG reason, const LdrDll* dll, void*)
+{
+    static wchar_t want[64];
+    if(!want[0]&&!MultiByteToWideChar(CP_ACP,0,g::GameDll(),-1,want,64))return;
+    const LdrName* name=dll->BaseDllName;
+    if(!name||name->Length!=wcslen(want)*2||_wcsnicmp(name->Buffer,want,name->Length/2))return;
+    Log("modulo de juego %s en %p",reason==1?"cargado":"descargado",dll->DllBase);
+    if(reason==1)HookLoad(dll->DllBase,true);
+    else if(dll->DllBase==g_damageHooked)g_damageHooked=nullptr;
+}
+
+void WatchGameDll(bool on)
+{
+    HMODULE ntdll=GetModuleHandleA("ntdll.dll");
+    if(on&&!g_dllCookie) {
+        auto reg=(LONG(NTAPI*)(ULONG,void*,void*,void**))GetProcAddress(ntdll,"LdrRegisterDllNotification");
+        if(!reg||reg(0,(void*)OnDllNotification,nullptr,&g_dllCookie)!=0) {
+            g_dllCookie=nullptr;
+            Log("sin aviso de carga del modulo de juego: una partida guardada con remotos puede no cargar sin coop");
+            return;
+        }
+        // Un recargado del nucleo puede ocurrir con el modulo ya cargado: entonces no habra aviso.
+        if(uint8_t* game=(uint8_t*)GetModuleHandleA(g::GameDll()))HookLoad(game,true);
+    } else if(!on&&g_dllCookie) {
+        auto unreg=(LONG(NTAPI*)(void*))GetProcAddress(ntdll,"LdrUnregisterDllNotification");
+        if(unreg)unreg(g_dllCookie);
+        g_dllCookie=nullptr;
     }
 }
 
@@ -4774,12 +4811,14 @@ EXPORT void Coop_Init(const CoreApi* api, void* state, int fresh)
     ConfigureBodyMemory(prepared);
     SetCoopCvarChanged("coop_select_pathfinder_api","0");
     PublishActorEligibility();
+    WatchGameDll(true);
     Log("nucleo listo (rol %d, %s)", S->role, fresh ? "estado nuevo" : "estado conservado");
     if (!steam::SelfTest()) Log("steam: FALLA la autoprueba de direcciones falsas / nombres");
 }
 
 EXPORT void Coop_Shutdown()
 {
+    WatchGameDll(false);  // el aviso apunta a esta DLL, que se va a descargar
     QUFWorldStop();
     BootStop();
     SetCoopCvarChanged("coop_select_api","0");

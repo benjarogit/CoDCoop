@@ -1,7 +1,7 @@
 import copy,sys,unittest
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).parents[1]/'tools'))
-from qa_uf_fresh_roles import require_body_models,host_plan_receipts_match,argument_parser,owned_game_environment,planned_weapon_cvars,union_extra_cvars
+from qa_uf_fresh_roles import require_body_models,host_plan_receipts_match,argument_parser,owned_game_environment,planned_weapon_cvars,union_extra_cvars,supported_maps,restored_world_rendered,move_with_room
 
 class FreshRoleBodyOracle(unittest.TestCase):
  def test_cli_all_weapon_media_is_opt_in_and_changes_only_one_native_flag(self):
@@ -48,6 +48,39 @@ class FreshRoleBodyOracle(unittest.TestCase):
   self.assertEqual(union_extra_cvars('noville'),{'coop_qa_union_extra_0':'thompson28'})
   self.assertEqual(union_extra_cvars('brecourt'),{})
   self.assertEqual(union_extra_cvars('foy'),{})
+  # bastogne1 is the map upstream names for the jeep/revive fixes: American,
+  # winter 1944 in campaign_patches/uf_world_rules.json, no post-export item
+  # registration observed yet.
+  self.assertEqual(union_extra_cvars('bastogne1'),{})
+ def test_map_choice_is_any_registered_united_fronts_map(self):
+  maps=supported_maps()
+  self.assertLessEqual({'brecourt','noville','foy','bastogne1','bizerte'},maps)
+  self.assertNotIn('not_a_map',maps)
+  self.assertEqual(argument_parser().parse_args(['--source','/a','--run','/b','--runtime-dir','/c']).map,'brecourt')
+ def test_restored_world_requires_fresh_snapshots_before_input(self):
+  old=[{'snapshot_num':7,'snapshot_time':1000},{'snapshot_num':9,'snapshot_time':2000}]
+  self.assertTrue(restored_world_rendered(old,[{'snapshot_num':8,'snapshot_time':1100},{'snapshot_num':10,'snapshot_time':2100}]))
+  self.assertFalse(restored_world_rendered(old,[{'snapshot_num':8,'snapshot_time':1100},dict(old[1])]))
+  self.assertFalse(restored_world_rendered(old,[{},dict(old[1])]))
+  self.assertFalse(restored_world_rendered(old,old[:1]))
+ def test_movement_probe_keeps_the_strict_oracle_per_direction(self):
+  calls=[]
+  def blocked_then_free(host,peer,slot,processes,timeout,action):
+   calls.append(action)
+   if action=='+forward':raise TimeoutError('host applies remote movement input')
+   return 12.5
+  action,distance=move_with_room(None,None,2,None,10,move=blocked_then_free)
+  self.assertEqual((action,distance),('+back',12.5))
+  self.assertEqual(calls,['+forward','+back'])
+  calls.clear()
+  def never_moves(host,peer,slot,processes,timeout,action):
+   calls.append(action);raise TimeoutError('host applies remote movement input')
+  with self.assertRaises(TimeoutError) as raised:move_with_room(None,None,2,None,10,move=never_moves)
+  self.assertEqual(calls,['+forward','+back','+moveleft','+moveright'])
+  self.assertIn('did not move in any walk direction',str(raised.exception))
+  def other_failure(host,peer,slot,processes,timeout,action):
+   raise TimeoutError('remote player controllable outside a vehicle/cinematic')
+  with self.assertRaises(TimeoutError):move_with_room(None,None,2,None,10,move=other_failure)
  def test_all_four_plan_receipts_require_current_native_identity(self):
   submitted={'coop_qa_kit_catalog':'hash','coop_qa_kit_epoch':'epoch'}
   native=dict(submitted,coop_qa_kit_status='PLAN_VALIDATED',coop_qa_kit_verified_catalog='hash',coop_qa_kit_verified_epoch='epoch',coop_spawn_session_a='10',coop_spawn_session_b='20',coop_spawn_session_c='1',coop_spawn_world='3')

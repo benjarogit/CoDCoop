@@ -343,8 +343,23 @@ static void __cdecl Hook_SendClientMessages()
     if (g_core.hostFrame) g_core.hostFrame();
 }
 
+// El cartel "Error:" del juego (com_errorMessage) tambien al registro, para que el jugador lo pueda mandar
+static void LogGameError()
+{
+    static DWORD last;
+    static char seen[256];
+    if (GetTickCount() - last < 500) return;
+    last = GetTickCount();
+    const char* e = g::CvarString("com_errorMessage");
+    if (!*e) seen[0] = 0;
+    if (!*e || !strncmp(e, seen, sizeof seen - 1)) return;
+    snprintf(seen, sizeof seen, "%s", e);
+    Log("error del juego: %s", e);
+}
+
 static void __cdecl Hook_SvFrame(int msec)
 {
+    LogGameError();
     if (!g_core.frozenFrame || !g_core.frozenFrame(msec)) g_origSvFrame(msec);
 }
 

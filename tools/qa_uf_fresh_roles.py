@@ -44,6 +44,11 @@ MAP_UNION_EXTRAS={'noville':['thompson28']}
 def union_extra_cvars(map_name):
  return {'coop_qa_union_extra_%d'%index:name for index,name in enumerate(MAP_UNION_EXTRAS.get(map_name,[]))}
 
+def supported_maps():
+ # The campaign inventory registers 122 maps; campaign coverage runs the same
+ # four-role fixture on any of them, so never hard-code a shorter list.
+ return frozenset(json.loads((qa.ROOT/'campaign_patches/uf_world_rules.json').read_text())['registered_maps'])
+
 def host_plan_receipts_match(native,submitted):
  if native.get('coop_qa_kit_status')!='PLAN_VALIDATED':return False
  if native.get('coop_qa_kit_verified_catalog')!=submitted['coop_qa_kit_catalog'] or native.get('coop_qa_kit_verified_epoch')!=submitted['coop_qa_kit_epoch']:return False
@@ -63,6 +68,30 @@ def host_plan_receipts_match(native,submitted):
   # plan, so PRESERVED is accepted here; any other disposition is not.
   if native.get('coop_inventory_%d_state'%slot) not in ('FRESH','PRESERVED') or native.get('coop_inventory_%d_identity'%slot)!=identity:return False
  return True
+
+def restored_world_rendered(baseline,current):
+ """A rejoin is only measurable once the client received snapshots of the restored world."""
+ if len(baseline)!=len(current):return False
+ return all(c and c.get('snapshot_num',0)>b.get('snapshot_num',0) and c.get('snapshot_time',0)>b.get('snapshot_time',0)
+            for b,c in zip(baseline,current))
+
+MOVEMENT_ACTIONS=('+forward','+back','+moveleft','+moveright')
+
+def move_with_room(host,peer,slot,processes,timeout,actions=MOVEMENT_ACTIONS,move=None):
+ """A restored pose is wherever the player stood, often against a wall or a body.
+
+ A blocked key is not a stuck peer, so try the four walk directions and keep the
+ strict per-direction oracle. Only a peer that moves in none of them fails.
+ """
+ move=move or qa.move_remote
+ blocked=[]
+ for action in actions:
+  try:
+   return action,move(host,peer,slot,processes,timeout,action)
+  except TimeoutError as error:
+   if str(error)!='host applies remote movement input':raise
+   blocked.append(action)
+ raise TimeoutError('remote %d did not move in any walk direction (%s)'%(slot,', '.join(blocked)))
 
 def require_body_models(host, observers):
  ownership={}
@@ -98,7 +127,7 @@ def require_body_models(host, observers):
 def argument_parser():
  p=argparse.ArgumentParser(description=__doc__)
  for name in ('source','run','runtime-dir'):p.add_argument('--'+name,type=Path,required=True)
- p.add_argument('--map',choices=('brecourt','noville','foy'),default='brecourt');p.add_argument('--port',type=int,default=29966)
+ p.add_argument('--map',default='brecourt',help='United Fronts map name registered in campaign_patches/uf_world_rules.json');p.add_argument('--port',type=int,default=29966)
  p.add_argument('--timeout',type=int,default=180);p.add_argument('--duration',type=int,default=2);p.add_argument('--checkpoint-reloads',type=int,default=0,choices=range(0,4));p.add_argument('--world-policy',choices=('universal','selected'),default='universal')
  p.add_argument('--experimental-borrow-trees',action='store_true',help='Explicit additional legacy QA native-tree ownership experiment, only after a preserved allocator negative')
  p.add_argument('--experimental-gmi-loader',action='store_true',help='QA-only pinned UO/GMI loader startup; leave disabled for original crash-payload causal traces')
@@ -108,7 +137,9 @@ def argument_parser():
  return p
 
 def main():
- a=argument_parser().parse_args();out=a.run.resolve();base=['--source',str(a.source.resolve()),'--run',str(out),'--runtime-dir',str(a.runtime_dir.resolve()),'--variant','united_fronts','--map',a.map,'--players','4','--timeout',str(a.timeout),'--port',str(a.port),'--duration',str(a.duration)]
+ a=argument_parser().parse_args()
+ if a.map not in supported_maps():raise SystemExit('map %r is not in the United Fronts world rules'%a.map)
+ out=a.run.resolve();base=['--source',str(a.source.resolve()),'--run',str(out),'--runtime-dir',str(a.runtime_dir.resolve()),'--variant','united_fronts','--map',a.map,'--players','4','--timeout',str(a.timeout),'--port',str(a.port),'--duration',str(a.duration)]
  qa.main(base+['--prepare-only'])
  folders=[out/name for name in ('host','join1','join2','join3')];kits,expected,fire=kit_fixture(4)
  catalog=json.loads((qa.ROOT/'campaign_patches/uf_equipment_catalog.json').read_text())
@@ -252,11 +283,16 @@ def main():
    recovered=checkpoint_connected()
    if not recovered:raise RuntimeError('remote disconnected during checkpoint recovery')
    qa.wait_liveness(reloaded[0],checkpoint_connected,processes,4)
-   for peer_number,folder in enumerate(folders[1:]):
+   # bastogne1 rejoins with the renderer still catching up (2 fps, zero snapshots
+   # for a few seconds). Input before the client renders the restored world cannot
+   # reach the host, so wait for fresh snapshots instead of widening the movement
+   # window: the gate stays strict, the precondition is explicit.
+   qa.wait_for(lambda: restored_world_rendered(reloaded[1:],[qa.read_state(folder) for folder in folders[1:]]),
+               processes,a.timeout,'every joiner renders snapshots of the restored world')
+   for folder in folders[1:]:
     slot=qa.read_state(folder)['slot']
-    action=('+forward','+back','+moveleft')[peer_number]
-    distance=qa.move_remote(folders[0],folder,slot,processes,a.timeout,action)
-    report.setdefault('checkpoint_reloads',[]).append({'iteration':iteration+1,'peer':folder.name,'slot':slot,'moved':distance})
+    action,distance=move_with_room(folders[0],folder,slot,processes,a.timeout)
+    report.setdefault('checkpoint_reloads',[]).append({'iteration':iteration+1,'peer':folder.name,'slot':slot,'action':action,'moved':distance})
   report['status']='PASS'
   return {'scope':__doc__,'checks':['four actual independent kits from the current QA epoch with concrete per-slot inventory (FRESH or PRESERVED native identity)','normal resource-bootstrap v2; no offline plan/media on peers','all remotes moved via genuine owner input','all four consumed own firearm ammo','Host authoritative all4 server bodies and every observer other3 client/shadow bodies match native worldModel+negative actualclient/SV CS IDs; own first-person body presence recorded separately','MG/bazooka and pistol/binocular selection through actual weaponslot input; no firing/deployment claim for special weapons']+(['native checkpoint reload restored the world and every joiner rejoined'] if a.checkpoint_reloads else []), 'evidence':{'proof':'uf-fresh-roles-proof.json','map':a.map,'no_explicit_QA_save_or_load':not a.checkpoint_reloads}}
  subprocess.Popen=launch
