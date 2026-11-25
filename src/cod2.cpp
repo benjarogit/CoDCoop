@@ -2397,6 +2397,7 @@ BOOL WINAPI DllMain(HINSTANCE self, DWORD reason, LPVOID)
         g_log = fopen(p, "w");
         strcpy(g_cmdFile, p);
         strcpy(strrchr(g_cmdFile, '.'), ".cmd");
+        steam::log = Log;
         Install();
     }
     return TRUE;
