@@ -89,6 +89,11 @@ passed.
   face an obstacle. Rule: wait for fresh restored-world snapshots and probe all
   four walk directions while keeping the strict per-direction oracle. Evidence:
   `run/qa-bastogne1-m13-wall1`.
+- `bastogne1` (front-line mortars): level triggers are host-only since M21, so
+  a remote standing in `line_zone_field_think` no longer drops that zone's
+  mortars on the host; the map's normal advance still runs through the host.
+  Evidence: `run/qa-c1da93f-smoke2` (both trigger hooks installed, four-player
+  PASS).
 - `afrika2` (desert and vehicle sample): the map runs a Sherman and supplies
   its GIs as 3rd Infantry models; the host body lookup covers those families
   and the authored AI weapon pass yields every eight actors so four native
@@ -178,7 +183,10 @@ Vier-Client-Smoke maß auf allen drei Remotes dieselben gescripteten 123,2
 Einheiten, während alle Verbindungs- und Liveness-Gates bestanden
 (`run/qa-uo-smoke2`). Der UO-Varianten-Smoke nutzt deshalb `training`.
 Bastogne1 wartet auf gerenderte Snapshots der wiederhergestellten Welt und
-prüft alle vier Laufrichtungen. Pavlov deckte einen Stock-Fehler von United
+prüft alle vier Laufrichtungen. Seit M21 lösen Level-Trigger nur für den Host
+aus, damit die Frontzone (`line_zone_field_think`) ihre Mörser nicht mehr auf
+den Host fallen lässt, während ein Remote darin steht
+(`run/qa-c1da93f-smoke2`). Pavlov deckte einen Stock-Fehler von United
 Fronts auf: `Axis_Swap` hinterlässt in den Waffentabellen je Jahr eine Lücke
 (`ger_heer`/1942 setzt kein `sniper[1]`, ein Karten-Spawner setzt `sniper[2]`),
 und die ungeprüfte `precacheItem`-Schleife brach den Thread ab, sodass der Rest

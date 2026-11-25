@@ -23,6 +23,12 @@ g++ -std=c++17 -fsanitize=address,undefined tests/test_pregame_gate.cpp -o build
 ./build/test_pregame_gate
 g++ -std=c++17 -fsanitize=address,undefined tests/test_join_guard.cpp -o build/test_join_guard
 ./build/test_join_guard
+g++ -std=c++17 -fsanitize=address,undefined tests/test_join_placement.cpp -o build/test_join_placement
+./build/test_join_placement
+g++ -std=c++17 -fsanitize=address,undefined tests/test_trigger_filter.cpp -o build/test_trigger_filter
+./build/test_trigger_filter
+g++ -std=c++17 -fsanitize=address,undefined tests/test_frozen_vm.cpp -o build/test_frozen_vm
+./build/test_frozen_vm
 g++ -std=c++17 -fsanitize=address,undefined tests/test_host_rules.cpp -o build/test_host_rules
 ./build/test_host_rules
 g++ -std=c++17 -fsanitize=address,undefined tests/test_archive_rules.cpp -o build/test_archive_rules

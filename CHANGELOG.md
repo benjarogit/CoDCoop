@@ -101,6 +101,17 @@
   `coopkill 0 100000` into that window: the host stays at 1 health, all three
   peers join, move and shut down cleanly; `tests/test_join_guard.cpp` covers the
   decision table.
+- Level triggers now only fire for the host: a teammate standing in a scripted
+  danger zone no longer drops that zone's response (the bastogne1 mortars) on
+  the host, and advance triggers no longer complete without the host. A peer
+  that joins mid-mission appears at the host spot instead of the map start, and
+  everyone gets 3 s without damage while the level's opening shots settle. The
+  joiner's frozen local game no longer runs its free-CPU `vmMain` 10/11 frames,
+  and its entity states are restored before that local map closes.
+  `run/qa-c1da93f-smoke2` passes a four-player CoD1 smoke with both trigger
+  hooks installed, all three local-state restores and 164.0/179.3/215.7 units
+  of movement; `tests/test_trigger_filter.cpp`, `tests/test_join_placement.cpp`
+  and `tests/test_frozen_vm.cpp` cover the decisions.
 - Fix atomic lobby-file exchange when a Windows/Wine reader temporarily blocks
   replacement; keep bounded retries, prior-file preservation and link rejection.
   Fresh frozen Linux and Windows/Wine workers pass signed party transactions,
@@ -305,6 +316,18 @@ mechanics remain acceptance gates. See [handoff](docs/HANDOFF-0.6.md).
   dieses Fenster: Der Host bleibt bei 1 Leben, alle drei Peers treten bei,
   bewegen sich und fahren sauber herunter; `tests/test_join_guard.cpp` deckt die
   Entscheidungstabelle ab.
+- Level-Trigger lösen nur noch für den Host aus: Steht ein Mitspieler in einer
+  gescripteten Gefahrenzone, fällt deren Reaktion (die Mörser in bastogne1)
+  nicht mehr auf den Host, und Fortschritts-Trigger erfüllen sich nicht mehr
+  ohne ihn. Ein Peer, der mitten in der Mission beitritt, erscheint am Host
+  statt am Kartenstart, und alle bekommen 3 s ohne Schaden, während sich die
+  Eröffnungssalven des Levels legen. Das eingefrorene lokale Spiel des Joiners
+  führt seine Freizeit-`vmMain`-10/11-Frames nicht mehr aus, und seine
+  Entity-Zustände werden vor dem Schließen der lokalen Karte zurückgesetzt.
+  `run/qa-c1da93f-smoke2` besteht einen Vier-Spieler-CoD1-Smoke mit beiden
+  Trigger-Hooks, allen drei Zustands-Resets und 164,0/179,3/215,7 Einheiten
+  Bewegung; `tests/test_trigger_filter.cpp`, `tests/test_join_placement.cpp`
+  und `tests/test_frozen_vm.cpp` decken die Entscheidungen ab.
 - Atomaren Lobby-Dateiaustausch bei vorübergehend blockierenden Windows-/Wine-
   Lesern korrigieren; begrenzte Wiederholungen, Erhalt der vorherigen Datei und
   Link-Abweisung beibehalten. Neu gebaute Linux- und Windows/Wine-Worker bestehen

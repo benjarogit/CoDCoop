@@ -116,7 +116,20 @@ _Hook_QAPreVM:
     add esp, 8
     popad
     popfd
+    # Este hook es dueno de VM_Call en QA: el joiner congelado necesita el mismo filtro que _Hook_VmCall
+    # (vmMain 10/11 del juego local no corren; vmMain 1 repone los estados locales antes de cerrar).
+    pushad
+    push eax
+    lea ecx, [esp+36]
+    push ecx
+    call _FrozenVmCall
+    add esp, 8
+    test eax, eax
+    popad
+    jnz 1f
     jmp dword ptr [_g_qaVMTrampoline]
+1:  xor eax, eax
+    ret
 .att_syntax
 )");
 extern "C" void Hook_QADeferredIndex();

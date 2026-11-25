@@ -702,6 +702,69 @@ This addendum supersedes pending statements below. Nothing has been published.
   drei Peers treten bei, bewegen sich 178,6/164,0/192,0 Einheiten und fahren
   sauber herunter. `tests/test_join_guard.cpp` fixiert die Wahrheitstabelle, die
   120-s-Grenze inklusive 32-Bit-Wrap und die Klemmung.
+- **M21 Host-only level triggers, join placement and the frozen local VM /
+  M21 Level-Trigger nur vom Host, Join-Platzierung und der eingefrorene lokale
+  VM:** the three evidenced `c1da93f` fragments are ported, not the 451-line
+  commit. (1) `G_Trigger` (gamex86 RVA `0x43810` / UO `0x47450`) and the
+  ClientThink trigger pass (call at `0x1285c` -> `0x11c10` / UO `0x14330` ->
+  `0x136d0`) only run for the host. In coop the remotes are native game
+  players, so their walk used to fire level triggers while the level scripts
+  act on `level.player` (= the host): the bastogne1 front zone dropped its
+  mortars on the host wherever it stood, and advance triggers completed without
+  the host. (2) A peer that joins mid-mission is moved to the host spot before
+  its first frame when it is farther than `CATCHUP_DIST`, and every join opens
+  a 3 s damage grace, because the level already fired at `ClientBegin`.
+  (3) The joiner's frozen local game no longer runs `vmMain` 10/11 (the cgame's
+  free-CPU frames that kept local scripts and vehicles alive), and on
+  `G_ShutdownGame` (`vmMain` 1) the local entity states that `M_ENTS`
+  overwrote are restored before the map closes. In QA the deferred-model hook
+  owns `VM_Call`, so `_Hook_QAPreVM` now chains `_FrozenVmCall`; production
+  installs `Hook_VmCall` directly. Prologues were checked against the retail
+  binaries (`gamex86.dll` `6A 01 FF 15 … 83 C4 04 85 C0`, the `E8` call at
+  `0x1285c`, `uo_gamex86.dll`/`CoDUOSP.exe` equivalents, and
+  `8B 4C 24 34 8B 54 24 30` for `VM_Call`). `run/qa-c1da93f-smoke2` passes a
+  four-player CoD1 smoke with the hooks installed: the host logs both trigger
+  hooks, all three joiners log the local-state restore, the remotes move
+  164.0/179.3/215.7 units and shut down cleanly; `run/qa-c1da93f-smoke1` is the
+  superseded run before the QA `VM_Call` chain. `tests/test_trigger_filter.cpp`,
+  `tests/test_join_placement.cpp` and `tests/test_frozen_vm.cpp` pin the
+  decisions. Not ported on purpose: the ghost-reclaim part (we drop saved
+  ghosts immediately, M9 divergence) and the AI path-node owner hook (no
+  evidence in our runs yet). Coverage note: the standard smoke joins everyone
+  at mission start, so the mid-mission placement is unit-tested, not triggered
+  by this run.
+  / Die drei belegten `c1da93f`-Fragmente sind portiert, nicht der 451-Zeilen-
+  Commit. (1) `G_Trigger` (gamex86-RVA `0x43810` / UO `0x47450`) und der
+  Trigger-Durchlauf in ClientThink (Aufruf bei `0x1285c` -> `0x11c10` / UO
+  `0x14330` -> `0x136d0`) laufen nur noch für den Host. Im Coop sind die
+  Remotes native Spieler des Spiels, deshalb löste ihr Laufen Level-Trigger aus,
+  während die Level-Skripte auf `level.player` (= Host) wirken: Die Frontzone
+  von bastogne1 ließ die Mörser auf den Host fallen, wo er auch stand, und
+  Fortschritts-Trigger erfüllten sich ohne ihn. (2) Ein Peer, der mitten in der
+  Mission beitritt, wird vor seinem ersten Frame an die Host-Position gesetzt,
+  wenn er weiter als `CATCHUP_DIST` entfernt ist; jeder Beitritt öffnet 3 s
+  Schadensgnade, weil das Level schon bei `ClientBegin` geschossen hat.
+  (3) Das eingefrorene lokale Spiel des Joiners führt `vmMain` 10/11 nicht mehr
+  aus (die Freizeit-Frames des cgame, die lokale Skripte und Fahrzeuge am Leben
+  hielten), und bei `G_ShutdownGame` (`vmMain` 1) werden die lokalen
+  Entity-Zustände, die `M_ENTS` überschrieben hat, vor dem Schließen der Karte
+  zurückgesetzt. In QA besitzt der Deferred-Model-Hook `VM_Call`, deshalb
+  verkettet `_Hook_QAPreVM` jetzt `_FrozenVmCall`; produktiv installiert
+  `Hook_VmCall` direkt. Die Prologe wurden gegen die Retail-Binaries geprüft
+  (`gamex86.dll` `6A 01 FF 15 … 83 C4 04 85 C0`, der `E8`-Aufruf bei
+  `0x1285c`, die UO-Entsprechungen und `8B 4C 24 34 8B 54 24 30` für
+  `VM_Call`). `run/qa-c1da93f-smoke2` besteht einen Vier-Spieler-CoD1-Smoke mit
+  installierten Hooks: Der Host loggt beide Trigger-Hooks, alle drei Joiner
+  loggen das Zurücksetzen der lokalen Zustände, die Remotes bewegen sich
+  164,0/179,3/215,7 Einheiten und fahren sauber herunter;
+  `run/qa-c1da93f-smoke1` ist der ersetzte Lauf vor der QA-`VM_Call`-Kette.
+  `tests/test_trigger_filter.cpp`, `tests/test_join_placement.cpp` und
+  `tests/test_frozen_vm.cpp` fixieren die Entscheidungen. Bewusst nicht
+  portiert: der Ghost-Reclaim-Teil (wir trennen gespeicherte Ghosts sofort,
+  M9-Abweichung) und der AI-Pfadknoten-Owner-Hook (noch kein Beleg in unseren
+  Läufen). Abdeckungshinweis: Der Standardsmoke lässt alle am Missionsstart
+  beitreten, deshalb ist die Mid-Mission-Platzierung unit-getestet, aber von
+  diesem Lauf nicht ausgelöst.
 - **U1 upstream comparison TheTiranix/CoDCoop / U1 Upstream-Abgleich:**
   `upstream/master` = `52dd2bc` (fetched read-only), merge base `21eae10`;
   upstream has 8 commits we do not, we have 78 it does not. Verdicts:
@@ -778,9 +841,12 @@ This addendum supersedes pending statements below. Nothing has been published.
   remote player immediately instead of waiting 8 s for it to reclaim the seat,
   because a rejoining peer rebuilds its body from the preserved inventory; the
   module-load patch is in place but loading a coop save while playing alone has
-  not been exercised in this environment yet. Still open: the full `3386c4f`
-  `crashlog.h` refactor and the selective `c1da93f` fragments (native
-  trigger/activator placement, join grace). `ab6cd25` stays rejected as-is. The
+  not been exercised in this environment yet. M21 landed the selective
+  `c1da93f` fragments (host-only level triggers, mid-mission placement with the
+  3 s join grace, frozen local `vmMain` 10/11 with the local-state restore); the
+  save-load and path-node-owner parts stay out (deliberate ghost divergence /
+  no evidence). Still open: the full `3386c4f` `crashlog.h` refactor.
+  `ab6cd25` stays rejected as-is. The
   next `tools/upstream_check.sh` run decides whether anything newer than
   `52dd2bc` changes these verdicts.
   / Mit `./build.sh` und der 382-Test-Suite (46 Umgebungs-Skips) umgesetzt:
@@ -801,9 +867,12 @@ This addendum supersedes pending statements below. Nothing has been published.
   sofort statt 8 s auf seine Rückkehr zu warten, weil ein zurückkehrender Peer
   seinen Körper aus dem erhaltenen Inventar neu aufbaut; der Modul-Patch ist
   gesetzt, das Laden eines Coop-Spielstands im Solo-Betrieb wurde in dieser
-  Umgebung aber noch nicht ausgeführt. Offen: der volle
-  `3386c4f`-`crashlog.h`-Umbau und die selektiven `c1da93f`-Fragmente (native
-  Trigger-/Aktivierer-Platzierung, Join-Grace). `ab6cd25` bleibt so abgelehnt.
+  Umgebung aber noch nicht ausgeführt. M21 hat die selektiven
+  `c1da93f`-Fragmente umgesetzt (Level-Trigger nur vom Host,
+  Mid-Mission-Platzierung mit 3-s-Join-Grace, eingefrorenes lokales `vmMain`
+  10/11 mit Zurücksetzen der lokalen Zustände); Save-Load und
+  Pfadknoten-Owner bleiben draußen (bewusste Ghost-Abweichung / kein Beleg).
+  Offen: der volle `3386c4f`-`crashlog.h`-Umbau. `ab6cd25` bleibt so abgelehnt.
   Der nächste `tools/upstream_check.sh`-Lauf entscheidet, ob etwas nach
   `52dd2bc` diese Bewertung ändert.
 - **Latest worker checkpoint / Neuester Worker-Stand:** local source `277fc47`
