@@ -722,17 +722,30 @@ This addendum supersedes pending statements below. Nothing has been published.
   installs `Hook_VmCall` directly. Prologues were checked against the retail
   binaries (`gamex86.dll` `6A 01 FF 15 … 83 C4 04 85 C0`, the `E8` call at
   `0x1285c`, `uo_gamex86.dll`/`CoDUOSP.exe` equivalents, and
-  `8B 4C 24 34 8B 54 24 30` for `VM_Call`). `run/qa-c1da93f-smoke2` passes a
+  `8B 4C 24 34 8B 54 24 30` for `VM_Call`). The detour reads `esi` as the
+  activator, as upstream does; the retail touch handler copies `other` into
+  `esi` before it calls `G_Trigger` (`0x43a40`: `mov esi,[esp+0xc]`), so the
+  filter really sees the player entity and not the trigger.
+  `run/qa-c1da93f-smoke2` passes a
   four-player CoD1 smoke with the hooks installed: the host logs both trigger
   hooks, all three joiners log the local-state restore, the remotes move
   164.0/179.3/215.7 units and shut down cleanly; `run/qa-c1da93f-smoke1` is the
-  superseded run before the QA `VM_Call` chain. `tests/test_trigger_filter.cpp`,
+  superseded run before the QA `VM_Call` chain. The UO and SP Improved variants
+  were rerun on the same build: `run/qa-c1da93f-uo1` (PASS, 189.9/193.4/168.8,
+  both UO trigger hooks installed, all three local-state restores) and
+  `run/qa-c1da93f-sp1` (PASS, 159.8/175.7/185.2), so the UO addresses and the
+  overlay coexist with the new hooks. `tests/test_trigger_filter.cpp`,
   `tests/test_join_placement.cpp` and `tests/test_frozen_vm.cpp` pin the
   decisions. Not ported on purpose: the ghost-reclaim part (we drop saved
   ghosts immediately, M9 divergence) and the AI path-node owner hook (no
   evidence in our runs yet). Coverage note: the standard smoke joins everyone
   at mission start, so the mid-mission placement is unit-tested, not triggered
-  by this run.
+  by this run; the trigger block path (a remote walking into a level trigger)
+  was not hit in these short sessions, while the host's pass does run through
+  the trampoline every frame. The ClientThink touch pass is also the native
+  item-touch path, so remotes no longer pick items up by walking over them
+  (consistent with the host-authoritative loadout); `+use`/`trigger_use` for a
+  remote is likewise not exercised yet.
   / Die drei belegten `c1da93f`-Fragmente sind portiert, nicht der 451-Zeilen-
   Commit. (1) `G_Trigger` (gamex86-RVA `0x43810` / UO `0x47450`) und der
   Trigger-Durchlauf in ClientThink (Aufruf bei `0x1285c` -> `0x11c10` / UO
@@ -753,18 +766,33 @@ This addendum supersedes pending statements below. Nothing has been published.
   `Hook_VmCall` direkt. Die Prologe wurden gegen die Retail-Binaries geprüft
   (`gamex86.dll` `6A 01 FF 15 … 83 C4 04 85 C0`, der `E8`-Aufruf bei
   `0x1285c`, die UO-Entsprechungen und `8B 4C 24 34 8B 54 24 30` für
-  `VM_Call`). `run/qa-c1da93f-smoke2` besteht einen Vier-Spieler-CoD1-Smoke mit
+  `VM_Call`). Der Detour liest `esi` als Aktivierer, wie upstream; der
+  Retail-Touch-Handler kopiert `other` vor dem Aufruf von `G_Trigger` nach
+  `esi` (`0x43a40`: `mov esi,[esp+0xc]`), der Filter sieht also wirklich die
+  Spieler-Entität und nicht den Trigger.
+  `run/qa-c1da93f-smoke2` besteht einen Vier-Spieler-CoD1-Smoke mit
   installierten Hooks: Der Host loggt beide Trigger-Hooks, alle drei Joiner
   loggen das Zurücksetzen der lokalen Zustände, die Remotes bewegen sich
   164,0/179,3/215,7 Einheiten und fahren sauber herunter;
   `run/qa-c1da93f-smoke1` ist der ersetzte Lauf vor der QA-`VM_Call`-Kette.
-  `tests/test_trigger_filter.cpp`, `tests/test_join_placement.cpp` und
-  `tests/test_frozen_vm.cpp` fixieren die Entscheidungen. Bewusst nicht
+  Die UO- und SP-Improved-Varianten wurden auf demselben Build erneut
+  gefahren: `run/qa-c1da93f-uo1` (PASS, 189,9/193,4/168,8, beide UO-Trigger-
+  Hooks installiert, alle drei Zustands-Resets) und `run/qa-c1da93f-sp1`
+  (PASS, 159,8/175,7/185,2), die UO-Adressen und das Overlay vertragen sich
+  also mit den neuen Hooks. `tests/test_trigger_filter.cpp`,
+  `tests/test_join_placement.cpp` und `tests/test_frozen_vm.cpp` fixieren die
+  Entscheidungen. Bewusst nicht
   portiert: der Ghost-Reclaim-Teil (wir trennen gespeicherte Ghosts sofort,
   M9-Abweichung) und der AI-Pfadknoten-Owner-Hook (noch kein Beleg in unseren
   Läufen). Abdeckungshinweis: Der Standardsmoke lässt alle am Missionsstart
   beitreten, deshalb ist die Mid-Mission-Platzierung unit-getestet, aber von
-  diesem Lauf nicht ausgelöst.
+  diesem Lauf nicht ausgelöst; der Trigger-Blockpfad (ein Remote läuft in einen
+  Level-Trigger) wurde in diesen kurzen Sitzungen nicht getroffen, während der
+  Durchlauf des Hosts in jedem Frame durch den Trampolin läuft. Der
+  ClientThink-Touch-Durchlauf ist zugleich der native Item-Touch-Pfad, deshalb
+  sammeln Remotes keine Items mehr durch Darüberlaufen auf (konsistent mit dem
+  host-autoritativen Loadout); `+use`/`trigger_use` eines Remotes ist ebenfalls
+  noch nicht ausgelöst.
 - **U1 upstream comparison TheTiranix/CoDCoop / U1 Upstream-Abgleich:**
   `upstream/master` = `52dd2bc` (fetched read-only), merge base `21eae10`;
   upstream has 8 commits we do not, we have 78 it does not. Verdicts:

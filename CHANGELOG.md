@@ -110,8 +110,11 @@
   and its entity states are restored before that local map closes.
   `run/qa-c1da93f-smoke2` passes a four-player CoD1 smoke with both trigger
   hooks installed, all three local-state restores and 164.0/179.3/215.7 units
-  of movement; `tests/test_trigger_filter.cpp`, `tests/test_join_placement.cpp`
-  and `tests/test_frozen_vm.cpp` cover the decisions.
+  of movement; the UO and SP Improved variants pass on the same build
+  (`run/qa-c1da93f-uo1` 189.9/193.4/168.8, `run/qa-c1da93f-sp1`
+  159.8/175.7/185.2); `tests/test_trigger_filter.cpp`,
+  `tests/test_join_placement.cpp` and `tests/test_frozen_vm.cpp` cover the
+  decisions.
 - Fix atomic lobby-file exchange when a Windows/Wine reader temporarily blocks
   replacement; keep bounded retries, prior-file preservation and link rejection.
   Fresh frozen Linux and Windows/Wine workers pass signed party transactions,
@@ -326,8 +329,11 @@ mechanics remain acceptance gates. See [handoff](docs/HANDOFF-0.6.md).
   Entity-Zustände werden vor dem Schließen der lokalen Karte zurückgesetzt.
   `run/qa-c1da93f-smoke2` besteht einen Vier-Spieler-CoD1-Smoke mit beiden
   Trigger-Hooks, allen drei Zustands-Resets und 164,0/179,3/215,7 Einheiten
-  Bewegung; `tests/test_trigger_filter.cpp`, `tests/test_join_placement.cpp`
-  und `tests/test_frozen_vm.cpp` decken die Entscheidungen ab.
+  Bewegung; die UO- und SP-Improved-Varianten bestehen auf demselben Build
+  (`run/qa-c1da93f-uo1` 189,9/193,4/168,8, `run/qa-c1da93f-sp1`
+  159,8/175,7/185,2); `tests/test_trigger_filter.cpp`,
+  `tests/test_join_placement.cpp` und `tests/test_frozen_vm.cpp` decken die
+  Entscheidungen ab.
 - Atomaren Lobby-Dateiaustausch bei vorübergehend blockierenden Windows-/Wine-
   Lesern korrigieren; begrenzte Wiederholungen, Erhalt der vorherigen Datei und
   Link-Abweisung beibehalten. Neu gebaute Linux- und Windows/Wine-Worker bestehen
