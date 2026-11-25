@@ -66,8 +66,12 @@ passed.
   (`run/qa-dawnville-m14-sample1`). Rule: the sampler pins only the host with
   the mod's own `coopgod 0 1` command (`--host-god`) and records it in result
   and proof as a QA liveness input. Kits, ammo, bodies, movement and checkpoint
-  reload keep their strict gates. Product open item: the paused death screen
-  currently blocks pending joins.
+  reload keep their strict gates. The product now covers the same window
+  natively: while a peer is inside the resource bootstrap and no remote is
+  active, a lethal host hit is clamped to 1 health instead of opening the death
+  screen (M20, `src/join_guard.h`). `run/qa-join-guard4` shoots the host with
+  `coopkill 0 100000` during that window: health 1, `pm_type 0`, no
+  `cl_paused 1`, all three peers join and move.
 - `bizerte` (content limitation): the level loads no allied player model, so no
   Coop body can be built on either side and the body gate cannot pass. Rule:
   bizerte is not a sample; `afrika2` is the desert sample. Evidence:
@@ -161,8 +165,13 @@ nicht abgedeckte Karte als bestanden gemeldet. Dawnville startet in einem
 laufenden Gefecht: Der Host starb nach 41 s Wartezeit, der Deathscreen pausierte
 den Listen-Server und kein Peer bekam ein Gamestate. Deshalb setzt der Sampler
 nur den Host mit dem mod-eigenen `coopgod 0 1` fest und protokolliert das als
-QA-Liveness-Eingabe. Bizerte bleibt Inhaltsgrenze (kein alliiertes
-Spielermodell), `carride`/`tankdrivecountry` bleiben On-Rails-Ausnahmen;
+QA-Liveness-Eingabe. Das Produkt deckt dasselbe Fenster jetzt selbst ab: Solange
+ein Peer im Resource-Bootstrap steckt und noch kein Remote aktiv ist, wird ein
+tödlicher Host-Treffer auf 1 Leben geklemmt, statt den Deathscreen zu öffnen
+(M20, `src/join_guard.h`). `run/qa-join-guard4` schießt den Host in diesem
+Fenster mit `coopkill 0 100000` ab: Leben 1, `pm_type 0`, kein `cl_paused 1`,
+alle drei Peers treten bei und bewegen sich. Bizerte bleibt Inhaltsgrenze (kein
+alliiertes Spielermodell), `carride`/`tankdrivecountry` bleiben On-Rails-Ausnahmen;
 `sicily1` teilt diese Eigenschaft für seinen Auftakt: `docks_boat_arrival()`
 bindet Spieler und Squad mit `playerlinkto` an das Fischerboot, und ein
 Vier-Client-Smoke maß auf allen drei Remotes dieselben gescripteten 123,2

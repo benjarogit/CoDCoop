@@ -452,12 +452,10 @@ This addendum supersedes pending statements below. Nothing has been published.
   `host_god_mode` with the scope "QA liveness pin, no damage or death claim".
   Kits, ammo, bodies, movement and the checkpoint reload keep their original
   gates.
-  **Open product question:** a host that dies while peers are still loading
-  leaves the listen server paused on the death screen, so those peers cannot
-  finish joining until the host resumes. The fixture avoids the situation; the
-  product does not solve it yet. For 0.6.0 this needs a decision (protect the
-  host until `coop_expected_players` arrived, or let a completing join resume
-  the pending reload).
+  **Resolved in M20:** a host that died while peers were still loading left the
+  listen server paused on the death screen, so those peers could not finish
+  joining. The 0.6.0 decision protects the join window instead of reopening the
+  pause; see M20.
   / `run/qa-dawnville-m14-god1` besteht Dawnville mit vier Spielern: 12 native
   Baum-Übernahmen je Joiner, je 6 Eigenbäume, 19 Host-Körper
   (`character_airborne`, `character_airborne_101`, `character_airborneslvup`),
@@ -479,12 +477,10 @@ This addendum supersedes pending statements below. Nothing has been published.
   Geltungsbereich „QA-Liveness-Klemme, keine Damage-/Death-Aussage" fest.
   Kits, Munition, Körper, Bewegung und der Checkpoint-Reload behalten ihre
   ursprünglichen Gates.
-  **Offene Produktfrage:** Stirbt der Host, während Peers noch laden, bleibt
-  der Listen-Server auf dem Deathscreen pausiert; diese Peers können den
-  Beitritt erst abschließen, wenn der Host fortsetzt. Die Fixture umgeht die
-  Situation, das Produkt löst sie noch nicht. Für 0.6.0 braucht das eine
-  Entscheidung (Host schützen, bis `coop_expected_players` da ist, oder ein
-  abschließender Join setzt den ausstehenden Reload fort).
+  **In M20 gelöst:** Starb der Host, während Peers noch luden, blieb der
+  Listen-Server auf dem Deathscreen pausiert und diese Peers konnten den
+  Beitritt nicht abschließen. Die 0.6.0-Entscheidung schützt das Join-Fenster,
+  statt die Pause wieder zu öffnen; siehe M20.
 - **M16 Russian sample and the sparse Axis weapon table / M16 Russland-Stichprobe und die lückenhafte Achsen-Waffentabelle:**
   `run/qa-pavlov-m15-sample3` PASSes four-player pavlov: four independent kits
   of the `american` family, 10 native-tree adoptions per joiner, host bodies in
@@ -672,6 +668,40 @@ This addendum supersedes pending statements below. Nothing has been published.
   `xmodel/weapon_garand`), obwohl das Vier-Spieler-Verbindungs- und
   Bewegungsgate bestand (`run/qa-uo-smoke1`); die zwei exakten Zeilen sind
   jetzt eine benannte Pro-Map-Inhaltsregel.
+- **M20 Join-window guard for a lethal host hit / M20 Join-Fenster-Schutz gegen
+  tödliche Host-Treffer:** while a peer is inside the resource bootstrap and no
+  remote is active, a lethal hit on the host is measured with the existing
+  inflated-health technique and clamped to 1 instead of opening the
+  single-player death screen, which sets `cl_paused 1` and stops `SV_Frame`
+  (`run/qa-dawnville-m14-sample1`: health -52, `pm_type 4`, server clock frozen
+  at 41408 while three peers waited). The window is state, not a timer: an
+  active and fresh (120 s) bootstrap peer. A reserved seat deliberately does not
+  count, because reservations survive a temporary disconnect and would make the
+  host immortal in a solo session with saved seats. Outside the window nothing
+  changes: with an active remote the coop downed/revive path applies, and when
+  everyone is down the host still dies for the checkpoint reload.
+  `run/qa-join-guard4` sends `coopkill 0 100000` while bootstrap serial=1/2 are
+  exporting: the host stays at health 1 with `pm_type 0`, no `cl_paused 1` after
+  the mission start, all three peers join, move 178.6/164.0/192.0 units and shut
+  down cleanly. `tests/test_join_guard.cpp` pins the truth table, the 120 s
+  boundary including the 32-bit wrap, and the clamp.
+  / Während ein Peer im Resource-Bootstrap steckt und kein Remote aktiv ist,
+  wird ein tödlicher Host-Treffer mit der vorhandenen
+  Inflated-Health-Technik gemessen und auf 1 geklemmt, statt den
+  Singleplayer-Deathscreen zu öffnen, der `cl_paused 1` setzt und `SV_Frame`
+  anhält (`run/qa-dawnville-m14-sample1`: Leben -52, `pm_type 4`, Server-Uhr
+  eingefroren bei 41408, drei wartende Peers). Das Fenster ist Zustand, kein
+  Timer: ein aktiver und frischer (120 s) Bootstrap-Peer. Ein reservierter Sitz
+  zählt bewusst nicht, weil Reservierungen einen temporären Disconnect
+  überleben und der Host in einer Solopartie mit gespeicherten Sitzen dauerhaft
+  unverwundbar wäre. Außerhalb des Fensters ändert sich nichts: Mit aktivem
+  Remote gilt der Coop-Pfad für caído/levantar, und wenn alle liegen, stirbt der
+  Host weiterhin für den Checkpoint-Reload. `run/qa-join-guard4` schickt
+  `coopkill 0 100000`, während Bootstrap serial=1/2 exportieren: Der Host bleibt
+  bei Leben 1 mit `pm_type 0`, kein `cl_paused 1` nach dem Missionsstart, alle
+  drei Peers treten bei, bewegen sich 178,6/164,0/192,0 Einheiten und fahren
+  sauber herunter. `tests/test_join_guard.cpp` fixiert die Wahrheitstabelle, die
+  120-s-Grenze inklusive 32-Bit-Wrap und die Klemmung.
 - **U1 upstream comparison TheTiranix/CoDCoop / U1 Upstream-Abgleich:**
   `upstream/master` = `52dd2bc` (fetched read-only), merge base `21eae10`;
   upstream has 8 commits we do not, we have 78 it does not. Verdicts:

@@ -89,6 +89,18 @@
   named per-map content rule (`run/qa-uo-smoke1`), and the map's full
   four-player connection and movement gate passed before the generic smoke
   rejected the console lines.
+- A host can no longer lose the session while friends are still loading. If the
+  host takes a lethal hit while a peer is inside the resource bootstrap and no
+  remote is active, the hit is measured with the coop's own inflated-health
+  technique and clamped to 1 health instead of opening the single-player death
+  screen, which pauses the listen server and leaves the joining peers without a
+  gamestate (`run/qa-dawnville-m14-sample1`). The window is native state, not a
+  timer: a fresh (120 s) bootstrap peer; a reserved seat does not count, so a
+  solo host with saved seats stays killable. With an active remote the normal
+  downed/revive rules apply again. `run/qa-join-guard4` fires
+  `coopkill 0 100000` into that window: the host stays at 1 health, all three
+  peers join, move and shut down cleanly; `tests/test_join_guard.cpp` covers the
+  decision table.
 - Fix atomic lobby-file exchange when a Windows/Wine reader temporarily blocks
   replacement; keep bounded retries, prior-file preservation and link rejection.
   Fresh frozen Linux and Windows/Wine workers pass signed party transactions,
@@ -280,6 +292,19 @@ mechanics remain acceptance gates. See [handoff](docs/HANDOFF-0.6.md).
   exakten Zeilen sind eine benannte Pro-Map-Inhaltsregel (`run/qa-uo-smoke1`),
   und das vollständige Vier-Spieler-Verbindungs- und Bewegungsgate der Karte
   bestand, bevor der generische Smoke die Konsolenzeilen ablehnte.
+- Der Host kann die Sitzung nicht mehr verlieren, während Freunde noch laden.
+  Nimmt er einen tödlichen Treffer, während ein Peer im Resource-Bootstrap
+  steckt und kein Remote aktiv ist, wird der Treffer mit der coop-eigenen
+  Inflated-Health-Technik gemessen und auf 1 Leben geklemmt, statt den
+  Singleplayer-Deathscreen zu öffnen, der den Listen-Server pausiert und die
+  beitretenden Peers ohne Gamestate lässt (`run/qa-dawnville-m14-sample1`). Das
+  Fenster ist nativer Zustand, kein Timer: ein frischer (120 s) Bootstrap-Peer;
+  ein reservierter Sitz zählt nicht, damit ein Solo-Host mit gespeicherten
+  Sitzen sterblich bleibt. Mit aktivem Remote gelten wieder die normalen
+  Caído/Levantar-Regeln. `run/qa-join-guard4` feuert `coopkill 0 100000` in
+  dieses Fenster: Der Host bleibt bei 1 Leben, alle drei Peers treten bei,
+  bewegen sich und fahren sauber herunter; `tests/test_join_guard.cpp` deckt die
+  Entscheidungstabelle ab.
 - Atomaren Lobby-Dateiaustausch bei vorübergehend blockierenden Windows-/Wine-
   Lesern korrigieren; begrenzte Wiederholungen, Erhalt der vorherigen Datei und
   Link-Abweisung beibehalten. Neu gebaute Linux- und Windows/Wine-Worker bestehen

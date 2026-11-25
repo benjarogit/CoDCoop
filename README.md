@@ -80,7 +80,9 @@ its mission tests pass.
 The host owns the saves. Keep that host's saves to continue a campaign. There is
 no automatic host migration. During ordinary play, opening the host's pause menu
 does not pause connected teammates; mission start/end screens retain their
-required behavior.
+required behavior. The host also cannot be killed while a teammate is still
+loading the map: a lethal hit in that window is clamped to 1 health, so the
+single-player death screen never pauses the server and blocks the pending join.
 
 <details>
 <summary>Connection requirements</summary>

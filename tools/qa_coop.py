@@ -272,6 +272,9 @@ def main(argv=None, *, scenario=None, allowed_error_markers=()):
     parser.add_argument('--host-god', action='store_true',
                         help='pin host player health with the mod coopgod command while peers connect and during the scenario; '
                              'a liveness pin for missions that open inside a live firefight, no damage or death claim')
+    parser.add_argument('--host-kill-during-join', action='store_true',
+                        help='shoot the host with coopkill while a peer is still in the resource bootstrap; proves the '
+                             'join-window guard keeps the listen server running, no ordinary damage/death claim')
     parser.add_argument('--checkpoint-reloads', type=int, choices=range(0, 6), default=0,
                         help='save and reload a real host checkpoint this many times (0..5)')
     parser.add_argument('--chaos-checkout', type=Path, help='Co-op Anything checkout at the pinned revision; enables its UDP relay')
@@ -299,6 +302,8 @@ def main(argv=None, *, scenario=None, allowed_error_markers=()):
     peer_source = args.peer_runtime_dir.resolve() if args.peer_runtime_dir else None
     if args.expect_protocol_rejection and (peer_source is None or args.players != 2):
         parser.error('protocol rejection test requires two players and --peer-runtime-dir')
+    if args.host_god and args.host_kill_during_join:
+        parser.error('--host-kill-during-join and --host-god contradict each other')
     if runtime_source == output / 'runtime' or runtime_source.is_relative_to(output / 'runtime'):
         parser.error('runtime input must be separate from the output snapshot that is archived on retry')
     if peer_source is not None and (peer_source == output / 'peer-runtime' or peer_source.is_relative_to(output / 'peer-runtime')):
@@ -364,6 +369,11 @@ def main(argv=None, *, scenario=None, allowed_error_markers=()):
             'enabled': True, 'command': 'coopgod 0 1',
             'scope': 'QA liveness pin for missions that open inside a live firefight; keeps the host alive while peers '
                      'load the map, no damage or death claim'}
+    if args.host_kill_during_join:
+        provenance['join_window_guard_probe'] = {
+            'enabled': True, 'command': 'coopkill 0 100000 after the first resource-bootstrap export',
+            'scope': 'proves a lethal host hit while peers are loading cannot open the death screen and pause the '
+                     'listen server; no damage or death claim outside that window'}
     (output / 'provenance.json').write_text(json.dumps(provenance, indent=2))
     if args.prepare_only:
         return 0
@@ -432,12 +442,45 @@ def main(argv=None, *, scenario=None, allowed_error_markers=()):
             start = 'coopuiclick 320 240\ncoopqastart'
             if args.host_god and n == 0:
                 # The host waits alone until every peer has loaded the map. On maps
-                # whose opening is a live firefight the idle host is shot dead, the
-                # engine pauses the server on the death screen and the joining peers
-                # never receive a gamestate. Keep only the host alive; the fixture
-                # makes no damage or death claim.
+                # whose opening is a live firefight the idle host can be shot, so
+                # this pin keeps it alive for the whole scenario. A lethal hit during
+                # the join window is already clamped to 1 health by the product
+                # (src/join_guard.h, M20); the fixture still makes no damage or death
+                # claim.
                 start += '\ncoopgod 0 1'
             command(folder, start, joiner=n != 0)
+        if args.host_kill_during_join:
+            # Esperar a que un peer este de verdad cargando: el host escribe esta
+            # linea cuando acepta su B_REQUEST, o sea ya dentro de la ventana.
+            def peer_loading():
+                log = folders[0] / 'codcoop.log'
+                text = log.read_text(errors='replace') if log.exists() else ''
+                return 'Resource bootstrap: exported serial=' in text
+            wait_for(peer_loading, processes, args.timeout, 'host resource bootstrap export with a loading peer')
+            command(folders[0], 'coopkill 0 100000')
+
+            def clamped():
+                log = folders[0] / 'codcoop.log'
+                text = log.read_text(errors='replace') if log.exists() else ''
+                return 'golpe mortal con jugadores entrando' in text
+            wait_for(clamped, processes, 30, 'host join-window lethal-damage clamp')
+
+            def clamped_state():
+                host = read_state(folders[0])
+                if not host: return None
+                player = host['players'][0]
+                # qa-state is written every 250 ms; wait for the clamp itself,
+                # then require the host to stay alive instead of pausing.
+                return host if player['health'] == 1 and player['pm_type'] != 4 else None
+            host = wait_for(clamped_state, processes, 10, 'host alive at 1 health after the join-window clamp')
+            join_window_hit = {
+                'command': 'coopkill 0 100000',
+                'evidence': 'host: golpe mortal con jugadores entrando',
+                'host_health_after_hit': host['players'][0]['health'],
+                'host_pm_type_after_hit': host['players'][0]['pm_type'],
+                'host_server_time_after_hit': host['server_time']}
+            results['join_window_guard'] = join_window_hit
+            results['checks'].append('host survived a lethal hit while peers were loading the map')
         def connected():
             states = [read_state(f) for f in folders]
             if not all(states): return None

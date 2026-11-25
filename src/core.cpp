@@ -31,6 +31,7 @@
 #include "cinematic_assets.h"
 #include "patch_ownership.h"
 #include "pregame_gate.h"
+#include "join_guard.h"
 #include "host_rules.h"
 #include "archive_rules.h"
 #include "reload_delivery.h"
@@ -2598,6 +2599,20 @@ bool CoopActive()
     return false;
 }
 
+// Hay jugadores cargando el mundo pero ninguno activo todavia. En esa ventana el
+// host no puede morir: su pantalla de muerte pausa el servidor y los que estan
+// cargando se quedan sin gamestate (ver src/join_guard.h y
+// run/qa-dawnville-m14-sample1).
+bool JoinGuardWindow()
+{
+    if (!S) return false;
+    bool bootPeerFresh = false;
+    DWORD now = GetTickCount();
+    for (const auto& peer : S->bootstrap.host)
+        if (peer.active && join_guard::Fresh(now, peer.last)) { bootPeerFresh = true; break; }
+    return join_guard::Window(S->role == HOST, CoopActive(), bootPeerFresh);
+}
+
 bool PlayerInGame(int n) { return g::svs_clients && *(int*)(g::Client(n) + g::CL_STATE) == 1; }
 uint8_t* PlayerState(int n) { return g::PlayerState(n); }
 
@@ -2733,6 +2748,29 @@ void __cdecl Hook_GDamage(uint8_t* targ, uint8_t* inflictor, uint8_t* attacker, 
     }
     int n = targPlayer ? *(uint16_t*)(targ + 6) : -1;
     bool savedHostWaiting=n==0&&S->downed[0]&&WaitingSavedAlivePeer();
+    if (n == 0 && !CoopActive() && !savedHostWaiting && JoinGuardWindow()) {
+        // La party todavia entra: se mide el golpe con la vida inflada (como el
+        // camino coop) y, si mataria, el host se queda en 1 en vez de abrir la
+        // pantalla de muerte y pausar el servidor.
+        constexpr int BOOST = 100000;
+        int health = *(int*)(targ + g::GE_HEALTH);
+        SetHealth(n, health + BOOST);
+        g_origDamage(targ, inflictor, attacker, dir, point, damage, dflags, mod, hitLoc);
+        int left = *(int*)(targ + g::GE_HEALTH) - BOOST;
+        int survive = join_guard::Survive(left);
+        SetHealth(n, survive);
+        if (left <= 0) {
+            static DWORD last, skipped;
+            DWORD hit = GetTickCount();
+            if (hit - last >= 1000) {
+                if (skipped) Log("host: %lu golpes mortales mas durante la entrada de jugadores", skipped);
+                Log("host: golpe mortal con jugadores entrando (dano %d, medio %d) -> vida 1, sin pantalla de muerte",
+                    damage, mod);
+                last = hit; skipped = 0;
+            } else ++skipped;
+        } else LogDamage(n, attacker, health - left, mod, left);
+        return;
+    }
     if (n < 0 || n >= g::MAX_CLIENTS || (!CoopActive()&&!savedHostWaiting)) {
         g_origDamage(targ, inflictor, attacker, dir, point, damage, dflags, mod, hitLoc);
         return;

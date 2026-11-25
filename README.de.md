@@ -85,7 +85,10 @@ bestanden sind, ist das ein Entwicklungsziel.
 Die Spielstände gehören dem Host. Zum Fortsetzen dessen Spielstände aufbewahren.
 Es gibt keine automatische Hostmigration. Im normalen Spiel pausiert das
 Pausenmenü des Hosts die Mitspieler nicht; Start- und Abschlussbildschirme
-behalten ihren vorgesehenen Ablauf.
+behalten ihren vorgesehenen Ablauf. Der Host kann außerdem nicht sterben,
+solange ein Mitspieler noch die Karte lädt: Ein tödlicher Treffer in diesem
+Fenster wird auf 1 Leben geklemmt, damit der Singleplayer-Deathscreen den Server
+nicht pausiert und den laufenden Beitritt blockiert.
 
 <details>
 <summary>Verbindungsvoraussetzungen</summary>
