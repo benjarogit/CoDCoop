@@ -234,7 +234,8 @@ bool PrepareIdentity()
     g_profileReady = suite::LoadIdentity(g::uo, g::CvarString("fs_game"), g_identity, error);
     if (!g_profileReady && g_identity.variant && !suite::IsQA()) {
         Log("suite: checking the installed campaign for direct launch");
-        if (suite::PrepareDirectLaunch(g_identity.variant))
+        CoopStatus("Verifying the installed campaign. This may take a moment.");
+        if (suite::PrepareDirectLaunch(g_identity.variant, &error))
             g_profileReady = suite::LoadIdentity(g::uo, g::CvarString("fs_game"), g_identity, error);
     }
     if (g_profileReady && !ConfigureBodyMemory(!suite::IsQA()||suite::PreparedQA())) return false;
@@ -4543,6 +4544,15 @@ void Cmd_CoopHost()
 // coopjoin <ip>[:puerto]; sin argumento usa la IP escrita en el menu Cooperativo (cvar coop_ip)
 void Cmd_CoopJoin()
 {
+    const char* target = g::cmd_argc > 1 ? g::Argv(1) : g::CvarString("coop_ip");
+    if (!*target) {
+        g::Com_Printf("usage: coopjoin <ip>[:port]\n");
+        CoopStatus("Enter the host's IP above or select a Steam friend.");
+        return;
+    }
+    char host[128];
+    strncpy(host, target, sizeof host - 1);
+    host[sizeof host - 1] = 0;
     BootCancelPeer();BootInvalidatePeer();
     S->selection={};
     S->reloadToken = {};
@@ -4558,15 +4568,6 @@ void Cmd_CoopJoin()
     if (!PrepareIdentity()) return;
     S->compatible = false;
     S->joinStarted = 0;
-    const char* target = g::cmd_argc > 1 ? g::Argv(1) : g::CvarString("coop_ip");
-    if (!*target) {
-        g::Com_Printf("usage: coopjoin <ip>[:port]\n");
-        CoopStatus("Type the host's IP.");
-        return;
-    }
-    char host[128];
-    strncpy(host, target, sizeof host - 1);
-    host[sizeof host - 1] = 0;
     if (!OpenSocket(0)) return;
     if (!_strnicmp(host, "steam:", 6)) {  // coopjoin steam:<SteamID> (boton del menu o "Unirse a la partida" de Steam)
         uint64_t id = _strtoui64(host + 6, nullptr, 10);

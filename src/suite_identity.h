@@ -106,7 +106,7 @@ inline bool LoadIdentity(bool uo, const char* fsGame, Identity& id, std::string&
     return true;
 }
 
-inline bool PrepareDirectLaunch(uint8_t variant)
+inline bool PrepareDirectLaunch(uint8_t variant, std::string* error = nullptr)
 {
     const wchar_t* variants[] = {L"cod1", L"uo", L"sp_improved", L"united_fronts"};
     if (IsQA() || variant == 0 || variant > 4) return false;
@@ -129,10 +129,16 @@ inline bool PrepareDirectLaunch(uint8_t variant)
                         nullptr, game.c_str(), &startup, &child)) return false;
     CloseHandle(child.hThread);
     DWORD exitCode = 1;
-    if (WaitForSingleObject(child.hProcess, 60000) == WAIT_OBJECT_0)
+    // The check reads the full suite, including several GB of campaign data.
+    // Allow time for cold reads from hard drives or external storage.
+    const DWORD wait = WaitForSingleObject(child.hProcess, 180000);
+    if (wait == WAIT_OBJECT_0)
         GetExitCodeProcess(child.hProcess, &exitCode);
-    else
+    else {
         TerminateProcess(child.hProcess, 1);
+        if (wait == WAIT_TIMEOUT && error)
+            *error = "Campaign verification timed out. Open the CoDCoop Launcher and select Check installation.";
+    }
     CloseHandle(child.hProcess);
     return exitCode == 0;
 }

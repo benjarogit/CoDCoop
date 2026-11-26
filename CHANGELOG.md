@@ -6,13 +6,15 @@
 
 - **EN:** Direct AnkerGames, Steam and game-executable starts prepare a missing
   or mismatched campaign profile when hosting or joining. Wine and Proton must
-  load the bundled `ddraw.dll`.
+  load the bundled `ddraw.dll`. The in-game Join button asks for the host
+  address when the field is empty.
 - **EN:** Setup shows the active download, transferred size, percentage and
   verification phase. Windows adds a **CoDCoop** shortcut in the game folder.
   Linux can open the launcher when setup finishes.
 - **DE:** Beim direkten Start über AnkerGames, Steam oder die Spiel-EXE bereitet
   die Mod ein fehlendes oder unpassendes Kampagnenprofil beim Hosten oder
   Beitreten vor. Wine und Proton müssen die mitgelieferte `ddraw.dll` laden.
+  Der Beitrittsknopf fragt nach der Host-Adresse, wenn das Feld leer ist.
 - **DE:** Das Setup zeigt den laufenden Download, die übertragene Datenmenge,
   den Prozentwert und die Prüfung an. Windows legt **CoDCoop** im Spielordner
   an. Unter Linux lässt sich der Launcher nach der Installation direkt öffnen.
