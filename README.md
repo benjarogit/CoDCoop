@@ -126,6 +126,10 @@ version. For other campaigns, select the matching variant in the launcher.
 2. Other players select **Join a game**, enter the **Host address**, then select **Join campaign**.
 3. Keep the launcher open during play. The host's progress is shared with the group. Use the same host to resume their save later.
 
+If the game menu is already open, select **Co-op**, enter the address in
+**Host IP**, and click **Join**. For Steam, select **Join [name]** or accept an
+invitation. The host stays in the mission while players join.
+
 | Connection | What to enter |
 | --- | --- |
 | **LAN** | The host's local IPv4 address, for example `192.168.1.50` |
@@ -157,7 +161,7 @@ version. For other campaigns, select the matching variant in the launcher.
 | **Check installation fails** | Read which file the launcher reports, run the matching installer again and repeat the check. |
 | **Linux starts without the Coop menu or closes at launch** | Check that Wine or Proton loads the supplied `ddraw.dll`. [Linux launch and graphics fixes](docs/linux.md#1-buffer-overrun-detected-right-after-the-intro) |
 | **Steam shows Spacewar but the campaign is not ready** | Close `CoDMP.exe` if you started it. Open the CoDCoop Launcher, select the host's campaign, and run **Check installation**. `CoDMP.exe` opens the standard multiplayer modes. |
-| **Players cannot join** | Check the suite version, host address and the host’s firewall. For direct-IP internet play, also check the UDP 28960 port forwarding rule. |
+| **Players cannot join** | Check the suite version and host address. For direct-IP internet play, check UDP 28960 forwarding and the host’s firewall. Join messages are in `codcoop.log` or `codcoop_join.log` in the folder containing `CoDSP.exe`. |
 | **United Fronts closes in Foy or Noville** | Both maps can reach the engine’s model limit in the default configuration. [Known limits and tested maps](docs/campaign-compatibility.md) |
 
 <details>

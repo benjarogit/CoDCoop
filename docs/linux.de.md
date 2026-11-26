@@ -10,7 +10,7 @@ die Mod. Die folgenden Einstellungen stammen aus den Tests mit dieser Umgebung.
 | Launcher | AnkerGames mit `umu-run` und Proton |
 | Proton | 11.0 |
 | Grafiktreiber | NVIDIA (proprietär) und Mesa (llvmpipe) |
-| Spiel | Call of Duty 1.5 und United Offensive 1.51 mit CoDCoop 0.6.1 |
+| Spiel | Call of Duty 1.5 und United Offensive 1.51 mit CoDCoop |
 | Suite | CoD 1, UO, SP Improved 1.5, United Fronts und YAP |
 
 Wenn du von Steam aus spielst oder einen anderen Launcher verwendest, findest

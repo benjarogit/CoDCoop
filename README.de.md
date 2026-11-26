@@ -126,6 +126,10 @@ Für die anderen Kampagnen wählt ihr die passende Variante im Launcher.
 2. Die Mitspieler wählen **Spiel beitreten**, tragen die **Host-Adresse** ein und klicken auf **Kampagne beitreten**.
 3. Lasst den Launcher während der Sitzung offen. Der Host bestimmt den gemeinsamen Fortschritt. Spielt später mit demselben Host weiter, um seinen Spielstand fortzusetzen.
 
+Wenn das Spielmenü schon offen ist, wählt **Co-op**, tragt die Adresse in
+**Host IP** ein und klickt **Join**. Bei Steam wählt ihr **Join [Name]** oder
+nehmt eine Einladung an. Der Host bleibt während des Beitritts in der Mission.
+
 | Verbindung | Was du einträgst |
 | --- | --- |
 | **LAN** | Lokale IPv4-Adresse des Hosts, zum Beispiel `192.168.1.50` |
@@ -157,7 +161,7 @@ Für die anderen Kampagnen wählt ihr die passende Variante im Launcher.
 | **Installation prüfen schlägt fehl** | Lies die gemeldete Datei, starte das passende Setup erneut und prüfe danach wieder im Launcher. |
 | **Linux startet ohne Coop-Menü oder bricht beim Start ab** | Prüfe, ob Wine/Proton die mitgelieferte `ddraw.dll` lädt. [Linux-Start und Grafik](docs/linux.de.md#1-buffer-overrun-detected-direkt-nach-dem-intro) |
 | **Steam zeigt Spacewar, aber die Kampagne ist nicht bereit** | Schließe `CoDMP.exe`, falls es läuft. Öffne den CoDCoop Launcher, wähle die Kampagne des Hosts und klicke auf **Installation prüfen**. `CoDMP.exe` öffnet die klassischen Mehrspielermodi. |
-| **Mitspieler kommen nicht rein** | Prüft Paketstand, Host-Adresse und die Firewall des Hosts. Bei Direkt-IP übers Internet prüft auch die Weiterleitung von UDP 28960. |
+| **Mitspieler kommen nicht rein** | Prüft Paketstand und Host-Adresse. Bei Direkt-IP übers Internet prüft die Weiterleitung von UDP 28960 und die Firewall. Die Meldungen zum Beitritt stehen in `codcoop.log` oder `codcoop_join.log` im Ordner mit `CoDSP.exe`. |
 | **United Fronts bricht in Foy oder Noville ab** | Beide Karten können im Standardbetrieb das Modelllimit erreichen. [Bekannte Grenzen und getestete Karten](docs/campaign-compatibility.md) |
 
 <details>
