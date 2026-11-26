@@ -4,7 +4,24 @@
 
 ## 0.6.0 development — English
 
-**Unreleased. No full-campaign or native-Windows certification yet.**
+**Unreleased. No full-campaign certification yet; native Windows is verified at
+installer level and with a two-player smoke.**
+
+- Verify the Windows package on real Windows 11 (QEMU/KVM, UEFI + TPM 2.0), not
+  only under Wine. `Install-CoD-Coop.exe --yes` exits 0 and
+  `coop\suite-check.exe` confirms every required suite file by SHA256; the
+  deployed 0.6.0-dev.6 suite then passes the native two-player smoke on CoD 1,
+  UO and SP Improved (`training`): real connect, advancing remote command clocks,
+  134.9 / 182.9 / 164.2 units of joiner movement through native input, rejected
+  packets from unallocated endpoints and clean shutdowns. The VM has no GPU, so
+  the smoke runs on Mesa's `llvmpipe` WGL driver (copied into the per-player QA
+  copies only); the installed acceptance folder stays byte-identical to the
+  suite. Two findings from that work are worth keeping: Mesa's d3d12 WGL path
+  initialises GL but crashes inside `libgallium_wgl.dll` while the map loads its
+  surfaces, and a game folder without the shipped `miles/` directory loses every
+  Miles 3D provider, which makes the single-player sound init fatal. Details,
+  commands and the rejected driver paths are in
+  [`run/qa-win-native1/NOTES.md`](run/qa-win-native1/NOTES.md).
 
 - Foy, Noville, Brecourt and Bastogne1 pass four-player Co-op on the production
   path: native tree adoption, own trees and host player-body trees on the heap
@@ -208,12 +225,30 @@
 - Give generated mission fixes priority over mod asset overlays, and retire
   unchanged older owned layers transactionally when updating.
 
-Mission-level coverage, Steam across accounts, native Windows and all special
-mechanics remain acceptance gates. See [handoff](docs/HANDOFF-0.6.md).
+Mission-level coverage, Steam across accounts and all special mechanics remain
+acceptance gates. See [handoff](docs/HANDOFF-0.6.md).
 
 ## 0.6.0 Entwicklung — Deutsch
 
-**Noch nicht veröffentlicht. Keine Bestätigung vollständiger Kampagnen oder nativer Windows-Läufe.**
+**Noch nicht veröffentlicht. Keine Bestätigung vollständiger Kampagnen; native
+Windows-Läufe sind auf Installer-Ebene und mit einem Zwei-Spieler-Smoke belegt.**
+
+- Das Windows-Paket auf echtem Windows 11 prüfen (QEMU/KVM, UEFI + TPM 2.0),
+  nicht nur unter Wine. `Install-CoD-Coop.exe --yes` endet mit Exit 0, und
+  `coop\suite-check.exe` bestätigt jede Pflichtdatei der Suite per SHA256; die
+  installierte Suite 0.6.0-dev.6 besteht danach den nativen Zwei-Spieler-Smoke
+  in CoD 1, UO und SP Improved (`training`): echter Connect, fortlaufende
+  Remote-Command-Uhren, 134,9 / 182,9 / 164,2 Einheiten Joiner-Bewegung über
+  echte Eingabe, verworfene Pakete nicht reservierter Endpunkte und sauberes
+  Herunterfahren. Die VM hat keine GPU, deshalb läuft der Smoke auf Mesas
+  `llvmpipe`-WGL-Treiber (nur in die QA-Kopien je Spieler kopiert); der
+  installierte Abnahmeordner bleibt byte-identisch zur Suite. Zwei Befunde
+  daraus bleiben wichtig: Mesas d3d12-WGL-Pfad initialisiert GL, stürzt aber
+  beim Laden der Karten-Oberflächen in `libgallium_wgl.dll` ab, und ein
+  Spielordner ohne das mitgelieferte `miles/`-Verzeichnis verliert sämtliche
+  Miles-3D-Provider, wodurch die Singleplayer-Soundinitialisierung fatal endet.
+  Einzelheiten, Befehle und die verworfenen Treiberwege stehen in
+  [`run/qa-win-native1/NOTES.md`](run/qa-win-native1/NOTES.md).
 
 - Foy, Noville, Brecourt und Bastogne1 bestehen mit vier Spielern auf dem Produktionspfad:
   Übernahme der nativen Bäume, Eigenbäume und Host-Körperbäume im Heap (keine
@@ -439,8 +474,8 @@ mechanics remain acceptance gates. See [handoff](docs/HANDOFF-0.6.md).
 - Generierte Missionskorrekturen vor Mod-Asset-Paketen laden; ältere unveränderte
   eigene Pakete beim Update gesichert und mit Rücknahme entfernen.
 
-Missionsabdeckung, Steam zwischen Accounts, native Windows-Läufe und sämtliche
-Spezialmechaniken bleiben Abnahmekriterien. Siehe [Übergabe](docs/HANDOFF-0.6.md).
+Missionsabdeckung, Steam zwischen Accounts und sämtliche Spezialmechaniken
+bleiben Abnahmekriterien. Siehe [Übergabe](docs/HANDOFF-0.6.md).
 
 ## Previous release · Vorherige Veröffentlichung
 
