@@ -79,13 +79,13 @@ Spielordner. Die Startdatei öffnet den Launcher mit deinem Spielordner.
 <details>
 <summary><strong>Was ist mit „Spielen“ in AnkerGames?</strong></summary>
 
-AnkerGames öffnet normalerweise direkt die Spiel-EXE. Wenn sie die
-`ddraw.dll` der Mod lädt, siehst du das **Co-op**-Menü. Unter Linux
-braucht der direkte Start dafür die Wine- oder Proton-Einstellung zum Laden
-der mitgelieferten DLL. Die aktuelle Suite braucht zum Hosten und Beitreten
-außerdem ein geprüftes Profil, das zur gestarteten Engine und Kampagne passt.
-Der CoDCoop Launcher prüft die Suite und bereitet das gewählte Profil für
-Host und Mitspieler vor.
+Installiere CoDCoop einmal in den Spielordner, den AnkerGames bereits
+verwendet. Wenn **Spielen** dort `CoDSP.exe` startet, öffnet sich die
+Originalkampagne. Unter Linux lädt das CoDCoop-Startskript für `umu-run`
+die Mod und bereitet das Profil für diese Kampagne automatisch vor.
+Wer über `Start-CoD-Coop.bat` oder `Start-CoD-Coop.sh` mitspielt, wählt
+**Call of Duty — Original**. Nutzt alle dieselbe CoDCoop-Version.
+Für die anderen Kampagnen wählt ihr die passende Variante im CoDCoop Launcher.
 [AnkerGames und Proton einrichten](docs/linux.de.md#3-das-spiel-über-den-launcher-starten)
 
 </details>

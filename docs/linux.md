@@ -103,7 +103,7 @@ install -Dm755 tools/umu-run ~/.local/bin/umu-run
 install -Dm755 tools/steam-shortcut.py ~/.local/bin/cod-coop-steam-id
 ```
 
-The wrapper does three things:
+The wrapper takes care of the direct launch:
 
 1. It exports the two OpenGL variables (above) and
    `WINEDLLOVERRIDES="ddraw=n,b"`. The `WINEDLLOVERRIDES` line is what makes the
@@ -111,12 +111,14 @@ The wrapper does three things:
    the game starts without the mod (no *Co-op* entry in the menu, no
    `codcoop.log`). Appending to an existing value keeps whatever the launcher or
    Proton already sets for DXVK.
-2. If the game is registered as a non-Steam game in Steam, it hands the launch
+2. When launching `CoDSP.exe` from a complete CoDCoop installation, it verifies
+   the suite and prepares the original campaign profile for hosting and joining.
+3. If the game is registered as a non-Steam game in Steam, it hands the launch
    over to Steam (`steam://rungameid/…`). That is what makes the Steam overlay
    and the friends list (Shift+Tab) work — Steam only injects its overlay into
    games it launches itself. The wrapper waits until the game exits, so the
    launcher keeps showing it as running.
-3. Without a Steam entry it falls back to `umu-run`: the game and the mod work,
+4. Without a Steam entry it falls back to `umu-run`: the game and the mod work,
    only the overlay/friends list is missing.
 
 Put it in place of the launcher's `umu-run` (back up the original first) and
@@ -136,11 +138,11 @@ files back and the mod has to be installed again.
 
 ## 3. Starting the game from the launcher
 
-For the full suite, use `Start-CoD-Coop.sh` to open the CoDCoop Launcher
-and prepare the campaign profile. The steps below describe AnkerGames
-starting the game executable directly. A visible **Co-op** menu confirms
-that the mod loaded. Hosting and joining also require a verified profile
-matching the engine and campaign that started.
+Install the full suite into the existing game folder once. With the wrapper
+above, **Play** in AnkerGames starts the original campaign and prepares it for
+Coop. Friends using the CoDCoop Launcher select **Call of Duty — Original**.
+For other campaigns, everyone selects the matching variant in the launcher
+opened by `Start-CoD-Coop.sh` on Linux or `Start-CoD-Coop.bat` on Windows.
 
 Once the launcher accepts the changed files, pressing **Play** shows a short
 check. It is fine as long as it finds `CoDSP.exe` and runs it through Proton:

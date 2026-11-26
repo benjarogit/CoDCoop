@@ -100,6 +100,19 @@ steam_launch() {
 }
 
 case "$1" in
+  CoDSP.exe|*/CoDSP.exe)
+    # AnkerGames opens the original campaign executable directly. Prepare
+    # its profile before handing off to either Steam or Proton.
+    if ! game_running; then
+      coop_game_dir=$(dirname -- "$1")
+      if [ -f "$coop_game_dir/coop/install.json" ] && [ -f "$coop_game_dir/coop/coop_suite.py" ]; then
+        python3 -E "$coop_game_dir/coop/coop_suite.py" prepare --game "$coop_game_dir" --variant cod1 || exit 1
+      fi
+    fi
+    ;;
+esac
+
+case "$1" in
   *CoDSP.exe|*CoDMP.exe|*CoDUOSP.exe)
     if steam_launch "$1"; then
       exit 0

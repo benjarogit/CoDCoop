@@ -104,11 +104,13 @@ install -Dm755 tools/steam-shortcut.py ~/.local/bin/cod-coop-steam-id
    `WINEDLLOVERRIDES="ddraw=n,b"`. Damit lädt Wine die `ddraw.dll` der Mod.
    Ohne diese DLL erscheinen weder der Menüpunkt **Co-op** noch die Datei
    `codcoop.log`. Das Skript übernimmt vorhandene DLL-Overrides.
-2. Findet es einen passenden Eintrag als Steam-fremdes Spiel, startet es das
+2. Beim Start von `CoDSP.exe` aus einer vollständigen CoDCoop-Installation prüft
+   das Skript die Suite und bereitet das Profil für die Originalkampagne vor.
+3. Findet es einen passenden Eintrag als Steam-fremdes Spiel, startet es das
    Spiel über `steam://rungameid/…`. So kann Steam sein Overlay und die
    Freundesliste einblenden. Das Skript wartet bis zum Spielende, damit der
    Launcher den laufenden Prozess weiterhin anzeigt.
-3. Ohne passenden Steam-Eintrag startet das Skript das Spiel über
+4. Ohne passenden Steam-Eintrag startet das Skript das Spiel über
    `umu-run`. Dann steht der Beitritt per IP zur Verfügung.
 
 Wenn dein Launcher einen eigenen `umu-run`-Pfad verwendet, sichere sein
@@ -130,12 +132,12 @@ Danach musst du CoDCoop erneut installieren.
 
 ## 3. Das Spiel über den Launcher starten
 
-Für die vollständige Suite öffnest du den CoDCoop Launcher über
-`Start-CoD-Coop.sh` und bereitest dort die Kampagnenvariante vor.
-Die folgenden Schritte beschreiben den direkten Start der Spiel-EXE
-über AnkerGames. Ein sichtbares **Co-op**-Menü zeigt, dass die Mod geladen
-wurde. Zum Hosten und Beitreten brauchst du außerdem ein geprüftes Profil
-für die gestartete Engine und Kampagne.
+Installiere die vollständige Suite einmal in den vorhandenen Spielordner.
+Mit dem Startskript oben öffnet **Spielen** in AnkerGames die Originalkampagne
+und bereitet sie für Coop vor. Freunde im CoDCoop Launcher wählen
+**Call of Duty — Original**. Für andere Kampagnen wählt ihr dieselbe Variante
+im CoDCoop Launcher, geöffnet über `Start-CoD-Coop.sh` unter Linux oder
+`Start-CoD-Coop.bat` unter Windows.
 
 Wenn AnkerGames die geänderten Dateien akzeptiert, startet **Spielen** mit
 einer kurzen Prüfung. Der Launcher sollte `CoDSP.exe` finden und Proton zum

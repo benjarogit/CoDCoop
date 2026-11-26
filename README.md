@@ -81,12 +81,13 @@ The start file opens the launcher and points it to that installation.
 <details>
 <summary><strong>What about the Play button in AnkerGames?</strong></summary>
 
-AnkerGames normally opens the game executable directly. You can see the
-**Co-op** menu if it loads the mod's `ddraw.dll`. Under Linux that also
-requires the Wine or Proton override. Hosting and joining in the current
-suite require a verified profile that matches the engine and campaign
-started. Use the CoDCoop Launcher to verify the suite and prepare the
-selected profile for both the host and joiners.
+Install CoDCoop once into the game folder AnkerGames already uses. When
+**Play** starts `CoDSP.exe`, it opens the original campaign. On Linux,
+the CoDCoop wrapper for `umu-run` loads the mod and automatically prepares
+that campaign's profile. Friends using `Start-CoD-Coop.bat` or
+`Start-CoD-Coop.sh` select **Call of Duty — Original**. Everyone should
+use the same CoDCoop version. For other campaigns, select the matching
+variant in the CoDCoop Launcher.
 [AnkerGames and Proton setup](docs/linux.md#3-starting-the-game-from-the-launcher)
 
 </details>
