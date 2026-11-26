@@ -4,7 +4,7 @@
 
 **The original campaigns. One squad.**
 
-[![Development](https://img.shields.io/badge/0.6.0--dev.6-development-orange)](#development-status)
+[![Release](https://img.shields.io/badge/0.6.0-release-brightgreen)](#development-status)
 ![Players](https://img.shields.io/badge/players-2%E2%80%934-blue)
 ![Windows target](https://img.shields.io/badge/target-Windows%2010%20%2F%2011-0078D4)
 ![Linux](https://img.shields.io/badge/Linux-Wine%20%2F%20Proton-FCC624)
@@ -16,10 +16,12 @@
 
 </div>
 
-> **0.6.0-dev.6 is under development.** This branch implements the complete-suite upgrade;
-> it is not a verified full-campaign release. The existing [v0.5.4 release](https://github.com/benjarogit/CoDCoop/releases/tag/v0.5.4)
-> predates this work and does **not** provide Coop for SP Improved or United Fronts.
-> A successful install or short connection test does not certify a campaign.
+> **0.6.0 — the full campaign suite.** Call of Duty 1, United Offensive, SP
+> Improved 1.5 and United Fronts in one Coop suite, verified under Linux
+> (Wine/Proton) and on native Windows 11. Coverage is recorded chapter by
+> chapter; a human full-campaign playthrough is not claimed, and Steam with two
+> separate accounts is still untested. A successful install or short connection
+> test does not by itself certify a campaign.
 
 The current package contract requires Core API mask 63, including native
 asset bootstrap and owned English/German Coop banners. This does not enable individual UF kits; their party/native
@@ -107,8 +109,8 @@ baseline). Game files are not stored in this source repository.
 
 | Platform | 0.6 installation route |
 |---|---|
-| Windows | Native setup window; complete pinned local suite payload during development |
-| Linux | Graphical AppImage assistant; terminal backend also available |
+| Windows | `Install-CoD-Coop.exe` plus the complete pinned suite folder from the release |
+| Linux | One command (`curl … tools/install.sh \| sh`) or the graphical AppImage assistant |
 | Offline | The same pinned payload and required game data, available locally |
 
 The setup checks content and runtime hashes, preserves personal configurations
@@ -116,10 +118,9 @@ and saves during repair, and creates an installation receipt. Missing or modifie
 required files prevent a successful final check. Language changes are explicit;
 repair does not silently replace your settings.
 
-**0.6 download links will appear only after an actual prerelease is built and
-published.** Do not combine a 0.5.4 installer with arbitrary new DLLs and assume
-that the full suite is installed. GitHub is the primary release location; MEGA
-mirrors must identify the same version and checksums.
+**Do not combine a 0.5.4 installer with arbitrary new DLLs and assume that the
+full suite is installed.** GitHub is the primary release location; MEGA mirrors
+must identify the same version and checksums.
 
 For local development payloads and exact commands see
 [development installation](docs/development-0.6.md).
@@ -147,6 +148,10 @@ See [Linux / Proton details](docs/linux.md).
 </details>
 
 ## Development status
+
+0.6.0 is released: CoD 1, UO, SP Improved and United Fronts install and play
+together on Linux (Wine/Proton) and on native Windows 11. What is still
+documented as *not covered* is listed below — it is not a hidden blocker.
 
 United Fronts still has an open resource issue in the default path: clean Foy
 and Noville startup can exhaust the engine's 255 model slots with the complete

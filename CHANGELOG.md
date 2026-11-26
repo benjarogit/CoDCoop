@@ -1,19 +1,21 @@
 # Changelog · Änderungsprotokoll
 
-[English](#060-development--english) · [Deutsch](#060-entwicklung--deutsch)
+[English](#060--english) · [Deutsch](#060--deutsch)
 
-## 0.6.0 development — English
+## 0.6.0 — English
 
-**Unreleased. No full-campaign certification yet; native Windows is verified at
-installer level and with a two-player smoke.**
+**Released 2026-11-26. Coverage is recorded per chapter; a human full-campaign
+playthrough and Steam with two separate accounts are documented as not covered.**
 
 - Verify the Windows package on real Windows 11 (QEMU/KVM, UEFI + TPM 2.0), not
-  only under Wine. `Install-CoD-Coop.exe --yes` exits 0 and
-  `coop\suite-check.exe` confirms every required suite file by SHA256; the
-  deployed 0.6.0-dev.6 suite then passes the native two-player smoke on CoD 1,
-  UO and SP Improved (`training`): real connect, advancing remote command clocks,
-  134.9 / 182.9 / 164.2 units of joiner movement through native input, rejected
-  packets from unallocated endpoints and clean shutdowns. The VM has no GPU, so
+  only under Wine. A fresh base game without any suite installs with
+  `Install-CoD-Coop.exe --yes` (exit 0), `coop\suite-check.exe` confirms every
+  required suite file by SHA256 after the QA runs, and the installed 0.6.0 suite
+  passes the native smoke on `training`: **four players** on CoD 1 (172.3 /
+  229.9 / 110.1 units of joiner movement through native input), two players on
+  UO (200.0), SP Improved (154.4) and United Fronts (173.2), each with a real
+  connect, advancing remote command clocks, rejected packets from unallocated
+  endpoints and clean shutdowns. The VM has no GPU, so
   the smoke runs on Mesa's `llvmpipe` WGL driver (copied into the per-player QA
   copies only); the installed acceptance folder stays byte-identical to the
   suite. Two findings from that work are worth keeping: Mesa's d3d12 WGL path
@@ -143,7 +145,7 @@ installer level and with a two-player smoke.**
   First-use registration remains experimental; selected-host-only startup is
   diagnostic evidence, not support for four individual kits.
 
-- Source `0.6.0-dev.6` requires compiled Core feature mask 63, including native
+- Source `0.6.0` requires compiled Core feature mask 63, including native
   asset bootstrap and localized Coop banners. Reject historical API15/API31 DLLs before new staging; individual
   UF kit application remains gated pending native owner/plan binding.
 - Transfer and verify the native model/weapon resource contract before loading
@@ -231,20 +233,23 @@ installer level and with a two-player smoke.**
 Mission-level coverage, Steam across accounts and all special mechanics remain
 acceptance gates. See [handoff](docs/HANDOFF-0.6.md).
 
-## 0.6.0 Entwicklung — Deutsch
+## 0.6.0 — Deutsch
 
-**Noch nicht veröffentlicht. Keine Bestätigung vollständiger Kampagnen; native
-Windows-Läufe sind auf Installer-Ebene und mit einem Zwei-Spieler-Smoke belegt.**
+**Veröffentlicht am 26.11.2026. Die Abdeckung wird kapitelweise festgehalten; ein
+vollständiger Durchspiel-Lauf von Hand und Steam mit zwei getrennten Accounts
+sind ausdrücklich als nicht abgedeckt dokumentiert.**
 
 - Das Windows-Paket auf echtem Windows 11 prüfen (QEMU/KVM, UEFI + TPM 2.0),
-  nicht nur unter Wine. `Install-CoD-Coop.exe --yes` endet mit Exit 0, und
-  `coop\suite-check.exe` bestätigt jede Pflichtdatei der Suite per SHA256; die
-  installierte Suite 0.6.0-dev.6 besteht danach den nativen Zwei-Spieler-Smoke
-  in CoD 1, UO und SP Improved (`training`): echter Connect, fortlaufende
-  Remote-Command-Uhren, 134,9 / 182,9 / 164,2 Einheiten Joiner-Bewegung über
-  echte Eingabe, verworfene Pakete nicht reservierter Endpunkte und sauberes
-  Herunterfahren. Die VM hat keine GPU, deshalb läuft der Smoke auf Mesas
-  `llvmpipe`-WGL-Treiber (nur in die QA-Kopien je Spieler kopiert); der
+  nicht nur unter Wine. Ein frisches Basisspiel ohne Suite lässt sich mit
+  `Install-CoD-Coop.exe --yes` installieren (Exit 0), `coop\suite-check.exe`
+  bestätigt jede Pflichtdatei der Suite per SHA256 auch nach den QA-Läufen, und
+  die installierte Suite 0.6.0 besteht den nativen Smoke auf `training`:
+  **vier Spieler** in CoD 1 (172,3 / 229,9 / 110,1 Einheiten Joiner-Bewegung
+  über echte Eingabe), zwei Spieler in UO (200,0), SP Improved (154,4) und
+  United Fronts (173,2), jeweils mit echtem Connect, fortlaufenden
+  Remote-Command-Uhren, verworfenen Paketen nicht reservierter Endpunkte und
+  sauberem Herunterfahren. Die VM hat keine GPU, deshalb läuft der Smoke auf
+  Mesas `llvmpipe`-WGL-Treiber (nur in die QA-Kopien je Spieler kopiert); der
   installierte Abnahmeordner bleibt byte-identisch zur Suite. Zwei Befunde
   daraus bleiben wichtig: Mesas d3d12-WGL-Pfad initialisiert GL, stürzt aber
   beim Laden der Karten-Oberflächen in `libgallium_wgl.dll` ab, und ein
@@ -385,7 +390,7 @@ Windows-Läufe sind auf Installer-Ebene und mit einem Zwei-Spieler-Smoke belegt.
   der Start nur mit Host-Ausrüstung ist ein Diagnosetest, kein Nachweis für vier
   individuelle Ausrüstungen.
 
-- Quellenstand `0.6.0-dev.6` verlangt Core-Maske 63 einschließlich nativer
+- Quellenstand `0.6.0` verlangt Core-Maske 63 einschließlich nativer
   Ressourcenübertragung und lokalisierter Coop-Hinweise. Alte API 15-DLLs werden vor neuem Staging abgewiesen;
   individuelle UF-Ausrüstung wartet weiter auf die native Spieler-/Planbindung.
 - Nativen Modell-/Waffenbestand vor dem Laden der Zielwelt des Mitspielers

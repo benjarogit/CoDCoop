@@ -18,6 +18,14 @@ def backend():
     return module
 
 
+def bundled_suite():
+    """The suite shipped inside this bundle, if any (AppImage / frozen setup)."""
+    for candidate in (Path(sys.executable).parent / 'suite', resource('suite')):
+        if (candidate / 'coop/variants.json').is_file():
+            return candidate
+    return None
+
+
 def main(argv=None):
     # A frozen AppImage uses its own executable for the worker, so Python never
     # has to be installed on the player's machine.
@@ -26,6 +34,14 @@ def main(argv=None):
     parser.add_argument('--launch', action='store_true')
     options, remaining = parser.parse_known_args(argv)
     if options.backend:
+        # A frozen AppImage carries the complete suite next to its worker. The
+        # terminal one-liner calls `--backend` directly, so supply the bundled
+        # payload unless the caller named one (--check/--rollback ignore it).
+        if not any(arg == '--suite-source' or arg.startswith('--suite-source=')
+                   for arg in remaining):
+            suite = bundled_suite()
+            if suite is not None:
+                remaining = ['--suite-source', str(suite)] + remaining
         return backend().suite_main(remaining)
     if options.launch:
         spec = importlib.util.spec_from_file_location('coop_launcher', resource('coop_suite.py'))
@@ -79,10 +95,9 @@ def main(argv=None):
             choices.addItem(path, path)
         choices.currentIndexChanged.connect(lambda _: game.setText(choices.currentData() or ''))
         form.insertRow(0, 'Detected / Gefunden', choices)
-    for candidate in (Path(sys.executable).parent / 'suite', resource('suite')):
-        if (candidate / 'coop/variants.json').is_file():
-            suite.setText(str(candidate))
-            break
+    found = bundled_suite()
+    if found is not None:
+        suite.setText(str(found))
     language = QComboBox()
     language.addItem('English', 'en')
     language.addItem('Deutsch', 'de')

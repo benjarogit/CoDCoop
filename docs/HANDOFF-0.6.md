@@ -12,26 +12,28 @@ published v0.5.4 binaries have not been replaced.
 
 ### Native Windows acceptance / Native Windows-Abnahme — 2026-11-26
 
-The dev.6 package was verified on real Windows 11 Pro (build 26300) in a
+The 0.6.0 package was verified on real Windows 11 Pro (build 26300) in a
 QEMU/KVM VM (UEFI + TPM 2.0, no GPU, `intel-hda` audio). `Install-CoD-Coop.exe
---yes --game C:\CoDTest --suite-source …` exits 0 with "installation complete;
-required suite files verified.", and `coop\suite-check.exe check C:\CoDTest`
+--yes --game C:\CoDTest060 --suite-source …` exits 0 with "installation complete;
+required suite files verified.", and `coop\suite-check.exe check C:\CoDTest060`
 re-verifies every required file by SHA256 after the QA runs. The installed
-protocol-9 suite then passes `tools/qa_coop_windows.py` on `training` with two
-players for CoD 1, UO and SP Improved: real connect, advancing remote command
-clocks, 134.9 / 182.9 / 164.2 units of joiner movement through native input,
-rejected packets from unallocated endpoints and clean shutdowns. This is a
+protocol-9 suite then passes `tools/qa_coop_windows.py` on `training`: four
+players on CoD 1 (172.3 / 229.9 / 110.1 units of joiner movement) and two
+players on UO (200.0), SP Improved (154.4) and United Fronts (173.2), each with
+a real connect, advancing remote command clocks, rejected packets from
+unallocated endpoints and clean shutdowns. This is a
 connection/liveness/movement smoke, not a campaign playthrough. Environment
 notes: the VM needs Mesa x86 25.3.6 `llvmpipe` (Mesa 26.3.1 llvmpipe/softpipe
 fail to create a pixel format and Mesa d3d12 crashes in `libgallium_wgl.dll`
 while the map loads surfaces), `MESA_EXTENSION_MAX_YEAR=2005`, and a game folder
 that still contains the shipped `miles/` directory. Full evidence, commands and
 rejected driver paths: `run/qa-win-native1/NOTES.md`.
-/ Das dev.6-Paket wurde auf echtem Windows 11 Pro (Build 26300) in einer
+/ Das 0.6.0-Paket wurde auf echtem Windows 11 Pro (Build 26300) in einer
 QEMU/KVM-VM geprüft (UEFI + TPM 2.0, keine GPU, `intel-hda`-Audio). Der Installer
 endet mit Exit 0, `suite-check.exe` bestätigt danach jede Pflichtdatei per
-SHA256, und die installierte Protocol-9-Suite besteht den Zwei-Spieler-Smoke in
-CoD 1, UO und SP Improved. Das ist ein Verbindungs-/Liveness-/Bewegungs-Smoke,
+SHA256, und die installierte Protocol-9-Suite besteht den nativen Smoke auf
+`training`: vier Spieler in CoD 1 und zwei Spieler in UO, SP Improved und United
+Fronts. Das ist ein Verbindungs-/Liveness-/Bewegungs-Smoke,
 kein Kampagnen-Durchspiel. Umgebungsdetails und Belege in
 `run/qa-win-native1/NOTES.md`.
 

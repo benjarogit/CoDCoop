@@ -8,7 +8,8 @@ Proton. This guide is the setup that was tested end to end:
 | Launcher | AnkerGames (also applies to similar launchers that start the game through `umu-run`/Proton) |
 | Proton | 11.0 |
 | GPU / driver | NVIDIA (proprietary) and Mesa (llvmpipe) |
-| Game | Call of Duty 1.5 + United Offensive 1.51, mod 0.5.4 (this fork) |
+| Game | Call of Duty 1.5 + United Offensive 1.51, mod 0.6.0 (this fork) |
+| Suite | CoD 1, UO, SP Improved 1.5, United Fronts and the YAP plugin |
 
 Three things matter on Linux: the launcher has to keep the modified files, the
 driver must not report more OpenGL extensions than the 2003 engine can hold, and
@@ -16,20 +17,19 @@ Steam — if you want the friend list — has to be reachable inside the prefix.
 
 ## 0. Install (one command)
 
-Nothing has to be prepared: no CoD patch, no disc image, no UO installer, no
-unpacking. One command downloads the package (about 1 GB) and installs
-everything:
+The 0.6 setup installs the complete suite in one step: Call of Duty 1, United
+Offensive, SP Improved 1.5, United Fronts, the YAP plugin and the coop runtime.
+You need an existing Call of Duty installation (a folder with `CoDSP.exe`),
+`python3`, and free space for the suite plus your saves. One command downloads
+the Linux setup, verifies its pinned SHA-256 and starts the terminal setup
+inside the downloaded image:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/benjarogit/CoDCoop/master/tools/install.sh | sh
 ```
 
 It finds the game folder itself (all Steam libraries, AnkerGames, current
-folder), installs **Call of Duty 1.5** if `CoDSP.exe` is another version (the old
-one stays as `CoDSP.exe.bak`) and copies **United Offensive 1.51** plus the mod
-into it. Existing files are kept as `<name>.bak`.
-
-On the way it asks the same questions as the Windows setup:
+folder) and asks the same questions as the Windows setup:
 
 | Question | Default |
 |---|---|
@@ -39,13 +39,14 @@ On the way it asks the same questions as the Windows setup:
 | resolution and fullscreen/windowed | desktop resolution, fullscreen |
 | FOV | 96 for 16:9 (Hor+), 90 otherwise |
 | quality — low/medium/high | high |
-| extras — SP Improved, United Fronts, UO map pack, Kar98k fix | no |
 
-It then writes the settings into `Main/config.cfg` and `uo/config.cfg`, applies
-the PCGamingWiki fixes (`com_maxfps 125`, `com_hunkmegs 256`, multicore renderer,
+There is no extras question any more: 0.6 always installs the full suite
+(SP Improved, United Fronts, UO map pack, Kar98k fix and YAP). The setup writes
+the settings into `Main/config.cfg` and `uo/config.cfg`, applies the
+PCGamingWiki fixes (`com_maxfps 125`, `com_hunkmegs 256`, multicore renderer,
 skipped intro) and, if German was chosen, installs the German language pack
 (`CoD-UO-German-Language.zip`, ~630 MB, downloaded once; English paks go to
-`localized_backup/`).
+`localized_backup/`). Existing files are kept as `<name>.bak`.
 
 Useful variants:
 
@@ -57,24 +58,29 @@ curl -fsSL .../tools/install.sh | sh -s -- --check
 curl -fsSL .../tools/install.sh | sh -s -- --game "/path/to/Call of Duty" --dry-run
 
 # unattended, everything given on the command line
-curl -fsSL .../tools/install.sh | sh -s -- --yes --language de --name Soldat \
-    --resolution 1920x1080 --fov 96 --quality hoch
+curl -fsSL .../tools/install.sh | sh -s -- --yes --game "/path/to/Call of Duty" \
+    --language de --name Soldat --resolution 1920x1080 --fov 96 --quality hoch
+
+# undo the last installation
+curl -fsSL .../tools/install.sh | sh -s -- --rollback latest
 ```
 
-Already downloaded the ZIP? Extract it and run `./install-linux.sh` or
-`python3 install-linux.py` in that folder — it uses the local `game/` and does
-not download anything.
+Prefer a window? Download `Install-CoD-Coop-Linux-x86_64.AppImage` from the
+release page, make it executable and double-click it (or start it without
+`--backend`). It is the same setup with the same bundled suite.
 
-The same package is mirrored on MEGA, together with the two optional archives:
+The MEGA mirrors still hold the **0.5.4** ready package and the two optional
+archives:
 
 | File | Size | Contents |
 |---|---|---|
-| [`Call of Duty - UO Coop Ready.zip`](https://mega.nz/file/RMw1QS6B#Elowfq-rcNcMqxUUGDwIXeFbijHOzP5TpoSdNxl36mA) | 1.04 GB | CoD 1.5, UO 1.51, the mod, both installers |
+| [`Call of Duty - UO Coop Ready.zip`](https://mega.nz/file/RMw1QS6B#Elowfq-rcNcMqxUUGDwIXeFbijHOzP5TpoSdNxl36mA) | 1.04 GB | CoD 1.5, UO 1.51, mod 0.5.4, both installers |
 | [`CoD-UO-German-Language.zip`](https://mega.nz/file/5cpi1LzL#F2kXKeDcP8Rz45oYRgPfcUUTvCdONDtEmDrnJLuAkmg) | 657 MB | German text and voices (CoD + UO) |
 | [`CoD-SP-Extras.zip`](https://mega.nz/file/FVYT3Coa#x0StdxHWj2a0lP5uHIZcuASlQWo2_J6SBQw8mg7dH5c) | 922 MB | SP Improved, United Fronts, UO map pack, Kar98k fix |
 
-Put the two optional ZIPs (or their extracted `german/` and `extras/` folders)
-next to `install-linux.sh` and the wizard uses them instead of downloading.
+Do not mix 0.5.4 files with a 0.6 installation: the 0.6 suite brings its own
+runtime and rejects foreign DLLs. The German pack is the only 0.5.4 asset the
+0.6 setup still downloads.
 
 ## 1. "Buffer overrun detected!" right after the intro
 
@@ -317,37 +323,34 @@ The only file that is not in the repository is Valve's 32-bit `steam_api.dll`
 (Steam invites); copy it into `build/` from a Windows build or a Steamworks
 redistributable. Without it the mod still works over IP.
 
-## 7. Installing without Wine (`install-linux.py`)
+## 7. Installing from the source checkout (`install-linux.py`)
 
-The ready package ships `install-linux.py`; the Windows installer only extracts
-its files, so on Linux you can do the same with a Python script that needs
-nothing but `python3`:
+`tools/install-linux.py` is the same backend the AppImage runs. It needs
+`python3` only:
 
 ```sh
-# from the extracted ready package (uses game/ next to the script)
-python3 install-linux.py
-
-# or point it at the folder / the ZIP
-python3 install-linux.py --game "/path/to/Call of Duty"
-python3 install-linux.py --archive "Call of Duty - UO Coop Ready.zip"
+# full suite into an existing game folder
+python3 tools/install-linux.py --game "/path/to/Call of Duty" \
+    --suite-source /path/to/0.6-suite --yes
 
 # only verify an existing installation
-python3 install-linux.py --check
+python3 tools/install-linux.py --game "/path/to/Call of Duty" --check
+
+# preview what would be written
+python3 tools/install-linux.py --game "/path/to/Call of Duty" \
+    --suite-source /path/to/0.6-suite --dry-run
 ```
 
-Without `--game` it looks for the game in all Steam libraries, in AnkerGames and
-in the current folder, and asks when there are several. It checks **Call of Duty
-1.5 first** (`CoDSP.exe` must be 1,716,224 bytes) and stops without writing
-anything if it is not. Existing files are kept as `<name>.bak`. `--dry-run`
-shows what would be copied, `--allow-incomplete` installs anyway
-(multiplayer-only copies).
+`--suite-source` must be a complete 0.6 payload: a directory containing
+`coop/variants.json` and `coop/launcher/CoD-Coop-Launcher`. `tools/stage_suite.py`
+builds such a payload from an owned game folder. Base game data comes from your
+installation; the pinned 0.5.4 archive can supply missing base packages via
+`--archive`, and missing files are named before anything is written. Existing
+files are kept as `<name>.bak`.
 
-The repository version (`tools/install-linux.py`) can also install only the mod:
-
-```sh
-python3 tools/install-linux.py --game ".../Call of Duty"                # latest GitHub release
-python3 tools/install-linux.py --game ".../Call of Duty" --build build  # from ./build.sh
-```
+Inside the AppImage the backend uses the bundled suite automatically, so
+`Install-CoD-Coop-Linux-x86_64.AppImage --backend --game ...` needs no
+`--suite-source`.
 
 The UO version label in the game stays **1.41** — it is hard-coded in the exe and
 the 1.51 patch does not change it. What matters is `uo/version.inf`

@@ -82,7 +82,7 @@ Ausrüstungsfähigkeit.
 
 ## Compiled API mask / Kompilierte API-Maske
 
-Current `0.6.0-dev.6` suite manifests require `core_features_required: 63`. `Coop_Features`
+Current `0.6.0` suite manifests require `core_features_required: 63`. `Coop_Features`
 is a readonly, nonexecutable PE DATA export: owner inventory=1, actor selection=2,
 actor eligibility=4, Pathfinder initial recipe=8, asset bootstrap=16, localized banners=32. All six required bits must be set;
 missing/forwarded/writable/executable/out-of-bounds exports are rejected without
@@ -102,7 +102,7 @@ mask, so an older protocol9 checker cannot silently ignore the new requirement.
 An absent or explicit zero requirement is retained only for legacy fixtures and
 historical profiles; it does not establish current API readiness.
 
-Aktuelle `0.6.0-dev.6`-Paketmanifeste verlangen alle sechs Bits (`63`); Bit16 steht für den Ressourcen-Bootstrap; Bit32 für lokalisierte Coop-Hinweise. Python, nativer
+Aktuelle `0.6.0`-Paketmanifeste verlangen alle sechs Bits (`63`); Bit16 steht für den Ressourcen-Bootstrap; Bit32 für lokalisierte Coop-Hinweise. Python, nativer
 Validator und Stager lesen dafür ausschließlich das begrenzte PE-Datenexport;
 die DLL wird nicht ausgeführt. Vorhandener Code ist noch kein Laufzeitnachweis:
 Die nativen Bereitschafts-CVars bleiben maßgeblich. Ein alter Protokoll9-Validator

@@ -4,7 +4,7 @@
 
 **Die ursprünglichen Kampagnen. Ein gemeinsamer Trupp.**
 
-[![Entwicklung](https://img.shields.io/badge/0.6.0--dev.6-Entwicklung-orange)](#entwicklungsstand)
+[![Veröffentlichung](https://img.shields.io/badge/0.6.0-Release-brightgreen)](#entwicklungsstand)
 ![Spieler](https://img.shields.io/badge/Spieler-2%E2%80%934-blue)
 ![Windows-Ziel](https://img.shields.io/badge/Ziel-Windows%2010%20%2F%2011-0078D4)
 ![Linux](https://img.shields.io/badge/Linux-Wine%20%2F%20Proton-FCC624)
@@ -16,12 +16,13 @@
 
 </div>
 
-> **0.6.0-dev.6 ist in Entwicklung.** Dieser Branch setzt die vollständige Coop-Suite um;
-> er ist noch keine durchgehend geprüfte Kampagnenveröffentlichung. Das bestehende
-> [Release v0.5.4](https://github.com/benjarogit/CoDCoop/releases/tag/v0.5.4)
-> entstand vorher und bietet **keinen Coop für SP Improved oder United Fronts**.
-> Eine erfolgreiche Installation oder ein kurzer Verbindungstest bestätigt noch
-> keine vollständige Kampagne.
+> **0.6.0 — die vollständige Kampagnen-Suite.** Call of Duty 1, United
+> Offensive, SP Improved 1.5 und United Fronts in einer Coop-Suite, geprüft
+> unter Linux (Wine/Proton) und nativ auf Windows 11. Die Abdeckung wird
+> kapitelweise festgehalten; ein vollständiger Durchspiel-Lauf von Hand wird
+> nicht behauptet, und Steam mit zwei getrennten Accounts ist weiterhin
+> ungetestet. Eine erfolgreiche Installation oder ein kurzer Verbindungstest
+> bestätigt noch keine vollständige Kampagne.
 
 Der aktuelle Paketvertrag verlangt die Core-API-Maske 63 einschließlich
 des nativen Ressourcen-Bootstraps und lokalisierter Coop-Hinweise. Das aktiviert noch keine individuelle
@@ -115,8 +116,8 @@ Wine/Proton. Die grafischen Linux-Pakete benötigen glibc ab 2.35
 
 | Plattform | Installationsweg für 0.6 |
 |---|---|
-| Windows | Grafisches Setup; während der Entwicklung mit vollständigem lokalem Suite-Paket |
-| Linux | Grafischer AppImage-Assistent; zusätzlich Terminal-Backend |
+| Windows | `Install-CoD-Coop.exe` plus vollständiger, festgelegter Suite-Ordner aus dem Release |
+| Linux | Ein Befehl (`curl … tools/install.sh | sh`) oder der grafische AppImage-Assistent |
 | Offline | Derselbe festgelegte Paketstand und die erforderlichen Spieldaten lokal |
 
 Das Setup prüft Inhalts- und Laufzeit-Prüfsummen, erhält persönliche
@@ -125,10 +126,9 @@ Installationsnachweis. Fehlende oder veränderte Pflichtdateien verhindern eine
 erfolgreiche Abschlussprüfung. Sprachwechsel erfolgen ausdrücklich; eine
 Reparatur ersetzt Einstellungen nicht stillschweigend.
 
-**Downloadlinks für 0.6 erscheinen erst nach einem tatsächlich gebauten und
-veröffentlichten Vorabrelease.** Ein 0.5.4-Installer mit beliebigen neuen DLLs ist
-noch keine vollständige Suite. GitHub ist die Hauptquelle; MEGA-Spiegel müssen
-dieselbe Version und dieselben Prüfsummen ausweisen.
+**Ein 0.5.4-Installer mit beliebigen neuen DLLs ist keine vollständige Suite.**
+GitHub ist die Hauptquelle; MEGA-Spiegel müssen dieselbe Version und dieselben
+Prüfsummen ausweisen.
 
 Lokale Entwicklungspakete und genaue Befehle:
 [Entwicklungsinstallation](docs/development-0.6.md).
@@ -158,6 +158,11 @@ Weitere Einzelheiten: [Linux / Proton](docs/linux.md).
 </details>
 
 ## Entwicklungsstand
+
+0.6.0 ist veröffentlicht: CoD 1, UO, SP Improved und United Fronts lassen sich
+unter Linux (Wine/Proton) und nativ auf Windows 11 installieren und gemeinsam
+spielen. Was weiterhin als *nicht abgedeckt* dokumentiert ist, steht unten — es
+ist kein versteckter Blocker.
 
 United Fronts hat weiterhin einen offenen Ressourcenfehler im Standardpfad:
 Foy und Noville können beim sauberen Start mit dem vollständigen
