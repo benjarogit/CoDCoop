@@ -75,10 +75,8 @@ Add `--language de` to install in German.
 For a Coop session, open the **CoDCoop Launcher** from the installed game folder.
 The start file opens the launcher and points it to that installation.
 
-- **Windows 0.6.1** uses `Start-CoD-Coop.bat` in the game folder. If it
-  opens with the wrong path, run `coop\launcher\CoD-Coop-Launcher.exe` and
-  select the folder containing `CoDSP.exe`. Newer setups add a **CoDCoop**
-  shortcut in the game folder.
+- **Windows:** Open **CoDCoop** in the game folder. The setup creates this
+  shortcut starting with 0.6.2. `Start-CoD-Coop.bat` also opens the launcher.
 - **Linux** uses `Start-CoD-Coop.sh`.
 
 <details>

@@ -2,7 +2,7 @@
 
 [English](#061--english) · [Deutsch](#061--deutsch)
 
-## Unreleased · Unveröffentlicht
+## 0.6.2 · Hotfix
 
 - **EN:** Direct AnkerGames, Steam and game-executable starts prepare a missing
   or mismatched campaign profile when hosting or joining. Wine and Proton must

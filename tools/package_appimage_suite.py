@@ -1,6 +1,7 @@
 """Packaging-only checks for a staged online/offline suite, never installation sealing."""
 import argparse
 import json
+import os
 from pathlib import Path
 import shutil
 from coop_suite import (PROTOCOL, approved_localizations, content_files, load_manifest,
@@ -9,7 +10,7 @@ from runtime_protocol import core_protocol, require_core_features, required_feat
 
 ROOT=Path(__file__).resolve().parents[1]
 
-def embed_suite(source,destination,base_catalog=None):
+def embed_suite(source,destination,base_catalog=None,hardlink=False):
     source=Path(source).resolve();destination=Path(destination).resolve()
     if destination.exists() or source.is_relative_to(destination) or destination.is_relative_to(source):
         raise ValueError('suite source and fresh destination must be separate')
@@ -49,7 +50,7 @@ def embed_suite(source,destination,base_catalog=None):
     launcher='coop/launcher/CoD-Coop-Launcher'
     if launcher not in lock['files'] or not resolve(source,launcher).is_file():
         raise ValueError('Linux launcher bundle is required')
-    shutil.copytree(source,destination)
+    shutil.copytree(source,destination,copy_function=os.link if hardlink else shutil.copy2)
     return {'scope':'staged prerelease payload; full installation validation still required',
             'suite_version':manifest['suite_version'],'protocol':PROTOCOL,
             'manifest_sha256':mhash,'runtime_lock_sha256':sha256(source/'coop/runtime-lock.json'),
@@ -60,7 +61,8 @@ def main():
     parser.add_argument('--source',required=True,type=Path)
     parser.add_argument('--destination',required=True,type=Path)
     parser.add_argument('--report',required=True,type=Path)
-    args=parser.parse_args();report=embed_suite(args.source,args.destination)
+    parser.add_argument('--hardlink',action='store_true',help='stage immutable inputs on the same filesystem')
+    args=parser.parse_args();report=embed_suite(args.source,args.destination,hardlink=args.hardlink)
     args.report.write_text(json.dumps(report,indent=2)+'\n')
 
 if __name__=='__main__':main()

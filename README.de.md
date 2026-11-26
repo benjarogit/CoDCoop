@@ -73,10 +73,9 @@ sh ./install-codcoop.sh --game "/Pfad/zu/Call of Duty" --language de
 Öffne für eine Coop-Partie den **CoDCoop Launcher** aus dem installierten
 Spielordner. Die Startdatei öffnet den Launcher mit deinem Spielordner.
 
-- **Windows 0.6.1** verwendet `Start-CoD-Coop.bat` im Spielordner. Falls
-  der falsche Pfad erscheint, öffne `coop\launcher\CoD-Coop-Launcher.exe`
-  und wähle den Ordner mit `CoDSP.exe`. Neuere Setups legen die Verknüpfung
-  **CoDCoop** im Spielordner an.
+- **Windows:** Öffne **CoDCoop** im Spielordner. Das Setup legt die
+  Verknüpfung ab Version 0.6.2 an. `Start-CoD-Coop.bat` öffnet den Launcher
+  ebenfalls.
 - **Linux** verwendet `Start-CoD-Coop.sh`.
 
 <details>

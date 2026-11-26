@@ -69,7 +69,9 @@ PYNOTICE
 # Optional self-contained installer payload. Missing original base packages are
 # retained as installer requirements; this never seals an incomplete game.
 if [ -n "${COOP_SUITE_SOURCE:-}" ]; then
-    "$PYTHON" tools/package_appimage_suite.py --source "$COOP_SUITE_SOURCE" \
+    set --
+    if [ "${COOP_APPIMAGE_LINK_SUITE:-0}" = 1 ]; then set -- --hardlink; fi
+    "$PYTHON" tools/package_appimage_suite.py "$@" --source "$COOP_SUITE_SOURCE" \
         --destination "$APPDIR/usr/bin/CoDCoop-Setup/suite" \
         --report "$APPDIR/bundled-suite.json"
 fi
