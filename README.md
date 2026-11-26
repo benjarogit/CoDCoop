@@ -35,8 +35,8 @@ contains `CoDSP.exe`. Use matching downloads from the same release.
    `Start-CoD-Coop.sh` from the game folder.
 
 Linux needs Wine or Proton for the game. The graphical bundle requires glibc
-2.35 or newer. The terminal installer, Steam setup, troubleshooting and
-rollback are covered in the [Linux guide](docs/linux.md).
+2.35 or newer. You can also use the [terminal installer with `install.sh`](docs/linux.md#terminal-setup-with-installsh).
+The [Linux guide](docs/linux.md) covers Steam setup, troubleshooting and rollback.
 
 GitHub lists two **Source code** archives for building from source.
 `SHA256SUMS` is optional and lets you check the downloads.

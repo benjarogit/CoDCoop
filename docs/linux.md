@@ -15,72 +15,54 @@ Three things matter on Linux: the launcher has to keep the modified files, the
 driver must not report more OpenGL extensions than the 2003 engine can hold, and
 Steam — if you want the friend list — has to be reachable inside the prefix.
 
-## 0. Install (one command)
+## 0. Install on Linux
 
-The 0.6 setup installs the complete suite in one step: Call of Duty 1, United
-Offensive, SP Improved 1.5, United Fronts, the YAP plugin and the coop runtime.
-You need an existing Call of Duty installation (a folder with `CoDSP.exe`),
-`python3`, and free space for the suite plus your saves. One command downloads
-the Linux setup, verifies its pinned SHA-256 and starts the terminal setup
-inside the downloaded image:
+Start with a complete Call of Duty installation. Its game folder contains
+`CoDSP.exe`. You need Wine or Proton to play and enough space for the suite
+and installation backups.
 
-```sh
-curl -fsSL https://raw.githubusercontent.com/benjarogit/CoDCoop/v0.6.1/tools/install.sh | sh
-```
+### Graphical AppImage
 
-It finds the game folder itself (all Steam libraries, AnkerGames, current
-folder) and asks the same questions as the Windows setup:
+Make the AppImage executable and open it. Select the game folder in the
+setup. The supplied suite is already selected. After installation, open
+`Start-CoD-Coop.sh` in the game folder. [Download the AppImage](https://github.com/benjarogit/CoDCoop/releases/latest/download/Install-CoD-Coop-Linux-x86_64.AppImage)
 
-| Question | Default |
-|---|---|
-| game folder (when several are found) | the first real install |
-| game language — German or English | system language |
-| player name | system user name |
-| resolution and fullscreen/windowed | desktop resolution, fullscreen |
-| FOV | 96 for 16:9 (Hor+), 90 otherwise |
-| quality — low/medium/high | high |
+### Terminal setup with install.sh
 
-There is no extras question any more: 0.6 always installs the full suite
-(SP Improved, United Fronts, UO map pack, Kar98k fix and YAP). The setup writes
-the settings into `Main/config.cfg` and `uo/config.cfg`, applies the
-PCGamingWiki fixes (`com_maxfps 125`, `com_hunkmegs 256`, multicore renderer,
-skipped intro) and, if German was chosen, installs the German language pack
-(`CoD-UO-German-Language.zip`, ~630 MB, downloaded once; English paks go to
-`localized_backup/`). Existing files are kept as `<name>.bak`.
-
-Useful variants:
+Download and run the script from a terminal. It requires `python3` and
+downloads the matching AppImage, verifies its pinned SHA-256 and starts the
+terminal installer inside it.
 
 ```sh
-# check an installation
-curl -fsSL .../tools/install.sh | sh -s -- --check
-
-# choose the folder yourself / show what would happen
-curl -fsSL .../tools/install.sh | sh -s -- --game "/path/to/Call of Duty" --dry-run
-
-# unattended, everything given on the command line
-curl -fsSL .../tools/install.sh | sh -s -- --yes --game "/path/to/Call of Duty" \
-    --language de --name Soldat --resolution 1920x1080 --fov 96 --quality hoch
-
-# undo the last installation
-curl -fsSL .../tools/install.sh | sh -s -- --rollback latest
+curl -fsSLo install-codcoop.sh https://raw.githubusercontent.com/benjarogit/CoDCoop/v0.6.1/tools/install.sh && sh ./install-codcoop.sh
 ```
 
-Prefer a window? Download `Install-CoD-Coop-Linux-x86_64.AppImage` from the
-release page, make it executable and double-click it (or start it without
-`--backend`). It is the same setup with the same bundled suite.
+The script uses a detected game folder when exactly one is found. If there are
+zero or several matches, pass `--game` with the path to the game folder.
+The terminal defaults to English. Use `--language de` for German.
+Without `--yes`, the installer asks for confirmation before installing.
 
-The MEGA mirrors still hold the **0.5.4** ready package and the two optional
-archives:
+```sh
+# Select the game folder and install in German.
+sh ./install-codcoop.sh --game "/path/to/Call of Duty" --language de
 
-| File | Size | Contents |
-|---|---|---|
-| [`Call of Duty - UO Coop Ready.zip`](https://mega.nz/file/RMw1QS6B#Elowfq-rcNcMqxUUGDwIXeFbijHOzP5TpoSdNxl36mA) | 1.04 GB | CoD 1.5, UO 1.51, mod 0.5.4, both installers |
-| [`CoD-UO-German-Language.zip`](https://mega.nz/file/5cpi1LzL#F2kXKeDcP8Rz45oYRgPfcUUTvCdONDtEmDrnJLuAkmg) | 657 MB | German text and voices (CoD + UO) |
-| [`CoD-SP-Extras.zip`](https://mega.nz/file/FVYT3Coa#x0StdxHWj2a0lP5uHIZcuASlQWo2_J6SBQw8mg7dH5c) | 922 MB | SP Improved, United Fronts, UO map pack, Kar98k fix |
+# Verify the installation or undo the latest completed setup.
+sh ./install-codcoop.sh --game "/path/to/Call of Duty" --check
+sh ./install-codcoop.sh --game "/path/to/Call of Duty" --rollback latest
+```
 
-Do not mix 0.5.4 files with a 0.6 installation: the 0.6 suite brings its own
-runtime and rejects foreign DLLs. The German pack is the only 0.5.4 asset the
-0.6 setup still downloads.
+Use `--dry-run` to preview installation changes. The wrapper still downloads
+and verifies the AppImage before passing the flag to the installer.
+
+### Additional downloads and backups
+
+The release AppImage bundles SP Improved, United Fronts, YAP and the Coop
+runtime. If `CoDUOSP.exe` is missing, setup can fetch the pinned legacy UO
+base archive. For a German installation, it can also fetch the pinned
+German language pack. Setup uses the current suite for the Coop files.
+
+Existing settings and saves are preserved by default. Setup records
+replaced files in a transaction backup under `coop/backups/`.
 
 ## 1. "Buffer overrun detected!" right after the intro
 
@@ -345,8 +327,8 @@ python3 tools/install-linux.py --game "/path/to/Call of Duty" \
 `coop/variants.json` and `coop/launcher/CoD-Coop-Launcher`. `tools/stage_suite.py`
 builds such a payload from an owned game folder. Base game data comes from your
 installation; the pinned 0.5.4 archive can supply missing base packages via
-`--archive`, and missing files are named before anything is written. Existing
-files are kept as `<name>.bak`.
+`--archive`, and missing original campaign files are reported in preflight. Setup records
+replaced files in a transaction backup under `coop/backups/`.
 
 Inside the AppImage the backend uses the bundled suite automatically, so
 `Install-CoD-Coop-Linux-x86_64.AppImage --backend --game ...` needs no

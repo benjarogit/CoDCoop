@@ -35,8 +35,9 @@ Im Spielordner liegt die Datei `CoDSP.exe`. Verwende Downloads aus demselben Rel
    Starte danach `Start-CoD-Coop.sh` im Spielordner.
 
 Das Spiel braucht unter Linux Wine oder Proton. Das grafische Paket setzt
-glibc 2.35 oder neuer voraus. Terminal-Setup, Steam, Fehlersuche und Rücknahme
-sind in der [Linux-Anleitung](docs/linux.md) beschrieben.
+glibc 2.35 oder neuer voraus. Alternativ gibt es das
+[Terminal-Setup mit `install.sh`](docs/linux.md#terminal-setup-with-installsh).
+Die [Linux-Anleitung](docs/linux.md) erklärt auch Steam, Fehlersuche und Rücknahme.
 
 Die zwei **Source code**-Archive auf GitHub sind für den Quellcode-Build.
 Mit der optionalen Datei `SHA256SUMS` kannst du die Downloads überprüfen.
