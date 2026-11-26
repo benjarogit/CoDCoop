@@ -1,7 +1,6 @@
-CALL OF DUTY COOP — 0.6 DEVELOPMENT / ENTWICKLUNG
+CALL OF DUTY COOP — INSTALLATION
 English | Deutsch below
 
-This is a development build, not a certified complete campaign release.
 CoD 2 is experimental and is not installed by the full CoD 1/UO setup.
 
 The complete suite contains four separate campaign variants:
@@ -20,9 +19,8 @@ Windows 10/11:
   preserved unless changing settings was explicitly selected.
 
 Linux:
-  Run Install-CoD-Coop-Linux-x86_64.AppImage and choose the game folder and the
-  matching full 0.6 payload. The graphical setup shares the terminal backend.
-  Terminal alternative: tools/install.sh --game PATH --suite-source PAYLOAD.
+  Make Install-CoD-Coop-Linux-x86_64.AppImage executable, run it and select
+  the game folder. The suite is bundled. For terminal setup, see the release notes.
 
 Start-CoD-Coop defaults to the improved CoD 1 campaign, continuing into UO.
 Start-CoD-Classic selects the original CoD 1 engine separately.
@@ -48,7 +46,6 @@ Changed runtime files or backups are refused before any rollback changes.
 --------------------------------------------------------------------------
 DEUTSCH
 
-Dies ist ein Entwicklungsstand, keine vollstaendig abgenommene Kampagnenversion.
 CoD 2 bleibt experimentell und wird vom CoD-1/UO-Komplettsetup nicht installiert.
 
 Das vollstaendige Paket enthaelt vier getrennte Kampagnenvarianten:
@@ -69,9 +66,8 @@ Windows 10/11:
   ausdruecklich ausgewaehlt.
 
 Linux:
-  Install-CoD-Coop-Linux-x86_64.AppImage starten, Spielordner und vollstaendiges
-  passendes 0.6-Paket waehlen. Grafikassistent und Terminal nutzen denselben Kern.
-  Terminal: tools/install.sh --game PFAD --suite-source PAKETORDNER.
+  Install-CoD-Coop-Linux-x86_64.AppImage ausfuehrbar machen, starten und den
+  Spielordner waehlen. Die Suite ist enthalten. Das Terminal-Setup steht im Release.
 
 Start-CoD-Coop startet standardmaessig die verbesserte CoD-1-Kampagne mit
 anschliessendem UO. Start-CoD-Classic waehlt die originale CoD-1-Engine separat.

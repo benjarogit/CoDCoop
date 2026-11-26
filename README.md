@@ -1,230 +1,85 @@
-<div align="center">
-
 # Call of Duty Coop
 
-**The original campaigns. One squad.**
+Play the Call of Duty and United Offensive campaigns with 2–4 players on
+Windows or Linux. The suite also includes SP Improved and United Fronts.
 
-[![Release](https://img.shields.io/badge/0.6.1-release-brightgreen)](#development-status)
-![Players](https://img.shields.io/badge/players-2%E2%80%934-blue)
-![Windows target](https://img.shields.io/badge/target-Windows%2010%20%2F%2011-0078D4)
-![Linux](https://img.shields.io/badge/Linux-Wine%20%2F%20Proton-FCC624)
-[![License](https://img.shields.io/badge/CoDCoop-MIT-green)](LICENSE)
-
-**English** · [Deutsch](README.de.md)
-
-[Installation](#installation) · [Campaigns](#campaigns) · [Play together](#play-together) · [Development status](#development-status) · [Building and tests](#building-and-tests)
-
-</div>
-
-> **0.6.1 — the full campaign suite.** Call of Duty 1, United Offensive, SP
-> Improved 1.5 and United Fronts in one Coop suite, verified under Linux
-> (Wine/Proton) and on native Windows 11. 0.6.1 fixes the Steam join path: the
-> host read the sender SteamID from the wrong offset and answered no Steam
-> session. Coverage is recorded chapter by chapter; a human full-campaign
-> playthrough is not claimed, and Steam with two separate accounts is still
-> untested. A successful install or short connection test does not by itself
-> certify a campaign.
-
-The current package contract requires Core API mask 63, including native
-asset bootstrap and owned English/German Coop banners. This does not enable individual UF kits; their party/native
-binding and equipment start remain gated.
-
-## Campaigns
-
-**Recommended main campaign: CoD + UO — Improved Coop.** Start with the first
-CoD campaign, keep the SP Improved 1.5 AI/gameplay improvements, watch the original
-CoD closing sequence, then continue into UO with the same group. This route uses
-the UO engine throughout. The credits→UO bridge has passed a targeted two-client
-test. A human full playthrough is not a release gate: coverage is recorded per
-chapter, and a chapter without a recorded sample is named as not covered.
-Classic profiles and United Fronts remain separate choices.
-
-
-| Variant | What you play | Runtime |
-|---|---|---|
-| Call of Duty | The original 2003 campaign | CoD 1.5 |
-| United Offensive | The original expansion campaign | UO 1.51 + YAP |
-| SP Improved 1.5 | CoD/UO missions with the mod's gameplay and quality improvements | UO + YAP |
-| United Fronts 1.1 beta | Its original and custom missions, campaign-order settings and special weapons | UO + YAP |
-
-Each variant keeps its own rules and saves. They are **not merged into one mod**.
-The complete pinned set is required on every Coop machine; language, resolution
-and other personal display settings remain local. German and English gameplay
-installations are intended to be compatible. Untranslated custom content keeps
-its original language.
-
-In UO-based profiles, the host's sprint and jump-shot settings also govern client
-prediction. Your previous local values are restored when you leave. The launcher
-shows the verified suite version and the latest local save for each campaign;
-joining always follows the host's progress.
-
-**Call of Duty 2 is experimental and outside the current completion target.**
-The UO Map Pack is an ordinary multiplayer extra, not a collection of new Coop
-campaign missions.
-
-## Play together
-
-The host runs the shared world: AI, objectives, scripts and progress. Up to three
-other players join. The implementation includes player bodies and animations,
-friendly-fire settings, downed players and reviving, checkpoint recovery,
-mission changes and vehicle passengers.
-
-The 0.6 work extends that behavior to the additional variants and their mechanics.
-The goal is for every player to participate in objectives. An exclusive scripted
-vehicle or cinematic role remains with the host; the others receive appropriate
-passenger, gunner or shared-scene behavior. This is a development target until
-its mission tests pass.
-
-1. Start **CoDCoop Launcher** and choose a campaign variant.
-2. The host selects **Host** and starts a mission. Other players select **Join**.
-3. Use the host's IP for LAN/direct-IP play, or the Steam join integration when
-   its prerequisites are met.
-4. Only the host chooses a new campaign. The group must be ready, the current
-   game must be saved at a safe point, then the launchers restart and reconnect.
-
-The host owns the saves. Keep that host's saves to continue a campaign. There is
-no automatic host migration. During ordinary play, opening the host's pause menu
-does not pause connected teammates; mission start/end screens retain their
-required behavior. The host also cannot be killed while a teammate is still
-loading the map: a lethal hit in that window is clamped to 1 health, so the
-single-player death screen never pauses the server and blocks the pending join.
-
-<details>
-<summary>Connection requirements</summary>
-
-Direct IP uses **UDP 28960** by default. LAN uses the host's local address;
-Internet IP play requires forwarding that UDP port to the host.
-
-Steam uses **Spacewar, AppID 480**. Each player needs their own signed-in Steam
-account. Under Linux, use the Steam/Proton launch route described in
-[the Linux guide](docs/linux.md). A local two-process IP test does not prove
-Steam invitation behavior across two computers.
-
-</details>
+[Deutsch](README.de.md) · [Latest release](https://github.com/benjarogit/CoDCoop/releases/latest) · [Changelog](CHANGELOG.md)
 
 ## Installation
 
-**Requirements:** an existing Call of Duty installation, enough disk space for
-UO and the full extra set, 64-bit Windows 10/11 or x86_64 Linux with a working Wine/Proton
-runtime. The Linux graphical bundles require glibc 2.35 or newer (Ubuntu 22.04
-baseline). Game files are not stored in this source repository.
+Start with an existing, complete Call of Duty installation. The game folder
+contains `CoDSP.exe`. Use matching downloads from the same release.
 
-| Platform | 0.6 installation route |
-|---|---|
-| Windows | `Install-CoD-Coop.exe` plus the complete pinned suite folder from the release |
-| Linux | One command (`curl … tools/install.sh \| sh`) or the graphical AppImage assistant |
-| Offline | The same pinned payload and required game data, available locally |
+### Windows 10/11 (64-bit)
 
-The setup checks content and runtime hashes, preserves personal configurations
-and saves during repair, and creates an installation receipt. Missing or modified
-required files prevent a successful final check. Language changes are explicit;
-repair does not silently replace your settings.
+1. Download **both** `Install-CoD-Coop.exe` and the ZIP ending in
+   `-suite-windows.zip`. [Windows installer](https://github.com/benjarogit/CoDCoop/releases/latest/download/Install-CoD-Coop.exe) · [Windows suite ZIP under Assets](https://github.com/benjarogit/CoDCoop/releases/latest#assets)
+2. Extract the ZIP. Rename the extracted folder that directly contains
+   `coop` to `suite` and put it next to `Install-CoD-Coop.exe`.
+3. Run the EXE, select your existing **Call of Duty game folder** and install.
+   The installer finds the `suite` folder automatically.
+4. Open `Start-CoD-Coop.bat` in the game folder.
 
-**Do not combine a 0.5.4 installer with arbitrary new DLLs and assume that the
-full suite is installed.** GitHub is the primary release location; MEGA mirrors
-must identify the same version and checksums.
+### Linux (x86_64)
 
-For local development payloads and exact commands see
-[development installation](docs/development-0.6.md).
+1. Download just `Install-CoD-Coop-Linux-x86_64.AppImage`. The suite is bundled
+   inside it. [Linux AppImage](https://github.com/benjarogit/CoDCoop/releases/latest/download/Install-CoD-Coop-Linux-x86_64.AppImage)
+2. In the file properties, allow execution, then open the AppImage. You can
+   also run these commands in the download directory.
 
-<details>
-<summary>Repair, backups and rollback</summary>
+   ```sh
+   chmod +x Install-CoD-Coop-Linux-x86_64.AppImage
+   ./Install-CoD-Coop-Linux-x86_64.AppImage
+   ```
+3. Select your existing **Call of Duty game folder** and install. Then run
+   `Start-CoD-Coop.sh` from the game folder.
 
-Use the setup's check/repair operation for a damaged installation. Replacing a
-file with another file of the same size is detected by its hash. Installation
-attempts keep a transaction journal and restore changed files on failure.
+Linux needs Wine or Proton for the game. The graphical bundle requires glibc
+2.35 or newer. The terminal installer, Steam setup, troubleshooting and
+rollback are covered in the [Linux guide](docs/linux.md).
 
-The Linux backend exposes `--rollback latest` (or a recorded transaction ID).
-Keep the generated backups until you have checked the new installation.
+GitHub lists two **Source code** archives for building from source.
+`SHA256SUMS` is optional and lets you check the downloads.
 
-</details>
+## Play together
 
-<details>
-<summary>Linux startup and display fixes</summary>
+1. Open **CoDCoop Launcher** and choose a campaign.
+2. One player selects **Host** and starts a mission. Everyone else selects
+   **Join**. Use the host's local IP on a LAN. Direct-IP play over the internet
+   uses UDP port `28960` by default.
+3. Use the same suite release on every machine. Players can use different
+   languages. The host's save and mission progress are shared with the group,
+   so use the same host to continue later.
 
-Wine must load the mod's `ddraw.dll` using `WINEDLLOVERRIDES="ddraw=n,b"`.
-Older OpenGL engines can overflow on modern extension strings. The launcher
-sets `__GL_ExtensionStringVersion=15000` and `MESA_EXTENSION_MAX_YEAR=2003`.
-See [Linux / Proton details](docs/linux.md).
+Steam joins use Spacewar (AppID 480) and a separate signed-in Steam account
+for each player. The Linux guide covers launching through Steam and Proton.
+The Steam transport has been tested locally with a stand-in Steam API.
+Joins with two real Steam accounts remain untested. [Linux Steam setup](docs/linux.md)
 
-</details>
+## Campaigns
 
-## Development status
+- **CoD + UO — Improved Coop** is the recommended route. Play the original
+  campaign with SP Improved through the UO engine, then continue into UO with
+  the same group.
+- **Call of Duty Classic** uses the original CoD 1.5 engine.
+- **United Offensive** starts the original expansion campaign.
+- **SP Improved** adds gameplay improvements to the CoD and UO missions.
+- **United Fronts** offers its own missions, campaign order and equipment.
+  Foy and Noville can hit the game's 255-model limit on the default path.
 
-0.6.1 is released: CoD 1, UO, SP Improved and United Fronts install and play
-together on Linux (Wine/Proton) and on native Windows 11. What is still
-documented as *not covered* is listed below — it is not a hidden blocker.
+The campaign variants keep separate saves. Call of Duty 2 remains experimental.
+The [compatibility guide](docs/campaign-compatibility.md) records which missions
+and mechanics were sampled. Full campaign playthroughs remain unverified.
 
-United Fronts still has an open resource issue in the default path: clean Foy
-and Noville startup can exhaust the engine's 255 model slots with the complete
-equipment set. The experimental deferred-registration path has passed
-four-player kits and native checkpoint reloads on Foy, Noville, Brecourt,
-Bastogne1, Afrika2, Dawnville, Pavlov, Arnhem and Pegasusnight, but it is not
-yet the production default and it does not certify complete missions. Coverage
-is being recorded per chapter; named limits are documented per map: bizerte
-loads no allied player model, dawnville's live-fire opening pins only the host
-during the QA join window (a liveness input, not a damage claim), pavlov
-combines an overlay-fixed stock weapon-table defect with two named, exactly
-matched content warnings, arnhem needed an authored-prefix fix plus one named
-missing-prop warning, and pegasusnight's glider intro owns the host body, so the
-host's fire readiness is waited for in a bounded per-map window. The signed
-equipment lobby works in frozen Linux
-and Windows/Wine workers; its native game owner/kit binding is still unfinished.
+## Development
 
-The release gate is **every campaign chapter sampled at least once, and every
-variant smoke-tested on the target platform**, not a human full playthrough. A
-playthrough can only be produced by playing the game correctly for many hours;
-it is therefore documented as *not covered* instead of being an open blocker.
-Steam with two separate accounts and the remaining special mechanics are still
-recorded as open.
+See the [build and test guide](docs/development-0.6.md), the
+[implementation handoff](docs/HANDOFF-0.6.md) and the
+[bilingual changelog](CHANGELOG.md) for release-specific changes.
 
-- [Implementation and test handoff](docs/HANDOFF-0.6.md)
-- [Campaign inventory and compatibility](docs/campaign-compatibility.md)
-- [YAP compatibility and pinned source](docs/yap-compatibility.md)
-- [English / German changelog](CHANGELOG.md)
-
-Tests deliberately distinguish connection/mechanics smoke tests from actual
-mission completion. They use isolated game copies and do not modify your live
-installation. Missing tests remain open; no platform or campaign is certified
-by inference from Wine or a screenshot.
-
-## Building and tests
-
-On Linux install the 32-bit MinGW-w64 toolchain, then run:
-
-```sh
-./build.sh
-python3 -m unittest discover -s tests -v
-g++ -std=c++17 tests/test_suite_protocol.cpp -o build/test_suite_protocol
-./build/test_suite_protocol
-```
-
-The Python tooling requires Python 3.10 or later. Graphical development tools
-use PySide6. See [development commands](docs/development-0.6.md) for native
-checker tests, isolated Wine tests, payload building and AppImage packaging.
-
-<details>
-<summary>Architecture and research tools</summary>
-
-The host runs the game's own single-player server. The loader bridges its
-loopback networking to remote clients and supplies state normally shared in
-process memory. The core can be reloaded during development; incompatible code
-or content requires matching participants.
-
-[Ghidra and REA](https://github.com/morluto/rea) help investigate specific engine
-functions and failures. [Co-op Anything](https://github.com/cranebeaker/coop-anything)
-provides testing and reverse-engineering methods. Using these tools does not
-itself prove compatibility: behavior must be tested in real game clients.
-
-Original technical notes: [architecture](notes/ARQUITECTURA.md).
-
-</details>
-
-## Credits and licenses
-
-Maintained fork of [TheTiranix/CoDCoop](https://github.com/TheTiranix/CoDCoop).
-CoDCoop source: [MIT](LICENSE). YAP is a separate
-[GPL-3.0 component](third_party/yap/LICENSE); retain its source/version information
-and license when packaging. Credits for SP Improved, United Fronts and their
-included community content remain with their authors. Call of Duty belongs to
-Activision; Steam components belong to Valve.
+CoDCoop is an [MIT-licensed](LICENSE) fork of
+[TheTiranix/CoDCoop](https://github.com/TheTiranix/CoDCoop). YAP has its own
+[GPL-3.0 license](third_party/yap/LICENSE) and
+[source and compatibility notes](docs/yap-compatibility.md). SP Improved and
+United Fronts credit their respective authors. Call of Duty belongs to Activision
+and Steam components belong to Valve.
