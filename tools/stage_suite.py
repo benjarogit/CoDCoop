@@ -79,10 +79,6 @@ def stage(game, output, yap_archive, yap_extras, include_base=False, launcher_so
     if sha256(yap_archive) != YAP_ZIP_SHA or sha256(yap_extras) != YAP_EXTRAS_SHA:
         raise ValueError('YAP release archive does not match the pinned r169 artifact')
     manifest = json.loads((ROOT/'content/variants.json').read_text())
-    for relative in ('Main/pakz_coop.pk3', 'uo/pakz_coop.pk3'):
-        with zipfile.ZipFile(resolve(game, relative)) as archive:
-            if 'ui/main.menu' not in archive.namelist() or b'exec "coopinternet"' not in archive.read('ui/main.menu'):
-                raise ValueError(f'{relative} is missing the internet address control. Rebuild the Coop menus with tools/make_ui.py.')
     runtime_source = Path(runtime_source or ROOT/'build')
     if checker_prefix is not None:
         prefix = Path(checker_prefix).resolve()
@@ -95,6 +91,14 @@ def stage(game, output, yap_archive, yap_extras, include_base=False, launcher_so
     provenance.assert_sources(ROOT,expected_graph)
     launcher_source=Path(launcher_source or ROOT/"build/launcher/CoD-Coop-Launcher")
     provenance.require_launcher(launcher_source,expected_graph,manifest["protocol"],required_feature_mask(manifest),checker_prefix)
+    for relative in ('Main/pakz_coop.pk3', 'uo/pakz_coop.pk3'):
+        path = resolve(game, relative)
+        if not path.is_file():
+            raise ValueError(f'{relative} is missing. Build it with tools/make_ui.py.')
+        with zipfile.ZipFile(path) as archive:
+            menu = archive.read('ui/main.menu') if 'ui/main.menu' in archive.namelist() else b''
+            if b'exec "coopinternet"' not in menu or b'cvar "ui_coop_join_status"' not in menu:
+                raise ValueError(f'{relative} has an older Coop menu. Rebuild it with tools/make_ui.py.')
     temporary = Path(tempfile.mkdtemp(prefix='codcoop-stage-', dir=output.parent))
     try:
         def copy(src, rel):

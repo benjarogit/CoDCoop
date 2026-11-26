@@ -76,6 +76,14 @@ void CoopStatus(const char* fmt, ...)
     g::Cvar_Set("ui_coop_status", b);
 }
 
+void ShowJoinStatus(const char* text)
+{
+    char message[201];
+    snprintf(message, sizeof message, "%.200s", text);
+    CoopStatus("%s", message);
+    g::Cvar_Set("ui_coop_join_status", message);
+}
+
 // VM_Call: EAX = vm, 13 argumentos en la pila (ver game.h GameCall). Las direcciones que usan los asm de este
 // archivo estan en variables (CoD1 o UO).
 extern "C" {
@@ -3996,10 +4004,13 @@ void JoinerSendJoin()
     if (!g_profileReady) return;
     if (!S->compatible) {
         if (suite::HandshakeExpired(GetTickCount(), S->joinStarted, S->lastJoinTry)) {
-            CoopStatus("Host did not pass the suite handshake (offline or older mod). Update both installations.");
-            Log("suite: handshake timed out");
-            if (S->recoveringConnection) JoinerLeave("Could not reconnect to the host. Retry joining when the host is available.");
-            else S->role = NONE;
+            const bool steamJoin = steam::IsAddr(S->host);
+            const char* message = steamJoin ? "Steam join timed out. Retry or use the host's IP address."
+                                           : "Host did not respond. Check the address, UDP port and firewall.";
+            Log("suite: handshake timed out via %s", steamJoin ? "Steam" : "UDP");
+            if (S->recoveringConnection) JoinerLeave(message);
+            else ShowJoinStatus(message);
+            S->role = NONE;
             return;
         }
         Writer hello(suite::HELLO);
@@ -4120,6 +4131,7 @@ void JoinerHijack()
     g::cls_state = state;
     g::CL_ApplyConfigstrings(g::sv_configstrings);
     S->joined = true;
+    g::Cvar_Set("ui_coop_join_status", "");
     Writer ready(M_WORLD_READY); SendTo(S->host, ready.buf, ready.len);
     Log("joiner: conectado al host como slot %d en %s", S->slot, S->hostMap);
     g::Com_Printf("^2COOP: connected to the host (player %d)\n", S->slot + 1);
@@ -4163,6 +4175,7 @@ void JoinerControl(uint8_t type, Reader r)
         if(!BootAcceptReady(r))break;
         if (!S->compatible && !S->joined) {
             S->compatible = true;
+            ShowJoinStatus("Host found. Joining the campaign...");
             Log("suite: host compatibility verified, requesting player slot");
             JoinerSendJoin();
         }
@@ -4171,7 +4184,7 @@ void JoinerControl(uint8_t type, Reader r)
         const char* reason = (const char*)r.p;
         if (!memchr(r.p, 0, (size_t)(r.end - r.p))) return;
         Log("suite: rejected: %.200s", reason);
-        CoopStatus("%.200s", reason);
+        ShowJoinStatus(reason);
         if (S->recoveringConnection) { JoinerLeave(reason); break; }
         S->role = NONE;
         S->compatible = false;
@@ -4409,7 +4422,7 @@ void JoinerLeave(const char* why)
     g_hostSeen = 0;
     memset(S->downed, 0, sizeof S->downed);
     g::Com_Printf("^3COOP: %s\n", why);
-    CoopStatus("%s", why);
+    ShowJoinStatus(why);
     g::Cbuf_AddText("disconnect\n");
 }
 
@@ -4446,7 +4459,7 @@ void OnSteamJoin(const char* connect)
     }
     g_pendingSteamJoin = 0;
     Log("steam: rich presence join request accepted");
-    CoopStatus("Steam invitation received. Preparing to join...");
+    ShowJoinStatus("Steam invitation received. Preparing to join...");
     QueueSteamJoin(id);
 }
 
@@ -4486,7 +4499,7 @@ void SteamFrame()
         if (up) QueueSteamJoin(id);
         else {
             Log("steam: join request expired while waiting for Steam initialization");
-            CoopStatus("Steam did not become ready. Open Steam and retry the invitation.");
+            ShowJoinStatus("Steam did not become ready. Open Steam and retry joining.");
         }
     }
     if (!up) return;
@@ -4497,7 +4510,10 @@ void SteamFrame()
             steam::ReadLaunchCommand(command) && !strncmp(command, "+coopjoin ", 10))
             OnSteamJoin(command);
     }
-    steam::Poll(OnSteamJoin);
+    steam::Poll(OnSteamJoin, [](uint64_t peer) {
+        if (S->role == JOINER && !S->compatible && peer && peer == steam::IdOf(S->steamPeer, S->host))
+            ShowJoinStatus("Steam could not connect to the host. Retrying...");
+    });
     if ((S->role == HOST) != presence) {  // al crear partida y al dejar de ser anfitrion (coopleave)
         presence = S->role == HOST;
         char connect[64];
@@ -4581,6 +4597,7 @@ void HostMissileOwners()
 void Cmd_CoopHost()
 {
     g_pendingSteamJoin = 0;
+    g::Cvar_Set("ui_coop_join_status", "");
     RestoreHostRules();
     if (!PrepareIdentity()) return;
     PreservationObserveReady();
@@ -4633,7 +4650,7 @@ void Cmd_CoopJoin()
     const char* target = g::cmd_argc > 1 ? g::Argv(1) : g::CvarString("coop_ip");
     if (!*target) {
         g::Com_Printf("usage: coopjoin <ip>[:port]\n");
-        CoopStatus("Enter the host's IP above or select a Steam friend.");
+        ShowJoinStatus("Enter the host address or select a Steam friend.");
         return;
     }
     char host[128];
@@ -4643,14 +4660,14 @@ void Cmd_CoopJoin()
     const uint64_t steamId = steamJoin ? SteamJoinId(host + 6) : 0;
     if (steamJoin && !steamId) {
         Log("steam: invalid host address");
-        CoopStatus("The Steam address needs a valid Steam ID.");
+        ShowJoinStatus("The Steam address needs a valid Steam ID.");
         return;
     }
     if (steamJoin && !steam::up) {
         g_pendingSteamJoin = steamId;
         g_pendingSteamJoinSince = GetTickCount();
         Log("steam: join request waiting for Steam initialization");
-        CoopStatus("Waiting for Steam before joining...");
+        ShowJoinStatus("Waiting for Steam before joining...");
         return;
     }
     g_pendingSteamJoin = 0;
@@ -4666,7 +4683,10 @@ void Cmd_CoopJoin()
     S->receivedMovie = 0; S->receivedMovieStatus = 0;
     S->movieWorldSuspended = false;
     g_animAssembler.Reset();
-    if (!PrepareIdentity()) return;
+    if (!PrepareIdentity()) {
+        g::Cvar_Set("ui_coop_join_status", g::CvarString("ui_coop_status"));
+        return;
+    }
     S->compatible = false;
     S->joinStarted = 0;
     if (!OpenSocket(0)) return;
@@ -4681,7 +4701,7 @@ void Cmd_CoopJoin()
         hints.ai_socktype = SOCK_DGRAM;
         if (getaddrinfo(host, nullptr, &hints, &res) != 0 || !res) {
             g::Com_Printf("^1COOP: could not find '%s'\n", host);
-            CoopStatus("Could not find '%s'.", host);
+            ShowJoinStatus("Host address could not be resolved.");
             return;
         }
         S->host = *(sockaddr_in*)res->ai_addr;
@@ -4696,11 +4716,10 @@ void Cmd_CoopJoin()
     if (steam::IsAddr(S->host)) {
         Log("steam: joining host as requested");
         g::Com_Printf("COOP: joining %s via Steam...\n", host);
-        CoopStatus("Looking for %s via Steam... (they must have chosen Host game and be playing)", host);
+        ShowJoinStatus("Connecting to the host via Steam...");
     } else {
         g::Com_Printf("COOP: joining %s:%d...\n", host, ntohs(S->host.sin_port));
-        CoopStatus("Looking for the host at %s:%d... (they must have chosen Host game and be playing)",
-                   host, ntohs(S->host.sin_port));
+        ShowJoinStatus("Waiting for the host to answer over UDP...");
     }
 }
 
@@ -4709,6 +4728,7 @@ void Cmd_CoopJoin()
 void Cmd_CoopLeave()
 {
     g_pendingSteamJoin = 0;
+    g::Cvar_Set("ui_coop_join_status", "");
     S->waitingForMap = false;
     Writer w(M_BYE);
     w.Put<uint8_t>(1); // intentional departure; empty/zero BYE is temporary clock/map recovery

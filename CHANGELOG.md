@@ -10,6 +10,9 @@
 - **EN:** A Steam invitation received before Steam is ready waits for initialization.
   The game also reads the Steam launch request when opened from an invitation.
   The status and log show whether the pending request starts or expires.
+- **EN:** The main menu shows join progress and reports whether Steam or UDP
+  timed out before the host handshake. Steam callbacks also work with an
+  already initialized Steam client interface.
 - **DE:** Spiel und Launcher kennzeichnen Heimnetz-Adresse und öffentliche IPv4
   getrennt. Die öffentliche Adresse wird auf Klick ermittelt. Der Launcher
   kopiert beide Adressen samt Port und erklärt die UDP-Weiterleitung.
@@ -17,6 +20,9 @@
   bleibt kurz vorgemerkt. Beim Start über eine Einladung liest das Spiel auch
   die Steam-Startanfrage. Der Status und das Log zeigen, ob der Beitritt
   startet oder die Wartezeit abläuft.
+- **DE:** Das Hauptmenü zeigt den Verbindungsfortschritt und meldet, ob der
+  Beitritt über Steam oder UDP vor der Antwort des Hosts abgelaufen ist.
+  Die Steam-Ereignisse werden auch bei bereits initialisierter API verarbeitet.
 
 ## 0.6.2 · Hotfix
 

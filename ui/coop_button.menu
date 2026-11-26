@@ -44,3 +44,21 @@
 			visible 1
 			decoration
 		}
+
+		itemDef
+		{
+			name coop_join_status
+			rect 385 440 240 32
+			type ITEM_TYPE_TEXT
+			style 1
+			textstyle 3
+			autowrapped
+			cvar "ui_coop_join_status"
+			textscale .18
+			textalign ITEM_ALIGN_LEFT
+			textalignx 0
+			textaligny 10
+			forecolor 1 1 .6 1
+			visible 1
+			decoration
+		}

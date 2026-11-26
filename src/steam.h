@@ -158,7 +158,6 @@ inline bool Start()
         if (!(*(FARPROC*)f.field = GetProcAddress(a.dll, f.name))) return strcpy(error, "steam_api.dll de otra version"), false;
     if (!a.user()) {
         SetEnvironmentVariableA("SteamAppId", "480");  // Spacewar, sin steam_appid.txt
-        a.dispatchInit();
         char err[1024] = "";
         if (a.init("SteamUser023\0SteamFriends017\0SteamNetworkingMessages002\0", err) != 0) {
             // En Linux/Proton solo funciona si Steam arranco el juego (ahi provee steamclient.dll en el prefix).
@@ -171,6 +170,7 @@ inline bool Start()
     a.friends = a.friendsIf();
     a.msgs = a.msgIf();
     if (!(up = a.users && a.friends && a.msgs)) return false;
+    a.dispatchInit();  // Also enable callbacks when Steam was initialized before the Coop core.
     static bool lock;
     if (!lock) InitializeCriticalSection(&netLock), lock = true;
     if (void* net = a.netUtilsIf()) {
@@ -208,18 +208,21 @@ inline bool ReadLaunchCommand(char (&command)[256])
 
 // Callbacks de Steam: aceptar a quien nos manda mensajes (SteamNetworkingMessagesSessionRequest_t) y
 // "Unirse a la partida" desde la lista de amigos (GameRichPresenceJoinRequested_t: amigo + texto "connect").
-inline void Poll(void (*onJoin)(const char* connect))
+inline void Poll(void (*onJoin)(const char* connect), void (*onFailure)(uint64_t) = nullptr)
 {
     if (!up) return;
     int pipe = a.pipe();
     a.runFrame(pipe);
     CallbackMsg m;
     while (a.nextCallback(pipe, &m)) {
-        if (m.id == 1251) {
+        if (m.id == 1251 && m.param && m.size >= static_cast<int>(sizeof(Identity))) {
             bool ok = a.accept(a.msgs, (const Identity*)m.param);
             if (log) log("steam: %I64u abre una sesion: %s", ((const Identity*)m.param)->id, ok ? "aceptada" : "NO se pudo aceptar");
-        } else if (m.id == 1252 && log) {  // SteamNetworkingMessagesSessionFailed_t: el motivo lo da NetDebug
-            log("steam: la sesion con %I64u fallo", ((const Identity*)m.param)->id);
+        } else if (m.id == 1252 && m.param && m.size >= static_cast<int>(sizeof(Identity))) {
+            // SteamNetConnectionInfo_t starts with the remote identity.
+            const auto peer = reinterpret_cast<const Identity*>(m.param)->id;
+            if (log) log("steam: session failure for %I64u", peer);
+            if (onFailure) onFailure(peer);
         } else if (m.id == 337 && onJoin) {
             const char* connect = m.param && m.size > 8 ? reinterpret_cast<const char*>(m.param + 8) : nullptr;
             if (connect && memchr(connect, '\0', m.size - 8)) onJoin(connect);
