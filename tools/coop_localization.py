@@ -54,11 +54,21 @@ def read_bank(root,relative):
         fd=os.open(path,os.O_RDONLY|getattr(os,'O_BINARY',0)|getattr(os,'O_NOFOLLOW',0))
         with os.fdopen(fd,'rb') as source:
             opened=os.fstat(source.fileno())
-            identity=lambda s:(s.st_dev,s.st_ino,s.st_size,s.st_mtime_ns,s.st_ctime_ns)
-            if identity(before)!=identity(opened) or not stat.S_ISREG(opened.st_mode):raise ValueError(unsafe)
-            data=source.read(MAX_LOCALE_BYTES+1)
-            after=os.fstat(source.fileno())
-            if len(data)>MAX_LOCALE_BYTES or len(data)!=opened.st_size or identity(opened)!=identity(after) or identity(after)!=identity(path.lstat()):raise ValueError(unsafe)
+            # On Windows, lstat and fstat can assign different meanings to
+            # ctime. Birthtime identifies the file consistently across both.
+            def identity(info):
+                timestamp = getattr(info, 'st_birthtime_ns', info.st_ctime_ns)
+                return info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, timestamp
+
+            if identity(before) != identity(opened) or not stat.S_ISREG(opened.st_mode):
+                raise ValueError(unsafe)
+            data = source.read(MAX_LOCALE_BYTES + 1)
+            after = os.fstat(source.fileno())
+            current = path.lstat()
+            if (len(data) > MAX_LOCALE_BYTES or len(data) != opened.st_size
+                    or identity(opened) != identity(after) or identity(after) != identity(current)
+                    or opened.st_ctime_ns != after.st_ctime_ns or before.st_ctime_ns != current.st_ctime_ns):
+                raise ValueError(unsafe)
         if path.is_symlink() or not path.parent.resolve().is_relative_to(root):raise ValueError(unsafe)
         return data
     except OSError as exc:
