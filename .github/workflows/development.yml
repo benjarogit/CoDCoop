@@ -70,7 +70,7 @@ jobs:
       - name: Build the native script-pool hook fixture
         run: >
           i686-w64-mingw32-g++ -std=c++17 -O2 -static tests/test_mt_epoch_hook.cpp
-          -Wl,--disable-dynamicbase,--image-base,0x400000,--section-start,.mtdata=0x8f0000
+          -Wl,--disable-dynamicbase,--image-base,0x400000
           -o build/test-mt-epoch.exe
       - run: i686-w64-mingw32-g++ -std=c++17 -Wall -Wextra -Werror -O2 -static tests/test_asset_bootstrap.cpp -o build/test-asset-bootstrap.exe
       - run: i686-w64-mingw32-g++ -std=c++17 -O2 -s -static -municode -Wl,--no-insert-timestamp tests/native_download_probe.cpp -o build/native-download-probe.exe -lole32 -lshell32 -lurlmon -lcomctl32 -loleaut32 -luuid -ladvapi32
