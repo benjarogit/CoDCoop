@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "suite_version": "0.6.0-dev.6",
+  "suite_version": "0.6.0",
   "protocol": 9,
   "complete_suite_required": true,
   "required": [
@@ -346,8 +346,8 @@
     }
   ],
   "acceptance": {
-    "stable": false,
-    "native_windows": false,
+    "stable": true,
+    "native_windows": true,
     "steam_two_accounts": false,
     "complete_playthroughs": false
   },
