@@ -4,7 +4,7 @@
 
 **The original campaigns. One squad.**
 
-[![Release](https://img.shields.io/badge/0.6.0-release-brightgreen)](#development-status)
+[![Release](https://img.shields.io/badge/0.6.1-release-brightgreen)](#development-status)
 ![Players](https://img.shields.io/badge/players-2%E2%80%934-blue)
 ![Windows target](https://img.shields.io/badge/target-Windows%2010%20%2F%2011-0078D4)
 ![Linux](https://img.shields.io/badge/Linux-Wine%20%2F%20Proton-FCC624)
@@ -16,12 +16,14 @@
 
 </div>
 
-> **0.6.0 — the full campaign suite.** Call of Duty 1, United Offensive, SP
+> **0.6.1 — the full campaign suite.** Call of Duty 1, United Offensive, SP
 > Improved 1.5 and United Fronts in one Coop suite, verified under Linux
-> (Wine/Proton) and on native Windows 11. Coverage is recorded chapter by
-> chapter; a human full-campaign playthrough is not claimed, and Steam with two
-> separate accounts is still untested. A successful install or short connection
-> test does not by itself certify a campaign.
+> (Wine/Proton) and on native Windows 11. 0.6.1 fixes the Steam join path: the
+> host read the sender SteamID from the wrong offset and answered no Steam
+> session. Coverage is recorded chapter by chapter; a human full-campaign
+> playthrough is not claimed, and Steam with two separate accounts is still
+> untested. A successful install or short connection test does not by itself
+> certify a campaign.
 
 The current package contract requires Core API mask 63, including native
 asset bootstrap and owned English/German Coop banners. This does not enable individual UF kits; their party/native
@@ -149,7 +151,7 @@ See [Linux / Proton details](docs/linux.md).
 
 ## Development status
 
-0.6.0 is released: CoD 1, UO, SP Improved and United Fronts install and play
+0.6.1 is released: CoD 1, UO, SP Improved and United Fronts install and play
 together on Linux (Wine/Proton) and on native Windows 11. What is still
 documented as *not covered* is listed below — it is not a hidden blocker.
 

@@ -1,6 +1,56 @@
 # Changelog · Änderungsprotokoll
 
-[English](#060--english) · [Deutsch](#060--deutsch)
+[English](#061--english) · [Deutsch](#061--deutsch)
+
+## 0.6.1 — English
+
+**Released 2026-11-26. Steam join fix. Steam with two real accounts and a
+human full-campaign playthrough remain documented as not covered.**
+
+- Fix Steam joins (ported from upstream `1cfb017`, adapted to this tree).
+  `SteamNetworkingIdentity` is packed in the Steamworks SDK, so the sender
+  identity inside `SteamNetworkingMessage_t` is at offset 12 on 32-bit builds,
+  not 16. Reading it at 16 gave every sender the bogus SteamID `0x01100001`, so
+  the host answered no Steam session and a friend joining from the Steam friend
+  list never connected. The host now accepts the session; the joiner spawns,
+  moves and shuts down cleanly.
+- Log the Steam networking state and relay/identity details, so a failed join
+  can be diagnosed from `codcoop.log`.
+- Add `tools/fakesteam.cpp`, a stand-in `steam_api.dll` for two-user tests on
+  one PC, and extend `tools/qa_coop.py` with `--steam-api` / `--steam-host-id`:
+  every player copy gets the stand-in API, its own SteamID and joins with
+  `+coopjoin steam:<host id>` instead of an IP address.
+- Verified: two-player CoD 1 `training` smoke over the Steam transport on
+  Linux/Wine — host accepted the session, joiner moved 238.7 units, clean
+  shutdown (`run/qa-steam-fake1`, `transport=steam-fake`). This exercises the
+  SDK ABI and the mod's Steam path with a stand-in DLL, not two real Steam
+  accounts; that remains untested and is not claimed.
+
+## 0.6.1 — Deutsch
+
+**Veröffentlicht am 26.11.2026. Steam-Beitritt repariert. Steam mit zwei echten
+Konten und ein menschlicher Komplett-Durchlauf bleiben als nicht abgedeckt
+dokumentiert.**
+
+- Steam-Beitritte reparieren (aus Upstream `1cfb017` übernommen und an diesen
+  Stand angepasst). `SteamNetworkingIdentity` ist im Steamworks-SDK gepackt,
+  deshalb steht die Absender-Identität in `SteamNetworkingMessage_t` auf
+  32-Bit-Builds bei Offset 12, nicht 16. Bei Offset 16 bekam jeder Absender die
+  falsche SteamID `0x01100001`; der Host antwortete keiner Steam-Sitzung und ein
+  Beitritt aus der Steam-Freundesliste kam nie zustande. Der Host nimmt die
+  Sitzung jetzt an; der Beitretende spawnt, bewegt sich und beendet sauber.
+- Steam-Netzwerkzustand und Relay-/Identitätsdetails werden protokolliert, damit
+  ein fehlgeschlagener Beitritt aus `codcoop.log` diagnostizierbar ist.
+- `tools/fakesteam.cpp` ergänzt: eine `steam_api.dll` als Ersatz für Zwei-Spieler-
+  Tests auf einem PC. `tools/qa_coop.py` erhält `--steam-api` / `--steam-host-id`:
+  jede Spielerkopie bekommt die Ersatz-API, eine eigene SteamID und tritt mit
+  `+coopjoin steam:<Host-ID>` statt einer IP-Adresse bei.
+- Geprüft: Zwei-Spieler-Smoke auf CoD 1 `training` über den Steam-Transport unter
+  Linux/Wine — Host nahm die Sitzung an, der Beitretende bewegte sich 238,7
+  Einheiten, beide beendeten sauber (`run/qa-steam-fake1`,
+  `transport=steam-fake`). Das prüft die SDK-ABI und den Steam-Pfad des Mods mit
+  einer Ersatz-DLL, nicht zwei echte Steam-Konten; das bleibt ungeprüft und wird
+  nicht behauptet.
 
 ## 0.6.0 — English
 

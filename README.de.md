@@ -4,7 +4,7 @@
 
 **Die ursprünglichen Kampagnen. Ein gemeinsamer Trupp.**
 
-[![Veröffentlichung](https://img.shields.io/badge/0.6.0-Release-brightgreen)](#entwicklungsstand)
+[![Veröffentlichung](https://img.shields.io/badge/0.6.1-Release-brightgreen)](#entwicklungsstand)
 ![Spieler](https://img.shields.io/badge/Spieler-2%E2%80%934-blue)
 ![Windows-Ziel](https://img.shields.io/badge/Ziel-Windows%2010%20%2F%2011-0078D4)
 ![Linux](https://img.shields.io/badge/Linux-Wine%20%2F%20Proton-FCC624)
@@ -16,13 +16,15 @@
 
 </div>
 
-> **0.6.0 — die vollständige Kampagnen-Suite.** Call of Duty 1, United
+> **0.6.1 — die vollständige Kampagnen-Suite.** Call of Duty 1, United
 > Offensive, SP Improved 1.5 und United Fronts in einer Coop-Suite, geprüft
-> unter Linux (Wine/Proton) und nativ auf Windows 11. Die Abdeckung wird
-> kapitelweise festgehalten; ein vollständiger Durchspiel-Lauf von Hand wird
-> nicht behauptet, und Steam mit zwei getrennten Accounts ist weiterhin
-> ungetestet. Eine erfolgreiche Installation oder ein kurzer Verbindungstest
-> bestätigt noch keine vollständige Kampagne.
+> unter Linux (Wine/Proton) und nativ auf Windows 11. 0.6.1 repariert den
+> Steam-Beitritt: Der Host las die Absender-SteamID an der falschen Stelle und
+> antwortete keiner Steam-Sitzung. Die Abdeckung wird kapitelweise
+> festgehalten; ein vollständiger Durchspiel-Lauf von Hand wird nicht
+> behauptet, und Steam mit zwei getrennten Accounts ist weiterhin ungetestet.
+> Eine erfolgreiche Installation oder ein kurzer Verbindungstest bestätigt noch
+> keine vollständige Kampagne.
 
 Der aktuelle Paketvertrag verlangt die Core-API-Maske 63 einschließlich
 des nativen Ressourcen-Bootstraps und lokalisierter Coop-Hinweise. Das aktiviert noch keine individuelle
@@ -159,7 +161,7 @@ Weitere Einzelheiten: [Linux / Proton](docs/linux.md).
 
 ## Entwicklungsstand
 
-0.6.0 ist veröffentlicht: CoD 1, UO, SP Improved und United Fronts lassen sich
+0.6.1 ist veröffentlicht: CoD 1, UO, SP Improved und United Fronts lassen sich
 unter Linux (Wine/Proton) und nativ auf Windows 11 installieren und gemeinsam
 spielen. Was weiterhin als *nicht abgedeckt* dokumentiert ist, steht unten — es
 ist kein versteckter Blocker.

@@ -10,6 +10,28 @@ This section supersedes the historical checkpoints below. / Dieser Abschnitt
 ersetzt die älteren Standangaben weiter unten. Development is unfinished;
 published v0.5.4 binaries have not been replaced.
 
+### 0.6.1 — Steam join fix / Steam-Beitritt repariert
+
+0.6.1 ports upstream `1cfb017` (adapted): the sender identity in
+`SteamNetworkingMessage_t` is at offset 12 on 32-bit builds, not 16, so the host
+previously answered every Steam peer with the bogus SteamID `0x01100001` and no
+Steam join completed. `tools/fakesteam.cpp` (a stand-in `steam_api.dll`) and
+`tools/qa_coop.py --steam-api` make the transport testable with two players on
+one PC. Verified with a two-player CoD 1 `training` smoke on Linux/Wine: host
+accepted the session, joiner moved 238.7 units, clean shutdown
+(`run/qa-steam-fake1`, `transport=steam-fake`). Steam with two real accounts
+remains untested and is not claimed.
+/ 0.6.1 übernimmt Upstream `1cfb017` (angepasst): Die Absender-Identität in
+`SteamNetworkingMessage_t` liegt auf 32-Bit-Builds bei Offset 12, nicht 16.
+Dadurch antwortete der Host jedem Steam-Peer bisher mit der falschen SteamID
+`0x01100001`, und kein Steam-Beitritt kam zustande. `tools/fakesteam.cpp` (eine
+Ersatz-`steam_api.dll`) und `tools/qa_coop.py --steam-api` machen den Transport
+mit zwei Spielern auf einem PC testbar. Geprüft mit einem Zwei-Spieler-Smoke auf
+CoD 1 `training` unter Linux/Wine: Host nahm die Sitzung an, der Beitretende
+bewegte sich 238,7 Einheiten, sauberes Beenden (`run/qa-steam-fake1`,
+`transport=steam-fake`). Steam mit zwei echten Konten bleibt ungeprüft und wird
+nicht behauptet.
+
 ### Native Windows acceptance / Native Windows-Abnahme — 2026-11-26
 
 The 0.6.0 package was verified on real Windows 11 Pro (build 26300) in a
