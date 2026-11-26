@@ -140,6 +140,20 @@ Ein Windows-Paket benötigt einen Windows-Launcher samt Laufzeit. Das Setup lehn
 reine Linux-Pakete unter Windows ab. Linux benötigt Linux-Dateien; die
 `_internal`-Verzeichnisse nicht vermischen.
 
+### Windows release ZIP / Windows-Installationspaket
+
+Package the verified installer and matching staged Windows suite in one ZIP.
+Das geprüfte Setup und die passende Windows-Suite kommen in eine ZIP-Datei.
+
+```sh
+python3 tools/package-windows.py --installer build/Install-CoD-Coop.exe \
+  --suite run/suite-windows --output build/Install-CoD-Coop-Windows-x86_64.zip
+```
+
+The installer opens from the extracted folder and discovers the adjacent
+`suite/` directory. Nach dem Entpacken findet das Setup den Ordner `suite/`
+neben der EXE.
+
 ## Launch and transitions / Start und Wechsel
 
 ```sh

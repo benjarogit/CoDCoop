@@ -14,19 +14,10 @@ Start with an **existing, complete Call of Duty installation**. The game folder 
 
 ### Windows 10/11 (64-bit)
 
-1. Download **both files** from the same release. [Installer `Install-CoD-Coop.exe`](https://github.com/benjarogit/CoDCoop/releases/latest/download/Install-CoD-Coop.exe) · [ZIP ending in `-suite-windows.zip`](https://github.com/benjarogit/CoDCoop/releases/latest#assets)
-2. Extract the ZIP. Rename the folder that directly contains `coop` to **`suite`** and put it next to the EXE.
-
-   ```text
-   CoDCoop-Setup/
-   ├── Install-CoD-Coop.exe
-   └── suite/
-       └── coop/
-           └── variants.json
-   ```
-
-3. Run the EXE and select your **Call of Duty game folder**. The setup finds `suite` next to the EXE.
-4. When setup finishes, open **`Start-CoD-Coop.bat` in the game folder**.
+1. [Download the Windows setup ZIP](https://github.com/benjarogit/CoDCoop/releases/latest/download/Install-CoD-Coop-Windows-x86_64.zip).
+2. Extract the ZIP and open `Install-CoD-Coop.exe` from the extracted folder.
+3. In setup, select your **Call of Duty game folder**. When setup finishes,
+   open **`Start-CoD-Coop.bat` in the game folder**.
 
 ### Linux (x86_64)
 
@@ -74,7 +65,7 @@ Add `--language de` to install in German.
 
 - Setup can download additional files if United Offensive data or the selected German language pack is missing.
 - Setup keeps your saves and existing settings by default.
-- `SHA256SUMS` is optional for verifying the downloads. GitHub’s **Source code** archives contain the source for building the mod.
+- GitHub shows the SHA-256 checksum next to each download. GitHub’s **Source code** archives contain the source for building the mod.
 
 </details>
 

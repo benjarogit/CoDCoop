@@ -14,19 +14,10 @@ Du brauchst eine **vorhandene, vollständige Call-of-Duty-Installation**. Der ri
 
 ### Windows 10/11 (64 Bit)
 
-1. Lade **beide Dateien** aus demselben Release. [Installer `Install-CoD-Coop.exe`](https://github.com/benjarogit/CoDCoop/releases/latest/download/Install-CoD-Coop.exe) · [ZIP mit der Endung `-suite-windows.zip`](https://github.com/benjarogit/CoDCoop/releases/latest#assets)
-2. Entpacke das ZIP. Benenne den entpackten Ordner, der direkt `coop` enthält, in **`suite`** um und lege ihn neben die EXE.
-
-   ```text
-   CoDCoop-Setup/
-   ├── Install-CoD-Coop.exe
-   └── suite/
-       └── coop/
-           └── variants.json
-   ```
-
-3. Starte die EXE. Wähle im Setup deinen **Call-of-Duty-Spielordner**. Das Setup findet `suite` neben der EXE.
-4. Öffne nach der Installation **`Start-CoD-Coop.bat` im Spielordner**.
+1. [Windows-Installationspaket herunterladen](https://github.com/benjarogit/CoDCoop/releases/latest/download/Install-CoD-Coop-Windows-x86_64.zip).
+2. Entpacke die ZIP-Datei und öffne `Install-CoD-Coop.exe` im entpackten Ordner.
+3. Wähle im Setup deinen **Call-of-Duty-Spielordner**. Öffne nach der Installation
+   **`Start-CoD-Coop.bat` im Spielordner**.
 
 ### Linux (x86_64)
 
@@ -72,7 +63,7 @@ sh ./install-codcoop.sh --game "/Pfad/zu/Call of Duty" --language de
 
 - Fehlen United-Offensive-Daten oder passende deutsche Sprachdateien, kann das Setup zusätzliche Dateien herunterladen.
 - Das Setup behält deine Spielstände und vorhandenen Einstellungen standardmäßig bei.
-- `SHA256SUMS` ist optional zum Prüfen der Downloads. GitHubs **Source code**-Archive enthalten den Quellcode für eigene Builds.
+- GitHub zeigt die SHA-256-Prüfsumme neben jedem Download. GitHubs **Source code**-Archive enthalten den Quellcode für eigene Builds.
 
 </details>
 

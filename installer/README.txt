@@ -13,10 +13,10 @@ local full payload can repair them. Modified or unknown language/extra PK3 files
 are compared as gameplay content unless their exact hashes are approved.
 
 Windows 10/11:
-  Put the matching Windows suite/ payload next to Install-CoD-Coop.exe and run
-  the installer. The payload must include the native Windows campaign launcher.
-  Language and personal settings remain local. Existing configs and saves are
-  preserved unless changing settings was explicitly selected.
+  Download and extract Install-CoD-Coop-Windows-x86_64.zip. Run
+  Install-CoD-Coop.exe from the extracted folder and select your existing
+  Call of Duty game folder. The matching suite is already beside the installer.
+  Existing settings and saves are kept unless you choose to change settings.
 
 Linux:
   Make Install-CoD-Coop-Linux-x86_64.AppImage executable, run it and select
@@ -59,11 +59,10 @@ Sprach-/Zusatz-PK3s werden ohne ausdruecklich freigegebenen Hash als Spielinhalt
 zwischen den Teilnehmern verglichen.
 
 Windows 10/11:
-  Das passende Windows-Paket suite/ neben Install-CoD-Coop.exe ablegen und den
-  Installer starten. Es muss den nativen Windows-Kampagnenlauncher enthalten.
-  Sprache und persoenliche Einstellungen bleiben lokal. Vorhandene Konfiguration
-  und Spielstaende bleiben erhalten, ausser Einstellungsänderungen wurden
-  ausdruecklich ausgewaehlt.
+  Install-CoD-Coop-Windows-x86_64.zip herunterladen und entpacken.
+  Install-CoD-Coop.exe im entpackten Ordner starten und den vorhandenen
+  Call-of-Duty-Spielordner waehlen. Die passende Suite liegt neben der EXE.
+  Vorhandene Einstellungen und Spielstaende werden standardmaessig behalten.
 
 Linux:
   Install-CoD-Coop-Linux-x86_64.AppImage ausfuehrbar machen, starten und den
