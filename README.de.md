@@ -96,9 +96,10 @@ Für die anderen Kampagnen wählt ihr die passende Variante im Launcher.
 
 ## Einrichten
 
-1. Klicke auf **Installation prüfen**. Der Launcher zeigt den geprüften Paketstand an. Vergleicht den Stand in der Gruppe.
-2. Wähle die **Kampagnenvariante**. Für die erste Runde empfiehlt sich **CoD + UO — Verbesserter Coop**.
-3. Lass **Startmission** leer, wenn du die Kampagne im Spiel beginnen oder einen Spielstand fortsetzen willst. Der Host legt den Schwierigkeitsgrad für neue Kampagnen fest. Bestehende Spielstände behalten ihren Schwierigkeitsgrad.
+Alle wählen **dieselbe Kampagne wie der Host**. Wer über **Spielen** in AnkerGames `CoDSP.exe` startet, spielt **Call of Duty — Original**. Bei Problemen zeigt **Installation prüfen** eure CoDCoop-Version an.
+
+<details>
+<summary><strong>Kampagnen und Startoptionen</strong></summary>
 
 | Variante im Launcher | Inhalt |
 | --- | --- |
@@ -106,6 +107,10 @@ Für die anderen Kampagnen wählt ihr die passende Variante im Launcher.
 | **Call of Duty — Original** | Die klassische Kampagne auf der CoD-1.5-Engine |
 | **United Offensive — Original** | Die ursprüngliche Erweiterungskampagne mit YAP |
 | **United Fronts** | Eigene Missionen, wählbare Kampagnenreihenfolge und Spezialwaffen |
+
+Lasst **Startmission** leer, um im Spiel eine Kampagne zu beginnen oder einen Spielstand zu laden. Der Host wählt den Schwierigkeitsgrad für neue Spiele.
+
+</details>
 
 <details>
 <summary><strong>Sprache, Grafik oder das Linux-Startprogramm ändern</strong></summary>
@@ -123,7 +128,7 @@ Für die anderen Kampagnen wählt ihr die passende Variante im Launcher.
 ## Gemeinsam spielen
 
 1. Der Host wählt **Spiel hosten** → **Kampagne starten** und öffnet eine Mission oder lädt seinen Spielstand.
-2. Die Mitspieler wählen **Spiel beitreten**, tragen die **Host-Adresse** ein und klicken auf **Kampagne beitreten**.
+2. Die Mitspieler öffnen den CoDCoop Launcher, wählen **Spiel beitreten**, tragen die **Host-Adresse** ein und klicken auf **Kampagne beitreten**.
 3. Lasst den Launcher während der Sitzung offen. Der Host bestimmt den gemeinsamen Fortschritt. Spielt später mit demselben Host weiter, um seinen Spielstand fortzusetzen.
 
 Wenn das Spielmenü schon offen ist, wählt **Co-op**, tragt die Adresse in

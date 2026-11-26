@@ -8,6 +8,17 @@ Dies ist der Entwicklungsweg, kein veröffentlichtes fertiges Release.
 Use Python 3.10+ and the 32-bit MinGW-w64 toolchain. / Python ab3.10 und
 32-Bit-MinGW-w64 verwenden.
 
+Before staging 0.6.3, regenerate the CoD and UO menu packages from the owned
+game data with `python3 -I tools/make_ui.py --game "/path/to/staging-game"`. Use the resulting `pakz_coop.pk3`
+files for both target-OS suites. The in-game Internet IPv4 control opens a
+lookup on demand, and the launcher can copy both addresses with the port.
+
+Vor dem Paketbau für 0.6.3 die Coop-Menüs für CoD und UO mit
+`python3 -I tools/make_ui.py --game "/Pfad/zum/Testspielordner"` aus den eigenen Spieldaten neu bauen. Die dabei
+erzeugten `pakz_coop.pk3` für beide Plattformpakete verwenden. Im Spiel wird
+die öffentliche IPv4 auf Klick ermittelt. Der Launcher kopiert beide Adressen
+mit Port.
+
 ```sh
 ./build.sh
 python3 -m unittest discover -s tests -v

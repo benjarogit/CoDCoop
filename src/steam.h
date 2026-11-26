@@ -193,6 +193,19 @@ inline uint64_t MyId() { return up ? a.steamID(a.users) : 0; }
 inline const char* Name(uint64_t id) { return up ? a.friendName(a.friends, id) : ""; }  // UTF-8
 inline void SetPresence(const char* key, const char* value) { if (up) a.setPresence(a.friends, key, value); }
 
+inline bool ReadLaunchCommand(char (&command)[256])
+{
+    if (!up) return false;
+    using Apps = void* (__cdecl*)();
+    using LaunchCommand = int (__cdecl*)(void*, char*, int);
+    const auto apps = reinterpret_cast<Apps>(GetProcAddress(a.dll, "SteamAPI_SteamApps_v008"));
+    const auto read = reinterpret_cast<LaunchCommand>(GetProcAddress(a.dll, "SteamAPI_ISteamApps_GetLaunchCommandLine"));
+    void* instance = apps ? apps() : nullptr;
+    if (!instance || !read) return false;
+    const int length = read(instance, command, sizeof command);
+    return length > 0 && length < static_cast<int>(sizeof command) && memchr(command, '\0', sizeof command);
+}
+
 // Callbacks de Steam: aceptar a quien nos manda mensajes (SteamNetworkingMessagesSessionRequest_t) y
 // "Unirse a la partida" desde la lista de amigos (GameRichPresenceJoinRequested_t: amigo + texto "connect").
 inline void Poll(void (*onJoin)(const char* connect))
@@ -207,7 +220,11 @@ inline void Poll(void (*onJoin)(const char* connect))
             if (log) log("steam: %I64u abre una sesion: %s", ((const Identity*)m.param)->id, ok ? "aceptada" : "NO se pudo aceptar");
         } else if (m.id == 1252 && log) {  // SteamNetworkingMessagesSessionFailed_t: el motivo lo da NetDebug
             log("steam: la sesion con %I64u fallo", ((const Identity*)m.param)->id);
-        } else if (m.id == 337 && onJoin) onJoin((const char*)m.param + 8);
+        } else if (m.id == 337 && onJoin) {
+            const char* connect = m.param && m.size > 8 ? reinterpret_cast<const char*>(m.param + 8) : nullptr;
+            if (connect && memchr(connect, '\0', m.size - 8)) onJoin(connect);
+            else if (log) log("steam: malformed rich presence join callback");
+        }
         a.freeCallback(pipe);
     }
     EnterCriticalSection(&netLock);

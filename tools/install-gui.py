@@ -56,15 +56,18 @@ def main(argv=None):
                                    QMessageBox, QPlainTextEdit, QProgressBar, QPushButton,
                                    QSpinBox, QVBoxLayout, QWidget)
     app = QApplication(sys.argv)
+    found = bundled_suite()
     window = QWidget()
-    window.setWindowTitle('CoDCoop 0.6 — Setup')
+    window.setWindowTitle('CoDCoop — Setup')
     window.resize(740, 670)
     outer = QVBoxLayout(window)
     heading = QLabel('CoDCoop — full campaign suite / vollständiges Kampagnenpaket')
     heading.setWordWrap(True)
     outer.addWidget(heading)
-    info = QLabel('Development build. All campaign variants and YAP are required.\n'
-                  'Entwicklungsstand. Alle Kampagnenvarianten und YAP sind erforderlich.')
+    info = QLabel('Select your existing Call of Duty folder and click Install.\n'
+                  'Vorhandenen Call-of-Duty-Ordner wählen und auf Installieren klicken.' if found else
+                  'Select your Call of Duty folder and a complete suite payload.\n'
+                  'Call-of-Duty-Ordner und vollständiges Paket auswählen.')
     info.setWordWrap(True)
     outer.addWidget(info)
     form = QFormLayout()
@@ -85,7 +88,7 @@ def main(argv=None):
         return line
 
     game = folder_row('Game folder / Spielordner')
-    suite = folder_row('0.6 suite payload / Paketordner')
+    suite = None if found else folder_row('Suite payload / Paketordner')
     base = folder_row('Offline base (optional) / Basis (optional)')
     installer = backend()
     detected = installer.detect_games()
@@ -102,9 +105,6 @@ def main(argv=None):
             choices.addItem(f'{kind} — {path}' if kind in ('Steam', 'AnkerGames') else path, path)
         choices.currentIndexChanged.connect(lambda _: game.setText(choices.currentData() or ''))
         form.insertRow(0, 'Detected / Gefunden', choices)
-    found = bundled_suite()
-    if found is not None:
-        suite.setText(str(found))
     language = QComboBox()
     language.addItem('English', 'en')
     language.addItem('Deutsch', 'de')
@@ -188,8 +188,12 @@ def main(argv=None):
 
     def start(mode='install'):
         nonlocal operation, target
-        if not game.text().strip() or (mode == 'install' and not suite.text().strip()):
-            QMessageBox.warning(window, 'Missing folder / Ordner fehlt', 'Select the game folder and the complete 0.6 payload.\nSpielordner und vollständiges 0.6-Paket auswählen.')
+        payload = str(found) if found else suite.text().strip()
+        if not game.text().strip():
+            QMessageBox.warning(window, 'Missing folder / Ordner fehlt', 'Select the Call of Duty game folder.\nCall-of-Duty-Spielordner auswählen.')
+            return
+        if mode == 'install' and not payload:
+            QMessageBox.warning(window, 'Missing payload / Paket fehlt', 'Select the complete suite payload.\nVollständiges Coop-Paket auswählen.')
             return
         args = ['--game', game.text().strip()]
         if mode == 'check':
@@ -203,7 +207,7 @@ def main(argv=None):
             answer = QMessageBox.question(window, 'Confirm / Bestätigen', downloads.text() + '\n\nInstall complete suite / Vollständig installieren?')
             if answer != QMessageBox.Yes:
                 return
-            args += ['--yes', '--suite-source', suite.text().strip(), '--language', language.currentData(),
+            args += ['--yes', '--suite-source', payload, '--language', language.currentData(),
                      '--name', name.text(), '--resolution', resolution.currentText(), '--fov', str(fov.value()),
                      '--quality', quality.currentData(), '--fullscreen' if fullscreen.isChecked() else '--windowed']
             if base.text().strip():

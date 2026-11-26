@@ -1,5 +1,6 @@
 """Launcher behavior checks; no game process or personal settings are used."""
 import importlib.util
+from io import BytesIO
 import json
 import os
 from pathlib import Path
@@ -24,6 +25,14 @@ except ImportError:
 
 
 class WorkerCommands(unittest.TestCase):
+    def test_public_address_lookup_rejects_private_ipv4_and_ipv6(self):
+        for raw in (b'192.168.1.9', b'100.72.3.4', b'::1', b'1.2.3.4\ninvalid'):
+            with self.subTest(raw=raw), mock.patch.object(gui, 'urlopen', return_value=BytesIO(raw)):
+                with self.assertRaises(ValueError):
+                    gui.internet_ipv4()
+        with mock.patch.object(gui, 'urlopen', return_value=BytesIO(b'8.8.8.8\r\n')):
+            self.assertEqual(gui.internet_ipv4(), '8.8.8.8')
+
     def test_source_worker_uses_registered_script_without_shell(self):
         command = gui.worker_command("session", ["--game", "a path with spaces", "--variant", "uo"])
         self.assertEqual(command[0], sys.executable)
@@ -96,6 +105,23 @@ class LauncherBehavior(unittest.TestCase):
             self.assertFalse(window.busy)
             self.assertFalse(window.session)
         self.run_window(operation)
+
+    def test_host_address_rows_copy_address_with_port_and_hide_for_joiners(self):
+        def operation(window):
+            self.assertEqual(window.lan_label.text(), 'Home network (LAN)')
+            self.assertEqual(window.internet_label.text(), 'Internet (public IPv4)')
+            self.assertEqual(window.internet_value.text(), '—')
+            window.lan_copy.click()
+            self.assertEqual(self.app.clipboard().text(), '192.168.1.9:28960')
+            with mock.patch.object(window.address_process, 'readAllStandardOutput', return_value=b'8.8.8.8\n'):
+                window.public_address_finished(0, QProcess.ExitStatus.NormalExit)
+            self.assertEqual(window.internet_value.text(), '8.8.8.8:28960')
+            self.assertEqual(self.app.clipboard().text(), '8.8.8.8:28960')
+            window.mode.setCurrentIndex(1)
+            self.assertFalse(window.share_addresses.isVisible())
+            self.assertTrue(window.host.isEnabled())
+        with mock.patch.object(gui, 'local_ipv4', return_value='192.168.1.9'):
+            self.run_window(operation)
 
     def test_new_launcher_defaults_to_improved_main_campaign(self):
         def operation(window):

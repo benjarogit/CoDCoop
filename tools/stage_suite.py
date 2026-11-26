@@ -79,6 +79,10 @@ def stage(game, output, yap_archive, yap_extras, include_base=False, launcher_so
     if sha256(yap_archive) != YAP_ZIP_SHA or sha256(yap_extras) != YAP_EXTRAS_SHA:
         raise ValueError('YAP release archive does not match the pinned r169 artifact')
     manifest = json.loads((ROOT/'content/variants.json').read_text())
+    for relative in ('Main/pakz_coop.pk3', 'uo/pakz_coop.pk3'):
+        with zipfile.ZipFile(resolve(game, relative)) as archive:
+            if 'ui/main.menu' not in archive.namelist() or b'exec "coopinternet"' not in archive.read('ui/main.menu'):
+                raise ValueError(f'{relative} is missing the internet address control. Rebuild the Coop menus with tools/make_ui.py.')
     runtime_source = Path(runtime_source or ROOT/'build')
     if checker_prefix is not None:
         prefix = Path(checker_prefix).resolve()

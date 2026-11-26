@@ -2,16 +2,22 @@
 # boton "Co-op" y su ventana (ui/coop_*.menu). Los originales salen de localized_spanish_pak0.pk3 /
 # localized_spanish_pakuo00.pk3 y no se tocan; en el repo quedan solo los agregados.
 # Uso: python -I tools/make_ui.py
-import os, re, sys, zipfile
+import argparse
+import os
+import re
+import zipfile
 
 root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 read = lambda name: open(os.path.join(root, 'ui', name), encoding='utf-8').read()
 
 
-def build(folder, pak, paused_tests):
-    main_dir = os.path.join(root, 'game', folder)
-    if not os.path.exists(os.path.join(main_dir, pak)):
+def build(game, folder, sources, paused_tests):
+    main_dir = os.path.join(game, folder)
+    source = next(((pak, expected) for pak, expected in sources if os.path.isfile(os.path.join(main_dir, pak))), None)
+    if source is None:
+        print(f'Skipped {folder}: no original menu archive.')
         return
+    pak, expected_hidden = source
     with zipfile.ZipFile(os.path.join(main_dir, pak)) as z:
         menu = z.read('ui/main.menu').decode('latin-1')
 
@@ -24,7 +30,7 @@ def build(folder, pak, paused_tests):
     # desaparecian Nueva Partida / Cargar Partida / Creditos. En vez de "mostrar solo con 0"
     # (showCVar) pasan a "ocultar solo en partida" (hideCvar 1), asi siguen a la vista en 0 y 2.
     menu, hidden = re.subn(r'showCvar(\s*)\{\s*"0"\s*\}', r'hideCvar\1{ "1" }', menu, flags=re.I)
-    assert hidden == 7, hidden   # los 7 items de "main" que miraban solo el estado 0
+    assert hidden == expected_hidden, hidden
     lines = menu.split('\n')
     # lugar para el boton: en el menu "main" (hasta el siguiente menuDef) la columna de abajo pasa de 35 a 30 px
     end = next(i for i, l in enumerate(lines) if i > 30 and re.match(r'\s*menuDef\b', l))
@@ -46,5 +52,9 @@ def build(folder, pak, paused_tests):
     print('ok:', out)
 
 
-build('Main', 'localized_spanish_pak0.pk3', 17)
-build('uo', 'localized_spanish_pakuo00.pk3', 8)
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Regenerate the CoD and UO Coop menu packages')
+    parser.add_argument('--game', default=os.path.join(root, 'game'), help='staging game folder with original language archives')
+    args = parser.parse_args()
+    build(args.game, 'Main', (('localized_spanish_pak0.pk3', 7), ('localized_english_pak0.pk3', 7)), 17)
+    build(args.game, 'uo', (('localized_spanish_pakuo00.pk3', 7), ('localized_english_pakuo00.pk3', 4)), 8)

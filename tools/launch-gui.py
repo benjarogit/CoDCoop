@@ -7,12 +7,35 @@ executables. coop_session validates and launches registered profiles only.
 import argparse
 from datetime import datetime
 import importlib
+from ipaddress import IPv4Address
 import json
 import os
 from pathlib import Path
+import socket
 import sys
+from urllib.request import urlopen
 import uf_equipment_preferences as equipment
 from uf_equipment_roster_view import validate_snapshot as validate_roster_snapshot
+
+DEFAULT_HOST_PORT = 28960
+
+
+def local_ipv4():
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as connection:
+            connection.connect(('8.8.8.8', 53))  # Select an interface without sending a packet.
+            address = IPv4Address(connection.getsockname()[0])
+            return str(address) if not address.is_loopback and not address.is_unspecified else ''
+    except OSError:
+        return ''
+
+
+def internet_ipv4():
+    with urlopen('https://api.ipify.org/', timeout=6) as response:
+        address = IPv4Address(response.read(32).decode('ascii').strip())
+    if not address.is_global or address.is_multicast:
+        raise ValueError('IPv4 lookup did not return a public address')
+    return str(address)
 
 
 TEXT = {
@@ -21,6 +44,10 @@ TEXT = {
         "folder": "Game folder", "browse": "Browse…", "browse_title": "Choose your complete CoD Coop installation",
         "variant": "Campaign variant", "mode": "Play as", "hosting": "Host a game", "joining": "Join a game",
         "host": "Host address", "host_help": "Use the host's IP address or steam: followed by their Steam ID.",
+        "lan_address": "Home network (LAN)", "internet_address": "Internet (public IPv4)",
+        "copy_address": "Copy", "lookup_address": "Find and copy", "looking_up": "Looking up…",
+        "address_unavailable": "Unavailable", "address_copied": "Copied",
+        "address_help": "For direct-IP play over the internet, forward UDP 28960 to this PC and allow it in the firewall. The lookup uses ipify.org.",
         "difficulty": "Difficulty", "difficulty_help": "For a new campaign. Saved games keep their own difficulty.",
         "host_difficulty": "The host chooses the difficulty when you join.",
         "difficulty_0": "Recruit", "difficulty_1": "Regular", "difficulty_2": "Hardened", "difficulty_3": "Veteran",
@@ -61,6 +88,10 @@ TEXT = {
         "folder": "Spielordner", "browse": "Durchsuchen…", "browse_title": "Vollständige CoD-Coop-Installation auswählen",
         "variant": "Kampagnenvariante", "mode": "Spielweise", "hosting": "Spiel hosten", "joining": "Spiel beitreten",
         "host": "Host-Adresse", "host_help": "IP-Adresse des Hosts oder steam: mit seiner Steam-ID verwenden.",
+        "lan_address": "Heimnetz (LAN)", "internet_address": "Internet (öffentliche IPv4)",
+        "copy_address": "Kopieren", "lookup_address": "Ermitteln und kopieren", "looking_up": "Wird ermittelt…",
+        "address_unavailable": "Nicht verfügbar", "address_copied": "Kopiert",
+        "address_help": "Für Direkt-IP übers Internet UDP 28960 an diesen PC weiterleiten und in der Firewall freigeben. Die Abfrage nutzt ipify.org.",
         "difficulty": "Schwierigkeit", "difficulty_help": "Für eine neue Kampagne. Spielstände behalten ihre eigene Schwierigkeit.",
         "host_difficulty": "Beim Beitreten bestimmt der Host die Schwierigkeit.",
         "difficulty_0": "Rekrut", "difficulty_1": "Normal", "difficulty_2": "Schwer", "difficulty_3": "Veteran",
@@ -176,7 +207,7 @@ def worker_command(kind, arguments):
 def internal_worker(argv):
     if argv[:1] != ["--internal-command"]:
         return None
-    if len(argv) < 2 or argv[1] not in {"suite", "session", "party", "capabilities"}:
+    if len(argv) < 2 or argv[1] not in {"suite", "session", "party", "capabilities", "public-ipv4"}:
         return 2
     # A Windows windowed bundle normally sets sys.std* to None. QProcess still
     # supplies inherited pipes for worker invocations; attach Python streams to
@@ -201,6 +232,14 @@ def internal_worker(argv):
         if len(argv)!=2:return 2
         from launcher_provenance import capabilities
         print(json.dumps(capabilities()),flush=True);return 0
+    if argv[1] == 'public-ipv4':
+        if len(argv) != 2:
+            return 2
+        try:
+            print(internet_ipv4(), flush=True)
+        except (OSError, ValueError):
+            return 1
+        return 0
     module = importlib.import_module({"suite":"coop_suite", "session":"coop_session", "party":"coop_party"}[argv[1]])
     return module.main(argv[2:])
 
@@ -271,6 +310,15 @@ def main(argv=None):
             self.process.readyReadStandardOutput.connect(self.read_output)
             self.process.finished.connect(self.finished)
             self.process.errorOccurred.connect(self.process_error)
+            self.local_address = local_ipv4()
+            self.public_address = ''
+            self.lookup_status = ''
+            self.address_process = QProcess(self)
+            self.address_process.finished.connect(self.public_address_finished)
+            self.address_process.errorOccurred.connect(self.address_process_error)
+            self.address_timeout = QTimer(self)
+            self.address_timeout.setSingleShot(True)
+            self.address_timeout.timeout.connect(self.address_process.kill)
 
             root = QWidget()
             outer = QVBoxLayout(root)
@@ -399,6 +447,27 @@ def main(argv=None):
             self.host_help.setObjectName("muted")
             options.addRow("", self.host_help)
             outer.addLayout(options)
+
+            self.share_addresses = QWidget()
+            address_form = QFormLayout(self.share_addresses)
+            address_form.setContentsMargins(0, 0, 0, 0)
+            self.lan_label, self.internet_label = QLabel(), QLabel()
+            self.lan_value, self.internet_value = QLabel(), QLabel()
+            self.lan_copy, self.internet_lookup = QPushButton(), QPushButton()
+            for label, value, button in ((self.lan_label, self.lan_value, self.lan_copy),
+                                         (self.internet_label, self.internet_value, self.internet_lookup)):
+                value.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+                row = QHBoxLayout()
+                row.addWidget(value, 1)
+                row.addWidget(button)
+                address_form.addRow(label, row)
+            self.address_help = QLabel()
+            self.address_help.setWordWrap(True)
+            self.address_help.setObjectName('muted')
+            address_form.addRow(self.address_help)
+            self.lan_copy.clicked.connect(self.copy_local_address)
+            self.internet_lookup.clicked.connect(self.lookup_public_address)
+            outer.addWidget(self.share_addresses)
 
             self.advanced_toggle = QPushButton()
             self.advanced_toggle.setCheckable(True)
@@ -542,6 +611,7 @@ def main(argv=None):
                 self.campaigns.item(index).setToolTip(self.text(variant) + "\n" + self.text(variant + "_desc"))
             self.campaign_changed()
             self.mode_changed()
+            self.refresh_addresses()
             self.set_status(self.status_key)
 
         def change_language(self):
@@ -562,12 +632,55 @@ def main(argv=None):
             self.host.setEnabled(joining and not self.busy)
             self.host_label.setEnabled(joining)
             self.host_help.setVisible(joining)
+            self.share_addresses.setVisible(not joining)
             self.difficulty.setEnabled(not joining and (not self.busy or (self.session and not self.switching)))
             self.difficulty_label.setEnabled(not joining)
             self.difficulty_help.setText(self.text("host_difficulty" if joining else "difficulty_help"))
             self.map.setEnabled(not joining and (not self.busy or (self.session and not self.switching)))
             self.start.setText(self.text("join" if joining else "start"))
             self.refresh_installation_info()
+
+        def refresh_addresses(self):
+            self.lan_label.setText(self.text('lan_address'))
+            self.internet_label.setText(self.text('internet_address'))
+            self.lan_value.setText(f'{self.local_address}:{DEFAULT_HOST_PORT}' if self.local_address else self.text('address_unavailable'))
+            self.internet_value.setText(f'{self.public_address}:{DEFAULT_HOST_PORT}' if self.public_address else
+                                        self.text(self.lookup_status) if self.lookup_status else '—')
+            self.lan_copy.setText(self.text('copy_address'))
+            self.lan_copy.setEnabled(bool(self.local_address))
+            self.internet_lookup.setText(self.text('lookup_address'))
+            self.internet_lookup.setEnabled(self.lookup_status != 'looking_up')
+            self.address_help.setText(self.text('address_help'))
+
+        def copy_local_address(self):
+            if self.local_address:
+                QApplication.clipboard().setText(f'{self.local_address}:{DEFAULT_HOST_PORT}')
+                self.statusBar().showMessage(self.text('address_copied'), 2500)
+
+        def lookup_public_address(self):
+            self.public_address = ''
+            self.lookup_status = 'looking_up'
+            self.refresh_addresses()
+            arguments = ['--internal-command', 'public-ipv4']
+            if not getattr(sys, 'frozen', False):
+                arguments.insert(0, str(Path(__file__).resolve()))
+            self.address_timeout.start(12000)
+            self.address_process.start(sys.executable, arguments)
+
+        def address_process_error(self, error):
+            if error == QProcess.ProcessError.FailedToStart:
+                self.public_address_finished(1, QProcess.ExitStatus.CrashExit)
+
+        def public_address_finished(self, code, status):
+            self.address_timeout.stop()
+            address = bytes(self.address_process.readAllStandardOutput()).decode('ascii', errors='replace').strip()
+            self.lookup_status = 'address_unavailable'
+            if code == 0 and status == QProcess.ExitStatus.NormalExit and address:
+                self.public_address = address
+                self.lookup_status = ''
+                QApplication.clipboard().setText(f'{address}:{DEFAULT_HOST_PORT}')
+                self.statusBar().showMessage(self.text('address_copied'), 2500)
+            self.refresh_addresses()
 
         def refresh_equipment(self):
             if not hasattr(self, 'equipment_button'):
@@ -1029,6 +1142,9 @@ def main(argv=None):
             self.settings.sync()
             if getattr(self, 'party_dialog', None) is not None:
                 self.party_dialog.reject()
+            if self.address_process.state() != QProcess.ProcessState.NotRunning:
+                self.address_process.kill()
+                self.address_process.waitForFinished(1000)
             event.accept()
 
     app = QApplication.instance() or QApplication([sys.argv[0]])

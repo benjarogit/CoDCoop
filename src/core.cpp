@@ -5,6 +5,7 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <cmath>
+#include <cerrno>
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>
@@ -14,6 +15,7 @@
 #include "api.h"
 #include "actor_eligibility.h"
 #include "core_features.h"
+#include "public_ipv4.h"
 #include "party_native_bridge_json.h"
 #include "resource_bootstrap_state.h"
 #include "resource_mapping_barrier.h"
@@ -332,7 +334,7 @@ bool OpenSocket(int port)
 const char* LocalIp()
 {
     static char ip[64] = "";
-    if (ip[0]) return ip;
+    ip[0] = 0;
     SOCKET s = socket(AF_INET, SOCK_DGRAM, 0);
     if (s != INVALID_SOCKET) {
         sockaddr_in dst{};
@@ -358,8 +360,54 @@ const char* LocalIp()
             }
         }
     }
-    if (!ip[0]) snprintf(ip, sizeof ip, "your IP");
+    if (!strncmp(ip, "127.", 4) || !strcmp(ip, "0.0.0.0")) ip[0] = 0;
     return ip;
+}
+
+unsigned HostPort()
+{
+    sockaddr_in bound{};
+    int size = sizeof bound;
+    return getsockname(S->sock, (sockaddr*)&bound, &size) == 0 ? ntohs(bound.sin_port) : 0;
+}
+
+HANDLE g_publicLookup;
+char g_publicAddress[INET_ADDRSTRLEN];
+
+DWORD WINAPI LookupPublicAddress(LPVOID module)
+{
+    const bool ok = public_ipv4::Lookup(g_publicAddress);
+    FreeLibraryAndExitThread(static_cast<HMODULE>(module), ok ? 0 : 1);
+}
+
+void Cmd_CoopInternet()
+{
+    if (S->role != HOST || g_publicLookup || suite::IsQA()) return;
+    HMODULE module = nullptr;
+    if (GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
+                         reinterpret_cast<LPCSTR>(&LookupPublicAddress), &module)) {
+        g_publicLookup = CreateThread(nullptr, 0, LookupPublicAddress, module, 0, nullptr);
+        if (!g_publicLookup) FreeLibrary(module);
+    }
+    g::Cvar_Set("ui_coop_public", g_publicLookup ? "Internet IPv4: looking up..." : "Internet IPv4: unavailable (retry)");
+}
+
+void PollPublicAddress()
+{
+    if (!g_publicLookup || WaitForSingleObject(g_publicLookup, 0) != WAIT_OBJECT_0) return;
+    DWORD result = 1;
+    GetExitCodeThread(g_publicLookup, &result);
+    CloseHandle(g_publicLookup);
+    g_publicLookup = nullptr;
+    if (S->role != HOST) return;
+    const auto port = HostPort();
+    if (result || !port) {
+        g::Cvar_Set("ui_coop_public", "Internet IPv4: unavailable (retry)");
+        return;
+    }
+    char label[96];
+    snprintf(label, sizeof label, "Internet IPv4: %s:%u  (UDP forwarding)", g_publicAddress, port);
+    g::Cvar_Set("ui_coop_public", label);
 }
 
 netadr_t ToNet(const sockaddr_in& a)
@@ -4367,18 +4415,39 @@ void JoinerLeave(const char* why)
 
 // ---------- Steam (steam.h) ----------
 
+uint64_t g_pendingSteamJoin;
+DWORD g_pendingSteamJoinSince;
+
+uint64_t SteamJoinId(const char* id)
+{
+    const auto length = strlen(id);
+    if (!length || length > 20 || strspn(id, "0123456789") != length) return 0;
+    errno = 0;
+    const uint64_t value = _strtoui64(id, nullptr, 10);
+    return errno == ERANGE ? 0 : value;
+}
+
+void QueueSteamJoin(uint64_t id)
+{
+    char cmd[64];
+    snprintf(cmd, sizeof cmd, "coopjoin steam:%I64u\n", id);
+    g::Cbuf_AddText(cmd);
+}
+
 // "Unirse a la partida" desde la lista de amigos de Steam: el texto viene del rich presence de otro, asi que
 // solo se acepta exactamente "+coopjoin steam:<numero>"
 void OnSteamJoin(const char* connect)
 {
-    const char* id = connect + strlen("+coopjoin steam:");
-    if (strncmp(connect, "+coopjoin steam:", strlen("+coopjoin steam:")) || !*id || strspn(id, "0123456789") != strlen(id)) {
-        Log("steam: pedido de union ignorado: '%.64s'", connect);
+    constexpr char prefix[] = "+coopjoin steam:";
+    const uint64_t id = strncmp(connect, prefix, sizeof prefix - 1) ? 0 : SteamJoinId(connect + sizeof prefix - 1);
+    if (!id) {
+        Log("steam: rich presence join request had no valid host address");
         return;
     }
-    char cmd[64];
-    snprintf(cmd, sizeof cmd, "coopjoin steam:%s\n", id);
-    g::Cbuf_AddText(cmd);
+    g_pendingSteamJoin = 0;
+    Log("steam: rich presence join request accepted");
+    CoopStatus("Steam invitation received. Preparing to join...");
+    QueueSteamJoin(id);
 }
 
 // botones "Unirse a <amigo>" del menu desde el k-esimo: ocultos (el menu los esconde con coop_friendid = "0")
@@ -4398,7 +4467,7 @@ void HideFriendButtons(int k)
 void SteamFrame()
 {
     if (suite::IsQA() && getenv("CODCOOP_QA_NO_STEAM")) return;
-    static bool wasUp, presence, triedOnce;
+    static bool wasUp, presence, triedOnce, checkedLaunchCommand;
     bool up = steam::Start();
     if (up != wasUp || !triedOnce) {
         if (up) Log("steam: listo como '%s' (%I64u)", steam::Name(steam::MyId()), steam::MyId());
@@ -4411,7 +4480,23 @@ void SteamFrame()
         wasUp = up;
         triedOnce = true;
     }
+    if (g_pendingSteamJoin && (up || GetTickCount() - g_pendingSteamJoinSince >= 30000)) {
+        const uint64_t id = g_pendingSteamJoin;
+        g_pendingSteamJoin = 0;
+        if (up) QueueSteamJoin(id);
+        else {
+            Log("steam: join request expired while waiting for Steam initialization");
+            CoopStatus("Steam did not become ready. Open Steam and retry the invitation.");
+        }
+    }
     if (!up) return;
+    if (!checkedLaunchCommand) {
+        checkedLaunchCommand = true;
+        char command[256]{};
+        if (S->role == NONE && !g_pendingSteamJoin && !strstr(GetCommandLineA(), "+coopjoin") &&
+            steam::ReadLaunchCommand(command) && !strncmp(command, "+coopjoin ", 10))
+            OnSteamJoin(command);
+    }
     steam::Poll(OnSteamJoin);
     if ((S->role == HOST) != presence) {  // al crear partida y al dejar de ser anfitrion (coopleave)
         presence = S->role == HOST;
@@ -4495,6 +4580,7 @@ void HostMissileOwners()
 
 void Cmd_CoopHost()
 {
+    g_pendingSteamJoin = 0;
     RestoreHostRules();
     if (!PrepareIdentity()) return;
     PreservationObserveReady();
@@ -4532,13 +4618,13 @@ void Cmd_CoopHost()
     S->role = HOST;
     const char* ip = LocalIp();
     char note[128];
-    snprintf(note, sizeof note, "CO-OP: hosting %s:%d", ip, port);
+    if (*ip) snprintf(note, sizeof note, "LAN IPv4: %s:%u", ip, HostPort());
+    else snprintf(note, sizeof note, "LAN IPv4: unavailable");
     g::Cvar_Set("ui_coop_host", note);       // aviso corto del menu principal
-    snprintf(note, sizeof note, "HOSTING on %s:%d - press Back, then New Game.", ip, port);
-    g::Cvar_Set("ui_coop_host_info", note);  // ventana Cooperativo
-    g::Com_Printf("^2COOP: hosting on %s:%d. Others: coopjoin %s\n", ip, port, ip);
-    CoopStatus("Hosting on %s:%d. Back, then New Game. Friends join with coopjoin %s%s.", ip, port, ip,
-               steam::up ? " or a Steam invite" : "");
+    g::Cvar_Set("ui_coop_hosting", "1");
+    g::Cvar_Set("ui_coop_public", g_publicLookup ? "Internet IPv4: looking up..." : "Internet IPv4: click to look up");
+    g::Com_Printf("^2COOP: %s. Internet hosting requires UDP port forwarding.\n", note);
+    CoopStatus("Hosting. Go back and start or load a mission.");
 }
 
 // coopjoin <ip>[:puerto]; sin argumento usa la IP escrita en el menu Cooperativo (cvar coop_ip)
@@ -4553,6 +4639,21 @@ void Cmd_CoopJoin()
     char host[128];
     strncpy(host, target, sizeof host - 1);
     host[sizeof host - 1] = 0;
+    const bool steamJoin = !_strnicmp(host, "steam:", 6);
+    const uint64_t steamId = steamJoin ? SteamJoinId(host + 6) : 0;
+    if (steamJoin && !steamId) {
+        Log("steam: invalid host address");
+        CoopStatus("The Steam address needs a valid Steam ID.");
+        return;
+    }
+    if (steamJoin && !steam::up) {
+        g_pendingSteamJoin = steamId;
+        g_pendingSteamJoinSince = GetTickCount();
+        Log("steam: join request waiting for Steam initialization");
+        CoopStatus("Waiting for Steam before joining...");
+        return;
+    }
+    g_pendingSteamJoin = 0;
     BootCancelPeer();BootInvalidatePeer();
     S->selection={};
     S->reloadToken = {};
@@ -4569,15 +4670,9 @@ void Cmd_CoopJoin()
     S->compatible = false;
     S->joinStarted = 0;
     if (!OpenSocket(0)) return;
-    if (!_strnicmp(host, "steam:", 6)) {  // coopjoin steam:<SteamID> (boton del menu o "Unirse a la partida" de Steam)
-        uint64_t id = _strtoui64(host + 6, nullptr, 10);
-        if (!steam::up || !id) {
-            g::Com_Printf("^1COOP: %s\n", steam::up ? "usage: coopjoin steam:<SteamID>" : "Steam is not running");
-            CoopStatus(steam::up ? "That Steam friend is not valid." : "Steam is not running.");
-            return;
-        }
-        S->host = steam::Addr(S->steamPeer, id);
-        steam::Latin1(steam::Name(id), host, sizeof host);
+    if (steamJoin) {
+        S->host = steam::Addr(S->steamPeer, steamId);
+        steam::Latin1(steam::Name(steamId), host, sizeof host);
     } else {
         int port = 28960;
         if (char* c = strchr(host, ':')) { *c = 0; port = atoi(c + 1); }
@@ -4599,6 +4694,7 @@ void Cmd_CoopJoin()
     memset(S->cs, 0, sizeof S->cs);  // el gamestate se junta de los M_CS de este intento
     JoinerSendJoin();
     if (steam::IsAddr(S->host)) {
+        Log("steam: joining host as requested");
         g::Com_Printf("COOP: joining %s via Steam...\n", host);
         CoopStatus("Looking for %s via Steam... (they must have chosen Host game and be playing)", host);
     } else {
@@ -4612,6 +4708,7 @@ void Cmd_CoopJoin()
 // todos y deja de ser anfitrion (la partida sigue para el solo). M_BYE avisa al otro lado para que no espere el corte.
 void Cmd_CoopLeave()
 {
+    g_pendingSteamJoin = 0;
     S->waitingForMap = false;
     Writer w(M_BYE);
     w.Put<uint8_t>(1); // intentional departure; empty/zero BYE is temporary clock/map recovery
@@ -4641,7 +4738,8 @@ void Cmd_CoopLeave()
         g_noPause = false;
         SkipUiPauseCheck(false);  // el menu vuelve a pausar como en el SP
         g::Cvar_Set("ui_coop_host", "");
-        g::Cvar_Set("ui_coop_host_info", "");
+        g::Cvar_Set("ui_coop_public", "");
+        g::Cvar_Set("ui_coop_hosting", "0");
         CoopStatus("You stopped hosting: the game goes on just for you.");
     } else {
         CoopStatus("You are not in a co-op game.");
@@ -5058,6 +5156,7 @@ const CmdDef kCmds[] = {
     {"coophealth", Cmd_CoopHealth}, {"coopkill", Cmd_CoopKill}, {"cooplists", Cmd_CoopLists}, {"coopbodyoverlap",Cmd_CoopBodyOverlap},
     {"cooprejoin", Cmd_CoopRejoin}, {"coopendlevel", Cmd_CoopEndLevel}, {"coopweapons", Cmd_CoopWeapons}, {"coopuiclick", Cmd_CoopUiClick}, {"coopnet", Cmd_CoopNet},
     {"coopjoinfriend", Cmd_CoopJoinFriend}, {"coopgive", Cmd_CoopGive}, {"coopleave", Cmd_CoopLeave},
+    {"coopinternet", Cmd_CoopInternet},
 };
 
 }  // namespace
@@ -5097,6 +5196,8 @@ EXPORT void Coop_Init(const CoreApi* api, void* state, int fresh)
 
 EXPORT void Coop_Shutdown()
 {
+    if (g_publicLookup) CloseHandle(g_publicLookup);
+    g_publicLookup = nullptr;
     WatchGameDll(false);  // el aviso apunta a esta DLL, que se va a descargar
     QUFWorldStop();
     BootStop();
@@ -5226,6 +5327,7 @@ EXPORT int __cdecl Coop_GetPacket(int sock, msg_t* msg, netadr_t* from)
     WriteSupervisorState();
     HostMissileOwners();
     StatsTick();
+    PollPublicAddress();
     SteamFrame();
     UiPausedFrame();
     MainlineContinue();

@@ -11,7 +11,7 @@ for /f "delims=" %%v in ('git describe --always --dirty 2^>nul') do set VERSION=
 set BUILD_DEF=-DCOOP_BUILD=\"%VERSION%\"
 g++ %OPT% %BUILD_DEF% -o build\ddraw.dll src\loader.cpp src\ddraw.def
 if errorlevel 1 exit /b 1
-g++ %OPT% -o build\codcoop_core.dll src\core.cpp -lws2_32 -ladvapi32
+g++ %OPT% -o build\codcoop_core.dll src\core.cpp -lws2_32 -ladvapi32 -lwinhttp
 if errorlevel 1 exit /b 1
 rem CoD2 (en prueba): modulo aparte que carga ddraw.dll en CoD2SP_s.exe; copia de desarrollo en game2\
 g++ -std=c++17 -O2 -s -static -municode -Wl,--no-insert-timestamp -o build\suite-check.exe installer\suite_check.cpp -ladvapi32

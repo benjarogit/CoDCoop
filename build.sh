@@ -44,7 +44,7 @@ mkdir -p build
 echo "== ddraw.dll"
 "$CXX" $OPT $BUILD_DEF -o build/ddraw.dll src/loader.cpp src/ddraw.def
 echo "== codcoop_core.dll"
-"$CXX" $OPT -o build/codcoop_core.dll src/core.cpp -lws2_32 -ladvapi32
+"$CXX" $OPT -o build/codcoop_core.dll src/core.cpp -lws2_32 -ladvapi32 -lwinhttp
 echo "== suite-check.exe"
 "$CXX" -std=c++17 -O2 -s -static -municode -Wl,--no-insert-timestamp -o build/suite-check.exe installer/suite_check.cpp -ladvapi32
 echo "== cod2coop.dll"

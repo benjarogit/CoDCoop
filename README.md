@@ -96,9 +96,10 @@ version. For other campaigns, select the matching variant in the launcher.
 
 ## Setup
 
-1. Select **Check installation**. The launcher displays the verified suite version. Check that everyone in your group has the same version.
-2. Pick a **Campaign variant**. For your first session, start with **CoD + UO — Improved Coop**.
-3. Leave **Starting mission** blank to begin or resume the campaign in the game. The host chooses the difficulty for new campaigns. Existing saves retain their difficulty.
+Everyone selects **the same campaign as the host**. When **Play** in AnkerGames starts `CoDSP.exe`, choose **Call of Duty — Original**. If you run into trouble, **Check installation** shows your CoDCoop version.
+
+<details>
+<summary><strong>Campaigns and starting options</strong></summary>
 
 | Launcher variant | What you play |
 | --- | --- |
@@ -106,6 +107,10 @@ version. For other campaigns, select the matching variant in the launcher.
 | **Call of Duty — original** | The classic campaign on the CoD 1.5 engine |
 | **United Offensive — original** | The original expansion campaign with YAP |
 | **United Fronts** | Its own missions, campaign order options and special weapons |
+
+Leave **Starting mission** blank to start the campaign or load a save in the game. The host chooses the difficulty for new games.
+
+</details>
 
 <details>
 <summary><strong>Change language, display or the Linux runner</strong></summary>
@@ -123,7 +128,7 @@ version. For other campaigns, select the matching variant in the launcher.
 ## Play together
 
 1. The host selects **Host a game** → **Start campaign** and opens a mission or loads their save.
-2. Other players select **Join a game**, enter the **Host address**, then select **Join campaign**.
+2. Other players open the CoDCoop Launcher, select **Join a game**, enter the **Host address**, then select **Join campaign**.
 3. Keep the launcher open during play. The host's progress is shared with the group. Use the same host to resume their save later.
 
 If the game menu is already open, select **Co-op**, enter the address in

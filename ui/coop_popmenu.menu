@@ -4,7 +4,7 @@
 		name "coop_popmenu"
 		visible 0
 		fullscreen 0
-		rect 174 65 295 346
+		rect 174 53 295 370
 		focusColor UI_FOCUS_COLOR
 		style 1
 		border 1
@@ -14,7 +14,7 @@
 		itemDef
 		{
 			name window
-			rect 0 2 295 346
+			rect 0 2 295 370
 			style WINDOW_STYLE_FILLED
 			border 1
 			bordercolor .5 .5 .5 .5
@@ -78,7 +78,7 @@
 			forecolor UI_BUTTON_TEXT_COLOR
 			backcolor UI_BUTTON_BACK_COLOR
 			visible 1
-			action { play "mouse_click"; exec "set ui_coop_hosting 1"; exec "coophost"; }
+			action { play "mouse_click"; exec "coophost"; }
 			mouseEnter { setitemcolor host backcolor UI_BUTTON_BACK_COLOR_HOVER play "mouse_over" }
 			mouseExit { setitemcolor host backcolor UI_BUTTON_BACK_COLOR }
 		}
@@ -208,12 +208,35 @@
 			decoration
 		}
 
+		itemDef
+		{
+			name internetaddress
+			type 1
+			cvar "ui_coop_public"
+			cvarTest "ui_coop_hosting"
+			showCVar { "1" }
+			rect 20 198 255 19
+			style UI_BUTTON_STYLE
+			border UI_BUTTON_BORDER
+			bordercolor UI_BUTTON_BORDER_COLOR
+			forecolor UI_BUTTON_TEXT_COLOR
+			backcolor UI_BUTTON_BACK_COLOR
+			textalign 1
+			textalignx 127
+			textaligny 14
+			textscale .18
+			visible 1
+			action { play "mouse_click"; exec "coopinternet"; }
+			mouseEnter { setitemcolor internetaddress backcolor UI_BUTTON_BACK_COLOR_HOVER }
+			mouseExit { setitemcolor internetaddress backcolor UI_BUTTON_BACK_COLOR }
+		}
+
 		// Steam: amigos que crearon partida (el mod pone los cvars cada 2 s, ver SteamFrame en src/core.cpp;
 		// coop_friendid<n> = "0" esconde el boton)
 		itemDef
 		{
 			name steaminfo
-			rect 20 196 255 12
+			rect 20 220 255 12
 			type ITEM_TYPE_TEXT
 			style 1
 			cvar "ui_coop_steam"
@@ -235,7 +258,7 @@
 			textscale .3
 			style UI_BUTTON_STYLE
 			textstyle UI_BUTTON_TEXT_STYLE
-			rect 20 210 255 22
+			rect 20 234 255 22
 			textalign 1
 			textalignx 127
 			textaligny 17
@@ -258,7 +281,7 @@
 			textscale .3
 			style UI_BUTTON_STYLE
 			textstyle UI_BUTTON_TEXT_STYLE
-			rect 20 234 255 22
+			rect 20 258 255 22
 			textalign 1
 			textalignx 127
 			textaligny 17
@@ -281,7 +304,7 @@
 			textscale .3
 			style UI_BUTTON_STYLE
 			textstyle UI_BUTTON_TEXT_STYLE
-			rect 20 258 255 22
+			rect 20 282 255 22
 			textalign 1
 			textalignx 127
 			textaligny 17
@@ -299,7 +322,7 @@
 		itemDef
 		{
 			name status
-			rect 20 286 255 56
+			rect 20 310 255 56
 			type ITEM_TYPE_TEXT
 			style 1
 			textstyle 3

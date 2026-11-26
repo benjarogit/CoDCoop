@@ -2,6 +2,22 @@
 
 [English](#061--english) · [Deutsch](#061--deutsch)
 
+## 0.6.3 · Unreleased / Unveröffentlicht
+
+- **EN:** The game and launcher distinguish the LAN address from the public
+  internet IPv4 address. Request the public address on demand. The launcher
+  copies either address with the port and explains UDP forwarding for internet play.
+- **EN:** A Steam invitation received before Steam is ready waits for initialization.
+  The game also reads the Steam launch request when opened from an invitation.
+  The status and log show whether the pending request starts or expires.
+- **DE:** Spiel und Launcher kennzeichnen Heimnetz-Adresse und öffentliche IPv4
+  getrennt. Die öffentliche Adresse wird auf Klick ermittelt. Der Launcher
+  kopiert beide Adressen samt Port und erklärt die UDP-Weiterleitung.
+- **DE:** Eine Steam-Einladung, die vor der Steam-Initialisierung eintrifft,
+  bleibt kurz vorgemerkt. Beim Start über eine Einladung liest das Spiel auch
+  die Steam-Startanfrage. Der Status und das Log zeigen, ob der Beitritt
+  startet oder die Wartezeit abläuft.
+
 ## 0.6.2 · Hotfix
 
 - **EN:** Direct AnkerGames, Steam and game-executable starts prepare a missing
