@@ -6,7 +6,7 @@ Play **Call of Duty** and **United Offensive** with **2–4 players** on Windows
 [![Install on Linux](https://img.shields.io/badge/Linux-Install-765400)](#linux-x86_64)
 [![Latest release](https://img.shields.io/github/v/release/benjarogit/CoDCoop?label=Release)](https://github.com/benjarogit/CoDCoop/releases/latest)
 
-[Install](#installation) · [Set up](#setup) · [Play](#play-together) · [Get help](#troubleshooting) · [Deutsch](README.de.md)
+[Install](#installation) · [Start](#start-codcoop) · [Set up](#setup) · [Play](#play-together) · [Get help](#troubleshooting) · [Deutsch](README.de.md)
 
 ## Installation
 
@@ -16,8 +16,8 @@ Start with an **existing, complete Call of Duty installation**. The game folder 
 
 1. [Download the Windows setup ZIP](https://github.com/benjarogit/CoDCoop/releases/latest/download/Install-CoD-Coop-Windows-x86_64.zip).
 2. Extract the ZIP and open `Install-CoD-Coop.exe` from the extracted folder.
-3. In setup, select your **Call of Duty game folder**. When setup finishes,
-   open **`Start-CoD-Coop.bat` in the game folder**.
+3. In setup, select your **Call of Duty game folder**. After setup, follow the
+   [Coop startup steps](#start-codcoop).
 
 ### Linux (x86_64)
 
@@ -25,7 +25,8 @@ You need **Wine or Proton** to play. The graphical setup requires **glibc 2.35 o
 
 1. Download **one AppImage**. It includes the suite. [Download the Linux AppImage](https://github.com/benjarogit/CoDCoop/releases/latest/download/Install-CoD-Coop-Linux-x86_64.AppImage)
 2. Allow execution in the file properties and open the AppImage.
-3. Select your **Call of Duty game folder** and install. Then open **`Start-CoD-Coop.sh` in the game folder**.
+3. Select your **Call of Duty game folder** and install. After setup, follow the
+   [Coop startup steps](#start-codcoop).
 
 <details>
 <summary><strong>Open the AppImage from a terminal</strong></summary>
@@ -69,12 +70,32 @@ Add `--language de` to install in German.
 
 </details>
 
+## Start CoDCoop
+
+For a Coop session, open the **CoDCoop Launcher** from the installed game folder.
+The start file opens the launcher and points it to that installation.
+
+- **Windows** uses `Start-CoD-Coop.bat`.
+- **Linux** uses `Start-CoD-Coop.sh`.
+
+<details>
+<summary><strong>What about the Play button in AnkerGames?</strong></summary>
+
+AnkerGames normally opens the game executable directly. You can see the
+**Co-op** menu if it loads the mod's `ddraw.dll`. Under Linux that also
+requires the Wine or Proton override. Hosting and joining in the current
+suite require a verified profile that matches the engine and campaign
+started. Use the CoDCoop Launcher to verify the suite and prepare the
+selected profile for both the host and joiners.
+[AnkerGames and Proton setup](docs/linux.md#3-starting-the-game-from-the-launcher)
+
+</details>
+
 ## Setup
 
-1. Open the launcher with `Start-CoD-Coop.bat` on Windows or `Start-CoD-Coop.sh` on Linux.
-2. Select **Check installation**. The launcher displays the verified suite version. Check that everyone in your group has the same version.
-3. Pick a **Campaign variant**. For your first session, start with **CoD + UO — Improved Coop**.
-4. Leave **Starting mission** blank to begin or resume the campaign in the game. The host chooses the difficulty for new campaigns. Existing saves retain their difficulty.
+1. Select **Check installation**. The launcher displays the verified suite version. Check that everyone in your group has the same version.
+2. Pick a **Campaign variant**. For your first session, start with **CoD + UO — Improved Coop**.
+3. Leave **Starting mission** blank to begin or resume the campaign in the game. The host chooses the difficulty for new campaigns. Existing saves retain their difficulty.
 
 | Launcher variant | What you play |
 | --- | --- |

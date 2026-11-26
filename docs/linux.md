@@ -136,6 +136,12 @@ files back and the mod has to be installed again.
 
 ## 3. Starting the game from the launcher
 
+For the full suite, use `Start-CoD-Coop.sh` to open the CoDCoop Launcher
+and prepare the campaign profile. The steps below describe AnkerGames
+starting the game executable directly. A visible **Co-op** menu confirms
+that the mod loaded. Hosting and joining also require a verified profile
+matching the engine and campaign that started.
+
 Once the launcher accepts the changed files, pressing **Play** shows a short
 check. It is fine as long as it finds `CoDSP.exe` and runs it through Proton:
 

@@ -1861,15 +1861,10 @@ static bool RunInstall(std::wstring& err)
         DeleteFileW((dir + L"\\__CoDSP").c_str());
         DeleteFileW((dir + L"\\__CoDUOSP").c_str());
 
-        Line(L("\r\nStart: CoDSP.exe (Menue \"Co-op\"), United Offensive: CoDUOSP.exe.",
-               "\r\nStart: CoDSP.exe (menu \"Co-op\"), United Offensive: CoDUOSP.exe."));
-        if (g_job.sp || g_job.uf)
-            Line(L("Einzelspieler-Mods: Start-SP-Improved.bat / Start-United-Fronts.bat.",
-                   "Singleplayer mods: Start-SP-Improved.bat / Start-United-Fronts.bat."));
-        Line(L("\r\nIm Spiel: Co-op -> Host game -> Back -> New Game.\r\n"
-               "Freunde: gleiche Version, dann Host IP -> Join oder Steam-Einladung.",
-               "\r\nIn game: Co-op -> Host game -> Back -> New Game.\r\n"
-               "Friends: same version, then Host IP -> Join or a Steam invite."));
+        Line(L("\r\nZum Spielen Start-CoD-Coop.bat im Spielordner oeffnen.\r\n"
+               "Im CoDCoop Launcher Kampagne waehlen und hosten oder beitreten.",
+               "\r\nTo play, open Start-CoD-Coop.bat in the game folder.\r\n"
+               "Choose your campaign in CoDCoop Launcher and host or join."));
     }
 
 #ifdef COOP_EXPERIMENTAL_COD2

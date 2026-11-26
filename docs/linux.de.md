@@ -130,6 +130,13 @@ Danach musst du CoDCoop erneut installieren.
 
 ## 3. Das Spiel über den Launcher starten
 
+Für die vollständige Suite öffnest du den CoDCoop Launcher über
+`Start-CoD-Coop.sh` und bereitest dort die Kampagnenvariante vor.
+Die folgenden Schritte beschreiben den direkten Start der Spiel-EXE
+über AnkerGames. Ein sichtbares **Co-op**-Menü zeigt, dass die Mod geladen
+wurde. Zum Hosten und Beitreten brauchst du außerdem ein geprüftes Profil
+für die gestartete Engine und Kampagne.
+
 Wenn AnkerGames die geänderten Dateien akzeptiert, startet **Spielen** mit
 einer kurzen Prüfung. Der Launcher sollte `CoDSP.exe` finden und Proton zum
 Starten verwenden.

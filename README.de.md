@@ -6,7 +6,7 @@ Spielt **Call of Duty** und **United Offensive** mit **2–4 Spielern** unter Wi
 [![Linux installieren](https://img.shields.io/badge/Linux-Installieren-765400)](#linux-x86_64)
 [![Aktuelles Release](https://img.shields.io/github/v/release/benjarogit/CoDCoop?label=Release)](https://github.com/benjarogit/CoDCoop/releases/latest)
 
-[Installation](#installation) · [Einrichten](#einrichten) · [Spielen](#gemeinsam-spielen) · [Hilfe](#probleme-beheben) · [English](README.md)
+[Installation](#installation) · [Starten](#codcoop-starten) · [Einrichten](#einrichten) · [Spielen](#gemeinsam-spielen) · [Hilfe](#probleme-beheben) · [English](README.md)
 
 ## Installation
 
@@ -16,8 +16,8 @@ Du brauchst eine **vorhandene, vollständige Call-of-Duty-Installation**. Der ri
 
 1. [Windows-Installationspaket herunterladen](https://github.com/benjarogit/CoDCoop/releases/latest/download/Install-CoD-Coop-Windows-x86_64.zip).
 2. Entpacke die ZIP-Datei und öffne `Install-CoD-Coop.exe` im entpackten Ordner.
-3. Wähle im Setup deinen **Call-of-Duty-Spielordner**. Öffne nach der Installation
-   **`Start-CoD-Coop.bat` im Spielordner**.
+3. Wähle im Setup deinen **Call-of-Duty-Spielordner**. Danach geht es weiter
+   mit [CoDCoop starten](#codcoop-starten).
 
 ### Linux (x86_64)
 
@@ -25,7 +25,8 @@ Du brauchst **Wine oder Proton** zum Spielen. Die grafische Installation setzt *
 
 1. Lade **ein AppImage** herunter. Die Suite ist darin enthalten. [Linux-AppImage herunterladen](https://github.com/benjarogit/CoDCoop/releases/latest/download/Install-CoD-Coop-Linux-x86_64.AppImage)
 2. Erlaube das Ausführen in den Dateieigenschaften und öffne die Datei.
-3. Wähle im Setup deinen **Call-of-Duty-Spielordner** und installiere. Öffne danach **`Start-CoD-Coop.sh` im Spielordner**.
+3. Wähle im Setup deinen **Call-of-Duty-Spielordner** und installiere.
+   Danach geht es weiter mit [CoDCoop starten](#codcoop-starten).
 
 <details>
 <summary><strong>AppImage aus dem Terminal öffnen</strong></summary>
@@ -67,12 +68,33 @@ sh ./install-codcoop.sh --game "/Pfad/zu/Call of Duty" --language de
 
 </details>
 
+## CoDCoop starten
+
+Öffne für eine Coop-Partie den **CoDCoop Launcher** aus dem installierten
+Spielordner. Die Startdatei öffnet den Launcher mit deinem Spielordner.
+
+- **Windows** verwendet `Start-CoD-Coop.bat`.
+- **Linux** verwendet `Start-CoD-Coop.sh`.
+
+<details>
+<summary><strong>Was ist mit „Spielen“ in AnkerGames?</strong></summary>
+
+AnkerGames öffnet normalerweise direkt die Spiel-EXE. Wenn sie die
+`ddraw.dll` der Mod lädt, siehst du das **Co-op**-Menü. Unter Linux
+braucht der direkte Start dafür die Wine- oder Proton-Einstellung zum Laden
+der mitgelieferten DLL. Die aktuelle Suite braucht zum Hosten und Beitreten
+außerdem ein geprüftes Profil, das zur gestarteten Engine und Kampagne passt.
+Der CoDCoop Launcher prüft die Suite und bereitet das gewählte Profil für
+Host und Mitspieler vor.
+[AnkerGames und Proton einrichten](docs/linux.de.md#3-das-spiel-über-den-launcher-starten)
+
+</details>
+
 ## Einrichten
 
-1. Öffne den Launcher über `Start-CoD-Coop.bat` unter Windows oder `Start-CoD-Coop.sh` unter Linux.
-2. Klicke auf **Installation prüfen**. Der Launcher zeigt den geprüften Paketstand an. Vergleicht den Stand in der Gruppe.
-3. Wähle die **Kampagnenvariante**. Für die erste Runde empfiehlt sich **CoD + UO — Verbesserter Coop**.
-4. Lass **Startmission** leer, wenn du die Kampagne im Spiel beginnen oder einen Spielstand fortsetzen willst. Der Host legt den Schwierigkeitsgrad für neue Kampagnen fest. Bestehende Spielstände behalten ihren Schwierigkeitsgrad.
+1. Klicke auf **Installation prüfen**. Der Launcher zeigt den geprüften Paketstand an. Vergleicht den Stand in der Gruppe.
+2. Wähle die **Kampagnenvariante**. Für die erste Runde empfiehlt sich **CoD + UO — Verbesserter Coop**.
+3. Lass **Startmission** leer, wenn du die Kampagne im Spiel beginnen oder einen Spielstand fortsetzen willst. Der Host legt den Schwierigkeitsgrad für neue Kampagnen fest. Bestehende Spielstände behalten ihren Schwierigkeitsgrad.
 
 | Variante im Launcher | Inhalt |
 | --- | --- |
