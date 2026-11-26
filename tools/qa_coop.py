@@ -184,7 +184,8 @@ def process_log_errors(folder, intentional_departures=0, allowed=()):
     paths = list(folder.glob('codcoop*.log'))
     paths += [folder / root / 'console.log' for root in ('Main', 'main', 'uo', 'sp_improved', 'UnitedFronts')
               if (folder / root / 'console.log').exists()]
-    for path in paths:
+    # Main and main refer to the same log on case-insensitive filesystems.
+    for path in dict.fromkeys(path.resolve() for path in paths):
         lines=path.read_text(errors='replace').splitlines()
         for index,line in enumerate(lines):
             # The native disconnect command prints a localized ERROR banner

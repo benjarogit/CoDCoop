@@ -167,7 +167,28 @@ class NativeBridgeWorkers(unittest.TestCase):
         compiler=shutil.which('g++') or shutil.which('c++')
         if not compiler:self.skipTest('C++ source encoder compiler unavailable')
         cpp=self.base/'encoder.cpp';exe=self.base/('encoder.exe' if os.name=='nt' else 'encoder')
-        cpp.write_text('#include "asset_bootstrap.h"\n#include <iostream>\nint main(){asset_bootstrap::Resources r;r.models={"xmodel/Example","xmodel/example","xmodel/a_test"};r.weapons={{1,"alpha",true},{2,"beta_alt",false}};std::string out;uint16_t count=0;if(!asset_bootstrap::EncodeResources(r,out,count))return 1;std::cout<<out;return 0;}\n')
+        cpp.write_text("""
+#include "asset_bootstrap.h"
+#include <cstdio>
+#include <iostream>
+#ifdef _WIN32
+#include <fcntl.h>
+#include <io.h>
+#endif
+
+int main() {
+#ifdef _WIN32
+    if (_setmode(_fileno(stdout), _O_BINARY) == -1) return 1;
+#endif
+    asset_bootstrap::Resources resources;
+    resources.models = {"xmodel/Example", "xmodel/example", "xmodel/a_test"};
+    resources.weapons = {{1, "alpha", true}, {2, "beta_alt", false}};
+    std::string output;
+    uint16_t count = 0;
+    if (!asset_bootstrap::EncodeResources(resources, output, count)) return 1;
+    std::cout << output;
+}
+""", encoding='utf-8')
         subprocess.run([compiler,'-std=c++17','-I',str(ROOT/'src'),str(cpp),'-o',str(exe)],check=True,capture_output=True)
         actual=subprocess.check_output([str(exe)])
         expected=encode_resources({'models':['xmodel/Example','xmodel/example','xmodel/a_test'],'weapons':[{'index':1,'name':'alpha','registered':True},{'index':2,'name':'beta_alt','registered':False}]})

@@ -63,16 +63,26 @@ class NativeShutdownTests(unittest.TestCase):
 
 
 class RunnerEnvironmentTests(unittest.TestCase):
+    def setUp(self):
+        self.prefix = Path('/owned/prefix')
+        self.bundle = Path('/game/coop/launcher')
+        self.environ = {'WINEPREFIX': str(self.prefix), 'CODCOOP_QA_PROFILE': '1'}
+
     def test_realistic_clean_runner_retains_owned_prefix(self):
-        value=qa.assess_runner_environment({'WINEPREFIX':'/owned/prefix','CODCOOP_QA_PROFILE':'1','PATH':'/usr/bin'},Path('/owned/prefix'),Path('/game/coop/launcher'))
-        self.assertEqual(value['PATH'],'/usr/bin')
+        self.environ['PATH'] = '/usr/bin'
+        value = qa.assess_runner_environment(self.environ, self.prefix, self.bundle)
+        self.assertEqual(value['PATH'], '/usr/bin')
         self.assertIsNone(value['LD_LIBRARY_PATH'])
+
     def test_poisoned_library_path_cannot_pass_gate(self):
-        with self.assertRaises(ValueError):
-            qa.assess_runner_environment({'WINEPREFIX':'/owned/prefix','CODCOOP_QA_PROFILE':'1','LD_LIBRARY_PATH':'/game/coop/launcher/_internal'},Path('/owned/prefix'),Path('/game/coop/launcher'))
+        self.environ['LD_LIBRARY_PATH'] = str(self.bundle / '_internal')
+        with self.assertRaisesRegex(ValueError, 'bundled GUI libraries leaked'):
+            qa.assess_runner_environment(self.environ, self.prefix, self.bundle)
+
     def test_pyinstaller_private_state_cannot_pass_gate(self):
-        with self.assertRaises(ValueError):
-            qa.assess_runner_environment({'WINEPREFIX':'/owned/prefix','CODCOOP_QA_PROFILE':'1','_PYI_APPLICATION_HOME_DIR':'/tmp/app'},Path('/owned/prefix'),Path('/game/coop/launcher'))
+        self.environ['_PYI_APPLICATION_HOME_DIR'] = '/tmp/app'
+        with self.assertRaisesRegex(ValueError, 'PyInstaller runtime variables leaked'):
+            qa.assess_runner_environment(self.environ, self.prefix, self.bundle)
 
 class SupervisorLifetimeTests(unittest.TestCase):
     def test_supervisor_loop_clears_previous_quit_before_restart(self):

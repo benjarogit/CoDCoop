@@ -29,7 +29,9 @@ class PartyUI(unittest.TestCase):
                 self.assertFalse(d.launch.isEnabled());self.assertFalse(d.confirm.isEnabled());self.assertFalse(d.submit.isEnabled())
                 d.create.click();self.app.processEvents()
                 self.assertEqual(captured[0][0],'party');self.assertIn('--host',captured[0][1]);self.assertIn('2',captured[0][1]);self.assertNotIn('--runner',captured[0][1])
-                self.assertEqual(d.invite_path.stat().st_mode&0o777,0o600)
+                self.assertTrue(d.invite_path.is_file())
+                if os.name == 'posix':
+                    self.assertEqual(d.invite_path.stat().st_mode&0o777,0o600)
                 d.reject();self.app.processEvents();self.assertFalse(d.invite_path.exists())
     def test_real_gui_workers_create_join_submit_and_confirm(self):
         import importlib.util, socket, time, zipfile

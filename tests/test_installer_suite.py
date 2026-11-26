@@ -15,6 +15,8 @@ spec = importlib.util.spec_from_file_location('installer', ROOT / 'tools/install
 installer = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(installer)
 
+LAUNCHER_NAME = 'CoD-Coop-Launcher.exe' if os.name == 'nt' else 'CoD-Coop-Launcher'
+
 
 class Response(io.BytesIO):
     def __init__(self, content, status=200, headers=None):
@@ -117,7 +119,7 @@ class InstallerTests(unittest.TestCase):
             tx=installer.InstallTransaction(game)
             tx.copy(source,'Main/config.cfg')
             self.assertEqual((game/'main/config.cfg').read_bytes(),b'PERSONAL')
-            self.assertFalse((game/'Main').exists())
+            self.assertEqual([entry.name for entry in game.iterdir() if entry.is_dir()], ['main'])
 
     def test_path_traversal_and_external_symlink_are_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -191,7 +193,7 @@ class InstallerTests(unittest.TestCase):
             (game/'ddraw.dll').write_bytes(b'original')
             (payload/'coop/variants.json').write_text('{}')
             (payload/'coop/launcher').mkdir()
-            (payload/'coop/launcher/CoD-Coop-Launcher').write_bytes(b'test-placeholder-not-executed')
+            (payload/'coop/launcher'/LAUNCHER_NAME).write_bytes(b'test-placeholder-not-executed')
             (payload/'ddraw.dll').write_bytes(b'replacement')
             with mock.patch.object(installer, 'run_suite_validator', return_value=1):
                 result=installer.suite_main(['--game',str(game),'--suite-source',str(payload),'--yes','--repair'])
@@ -234,7 +236,7 @@ class BaseCompletenessTests(unittest.TestCase):
                 root=Path(folder);game=root/'game';overlay=root/'payload'
                 game.mkdir();(overlay/'coop/launcher').mkdir(parents=True)
                 (game/'CoDSP.exe').write_bytes(b'owned game');(game/'ddraw.dll').write_bytes(b'old intact module')
-                (overlay/'coop/launcher/CoD-Coop-Launcher').write_bytes(b'not executed')
+                (overlay/'coop/launcher'/LAUNCHER_NAME).write_bytes(b'not executed')
                 for name in ('sp_improved/sp_improved_1.5.pk3','UnitedFronts/ZUnitedFronts_1.1_beta.pk3'):
                     path=(game if location=='game' else overlay)/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(b'campaign already present')
                 (overlay/'coop/variants.json').write_text(json.dumps({'required':[{'path':'Main/zzz_patch.pk3','sha256':hashlib.sha256(b'reviewed').hexdigest(),'size':8,'install_source':'suite'}]}))
@@ -262,7 +264,7 @@ class BaseCompletenessTests(unittest.TestCase):
             game.mkdir();(overlay/'coop/launcher').mkdir(parents=True)
             (game/'CoDSP.exe').write_bytes(b'owned game')
             (game/'ddraw.dll').write_bytes(b'previous mod')
-            (overlay/'coop/launcher/CoD-Coop-Launcher').write_bytes(b'not executed')
+            (overlay/'coop/launcher'/LAUNCHER_NAME).write_bytes(b'not executed')
             (overlay/'coop/variants.json').write_text(json.dumps({'required':[{'path':'Main/pak4.pk3','kind':'base_content','engine':'cod1'}]}))
             with mock.patch.object(installer,'run_suite_validator') as validate:
                 result=installer.suite_main(['--game',str(game),'--suite-source',str(overlay),'--yes'])

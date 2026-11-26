@@ -1,6 +1,7 @@
 import hashlib
 import importlib.util
 import json
+import os
 from pathlib import Path
 import sys
 import tempfile
@@ -99,7 +100,8 @@ class CoopLocaleInstall(unittest.TestCase):
         info=locale.generate_banks(f.game,f.manifest)
         f.write('coop/variants.json',fixtures.suite.canonical(f.manifest))
         f.write('coop/languages/en/manifest.json',fixtures.suite.canonical({'schema':1,'language':'en','files':{INSTALLED_PATH:info}}))
-        f.write('coop/launcher/CoD-Coop-Launcher',b'fixture, never executed')
+        launcher = 'CoD-Coop-Launcher.exe' if os.name == 'nt' else 'CoD-Coop-Launcher'
+        f.write('coop/launcher/' + launcher, b'fixture, never executed')
         (f.game/'coop/runtime-lock.json').unlink()
         lock={'suite_version':f.manifest['suite_version'],'manifest_sha256':fixtures.suite.sha256(f.game/'coop/variants.json'),'files':runtime_files(f.game)}
         f.write('coop/runtime-lock.json',fixtures.suite.canonical(lock))
