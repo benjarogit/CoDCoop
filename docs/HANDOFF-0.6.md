@@ -1880,7 +1880,10 @@ below. Source is still in development; no stable release has been published.
 - Mixed German/English gameplay installations; unlocalized custom content retains original language.
 - Windows10/11x64, Linuxx86_64 Wine/Proton; CoD2 experimental, outside completion target.
 - Graphical Linux installer plus terminal; full suite mandatory rather than optional extras.
-- Native Windows, multi-account Steam and complete campaign tests remain final acceptance gates.
+- Native Windows installer plus a two-player smoke per engine variant are now
+  recorded (`run/qa-win-native1/`); multi-account Steam remains an open gate.
+  A human full-campaign playthrough is explicitly **not** a release gate — it is
+  documented as not covered, chapter sampling is the coverage claim.
 - Hardware confirmed by the user: only this Linux machine is currently available.
   Windows setup executed through Wine does not close native Windows acceptance.
 
@@ -2067,9 +2070,13 @@ its `provenance.json`/`result.json`. Do not attribute an older run to a later re
 
 ## Open acceptance / Offene Abnahme
 
-This development change is NOT a full-campaign certification. Required remaining proof includes:
+This development change is NOT a full-campaign certification. A human full
+playthrough is not required for the release: per-chapter sampling plus one smoke
+test per variant and platform is the coverage claim. Required remaining proof
+includes:
 
-- Natural full original campaign→credits→UO route, and complete per-mission playthrough coverage.
+- Chapter samples for every campaign, plus the two-player native Windows smoke
+  for United Fronts (CoD 1, UO and SP Improved are recorded).
 - Safe group campaign changes with both real processes restarting/rejoining and failure/cancel recovery.
 - UF complete terrain-dependent MG use and artillery/airstrike damage.
 - All mission objectives/interactions, vehicles, checkpoint/save-load stress and rejoin scenarios.

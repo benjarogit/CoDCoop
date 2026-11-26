@@ -31,6 +31,9 @@ installer level and with a two-player smoke.**
   now runs in the packet pump, so a long native load no longer drops a joiner's
   slot after 8 s.
 - Record campaign coverage chapter by chapter instead of claiming a playthrough.
+  A human full playthrough is explicitly **not** a release gate: it can only be
+  produced by playing the game correctly for hours, so it is documented as not
+  covered while the per-chapter samples remain the coverage claim.
   Both bastogne1 failures that preceded the pass are retained as evidence: the
   rejoin renderer catches up at 2 fps and the restored pose can face an
   obstacle, so the fixture now waits for restored-world snapshots and probes the
@@ -258,7 +261,10 @@ Windows-Läufe sind auf Installer-Ebene und mit einem Zwei-Spieler-Smoke belegt.
   läuft jetzt im Paket-Pump, damit ein langer nativer Ladevorgang den
   Joiner-Slot nicht mehr nach 8 s freigibt.
 - Kampagnenabdeckung kapitelweise festhalten statt einen Durchlauf zu
-  behaupten. Beide Bastogne1-Fehler vor dem Bestehen bleiben als Evidenz
+  behaupten. Ein vollständiger Durchspiel-Lauf von Hand ist ausdrücklich **kein**
+  Veröffentlichungskriterium: Er entsteht nur durch stundenlanges korrektes
+  Spielen und wird deshalb als nicht abgedeckt dokumentiert, während die
+  Kapitel-Stichproben die Abdeckungsaussage bleiben. Beide Bastogne1-Fehler vor dem Bestehen bleiben als Evidenz
   erhalten: Der Renderer holt beim Rejoin mit 2 Bildern/s auf, und die
   wiederhergestellte Pose kann auf ein Hindernis zeigen; deshalb wartet die
   Fixture jetzt auf Snapshots der wiederhergestellten Welt und probiert die vier

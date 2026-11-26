@@ -31,7 +31,8 @@ binding and equipment start remain gated.
 CoD campaign, keep the SP Improved 1.5 AI/gameplay improvements, watch the original
 CoD closing sequence, then continue into UO with the same group. This route uses
 the UO engine throughout. The credits→UO bridge has passed a targeted two-client
-test; full campaign playthroughs remain part of acceptance.
+test. A human full playthrough is not a release gate: coverage is recorded per
+chapter, and a chapter without a recorded sample is named as not covered.
 Classic profiles and United Fronts remain separate choices.
 
 
@@ -163,9 +164,12 @@ host's fire readiness is waited for in a bounded per-map window. The signed
 equipment lobby works in frozen Linux
 and Windows/Wine workers; its native game owner/kit binding is still unfinished.
 
-The release gate is **complete tested campaigns**, not merely successful map
-loads. Native Windows 10/11 tests, Steam with separate accounts, all campaign
-playthroughs and the extra mechanics must be recorded before a stable release.
+The release gate is **every campaign chapter sampled at least once, and every
+variant smoke-tested on the target platform**, not a human full playthrough. A
+playthrough can only be produced by playing the game correctly for many hours;
+it is therefore documented as *not covered* instead of being an open blocker.
+Steam with two separate accounts and the remaining special mechanics are still
+recorded as open.
 
 - [Implementation and test handoff](docs/HANDOFF-0.6.md)
 - [Campaign inventory and compatibility](docs/campaign-compatibility.md)

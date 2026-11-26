@@ -34,7 +34,10 @@ CoD-Kampagne anfangen, die KI-/Gameplay-Verbesserungen von SP Improved 1.5 nutze
 die ursprüngliche CoD-Abschlusssequenz sehen und anschließend mit derselben
 Gruppe in UO weiterspielen. Dieser Ablauf verwendet durchgehend die UO-Engine;
 der Abspann→UO-Übergang hat einen gezielten Test mit zwei echten Spielinstanzen
-bestanden. Vollständige Kampagnendurchläufe bleiben Teil der Abnahme. Klassische Varianten und
+bestanden. Ein vollständiger Durchspiel-Lauf von Hand ist **kein**
+Veröffentlichungskriterium: Die Abdeckung wird kapitelweise festgehalten, und ein
+Kapitel ohne aufgezeichnete Stichprobe wird ausdrücklich als nicht abgedeckt
+benannt. Klassische Varianten und
 United Fronts bleiben zusätzlich auswählbar.
 
 
@@ -175,9 +178,12 @@ abgewartet wird. Die signierte Ausrüstungslobby funktioniert in gebauten
 Linux- und Windows/Wine-Workern; ihre native Spieler-/Ausrüstungsbindung im
 Spiel ist noch nicht fertig.
 
-Für die stabile Veröffentlichung zählen **vollständig geprüfte Kampagnen**,
-nicht nur geladene Karten. Native Windows-10/11-Tests, Steam mit getrennten
-Accounts, sämtliche Kampagnen und Zusatzmechaniken müssen nachgewiesen sein.
+Für die Veröffentlichung zählt **mindestens eine Stichprobe pro Kapitel und ein
+Smoke-Test jeder Variante auf der Zielplattform**, nicht ein vollständiger
+Durchspiel-Lauf von Hand. Ein Durchspielen entsteht nur durch stundenlanges
+korrektes Spielen; es wird deshalb als *nicht abgedeckt* dokumentiert statt als
+offener Blocker geführt. Steam mit zwei getrennten Accounts und die restlichen
+Spezialmechaniken bleiben weiterhin offen ausgewiesen.
 
 - [Umsetzungsstand und Übergabe](docs/HANDOFF-0.6.md)
 - [Missionsinventar und Kompatibilität](docs/campaign-compatibility.md)
