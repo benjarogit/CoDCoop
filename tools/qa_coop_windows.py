@@ -45,7 +45,7 @@ def copytree(source, destination):
         raise RuntimeError('robocopy failed (%d): %s' % (result.returncode, result.stdout[-2000:]))
 
 
-def prepare_folders(source, output, players, runtime_dir=None, mesa_dir=None):
+def prepare_folders(source, output, players, runtime_dir=None, mesa_dir=None, steam_api=None):
     folders = []
     for n in range(players):
         folder = output / ('host' if n == 0 else 'join%d' % n)
@@ -53,6 +53,8 @@ def prepare_folders(source, output, players, runtime_dir=None, mesa_dir=None):
         if runtime_dir is not None:
             for module in ('ddraw.dll', 'codcoop_core.dll'):
                 shutil.copy2(runtime_dir / module, folder / module)
+        if steam_api is not None:
+            shutil.copy2(steam_api, folder / 'steam_api.dll')
         if mesa_dir is not None:
             # id Tech 3 needs a real OpenGL 1.4+ driver; the VM has no GPU, so
             # the smoke uses Mesa in the player copies only. The installed
@@ -88,8 +90,15 @@ def main(argv=None):
                         help='pin the host with coopgod while peers load; liveness only')
     parser.add_argument('--runtime-dir', type=Path, help='optional DLL snapshot copied over every folder')
     parser.add_argument('--mesa-dir', type=Path, help='optional Mesa x86 opengl32.dll/libgallium_wgl.dll for GPU-less hosts')
+    parser.add_argument('--steam-api', type=Path,
+                        help='stand-in steam_api.dll copied into every player folder; joiners use '
+                             '+coopjoin steam:<id> instead of 127.0.0.1')
+    parser.add_argument('--steam-host-id', type=int, default=76561190000000001,
+                        help='fake SteamID64 of the host with --steam-api; joiners get the next IDs')
     parser.add_argument('--prepare-only', action='store_true')
     args = parser.parse_args(argv)
+    if args.steam_api is not None and not args.steam_api.is_file():
+        parser.error('--steam-api is not a file: ' + str(args.steam_api))
 
     source, output = args.source.resolve(), args.run.resolve()
     if output == source or output.is_relative_to(source) or source.is_relative_to(output):
@@ -112,15 +121,21 @@ def main(argv=None):
     if args.mesa_dir is not None:
         provenance['mesa'] = {p: hashlib.sha256((args.mesa_dir / p).read_bytes()).hexdigest()
                               for p in MESA_MODULES if (args.mesa_dir / p).is_file()}
+    if args.steam_api is not None:
+        provenance['transport'] = 'steam-fake'
+        provenance['steam_api'] = hashlib.sha256(args.steam_api.read_bytes()).hexdigest()
+        provenance['steam_host_id'] = args.steam_host_id
     (output / 'provenance.json').write_text(json.dumps(provenance, indent=2))
 
-    folders = prepare_folders(source, output, args.players, args.runtime_dir, args.mesa_dir)
+    folders = prepare_folders(source, output, args.players, args.runtime_dir, args.mesa_dir, args.steam_api)
     if args.prepare_only:
         return 0
 
     processes, handles = [], []
     env = os.environ.copy()
-    env.update(CODCOOP_QA='1', CODCOOP_QA_NO_STEAM='1')
+    env.update(CODCOOP_QA='1')
+    if not args.steam_api:
+        env['CODCOOP_QA_NO_STEAM'] = '1'
     results = {'status': 'FAIL', **provenance, 'checks': []}
     try:
         exe = 'CoDSP.exe' if args.variant == 'cod1' else 'CoDUOSP.exe'
@@ -139,8 +154,19 @@ def main(argv=None):
                    '+set', 'com_introplayed', '1', '+set', 'logfile', '2',
                    '+set', 'com_hunkmegs', '512' if args.variant == 'united_fronts' else '256',
                    '+set', 'sv_cheats', '1', '+devmap', args.map]
-            cmd += ['+coophost', str(args.port)] if n == 0 else ['+coopjoin', '127.0.0.1:' + str(args.port)]
-            processes.append(subprocess.Popen(cmd, env=env, cwd=str(folder), stdout=log, stderr=log))
+            if n == 0:
+                cmd += ['+coophost', str(args.port)]
+            elif args.steam_api:
+                cmd += ['+coopjoin', 'steam:%d' % args.steam_host_id]
+            else:
+                cmd += ['+coopjoin', '127.0.0.1:' + str(args.port)]
+            player_env = env
+            if args.steam_api:
+                player_env = env.copy()
+                player_env['FAKESTEAM_ID'] = str(args.steam_host_id + n)
+                player_env['FAKESTEAM_NAME'] = 'QA%d' % n
+                player_env['FAKESTEAM_DIR'] = str(output / 'fakesteam')
+            processes.append(subprocess.Popen(cmd, env=player_env, cwd=str(folder), stdout=log, stderr=log))
             wait_for(lambda folder=folder: read_state(folder), processes, args.timeout,
                      'core initialization for slot %d' % n)
             start = 'coopuiclick 320 240\ncoopqastart'

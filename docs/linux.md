@@ -8,7 +8,7 @@ Proton. This guide is the setup that was tested end to end:
 | Launcher | AnkerGames (also applies to similar launchers that start the game through `umu-run`/Proton) |
 | Proton | 11.0 |
 | GPU / driver | NVIDIA (proprietary) and Mesa (llvmpipe) |
-| Game | Call of Duty 1.5 + United Offensive 1.51, mod 0.6.0 (this fork) |
+| Game | Call of Duty 1.5 + United Offensive 1.51, mod 0.6.1 (this fork) |
 | Suite | CoD 1, UO, SP Improved 1.5, United Fronts and the YAP plugin |
 
 Three things matter on Linux: the launcher has to keep the modified files, the
@@ -25,7 +25,7 @@ the Linux setup, verifies its pinned SHA-256 and starts the terminal setup
 inside the downloaded image:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/benjarogit/CoDCoop/v0.6.0/tools/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/benjarogit/CoDCoop/v0.6.1/tools/install.sh | sh
 ```
 
 It finds the game folder itself (all Steam libraries, AnkerGames, current

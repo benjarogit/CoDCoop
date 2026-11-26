@@ -3,7 +3,7 @@
 # the complete pinned suite: CoD 1, UO, SP Improved, United Fronts and the YAP
 # plugin), verifies its SHA-256 and starts the terminal setup.
 #
-#   curl -fsSL https://raw.githubusercontent.com/benjarogit/CoDCoop/v0.6.0/tools/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/benjarogit/CoDCoop/v0.6.1/tools/install.sh | sh
 #
 # or save it and run:  sh install.sh [--game "/path/to/Call of Duty"] [--check]
 #
@@ -19,9 +19,9 @@ if [ ! -t 0 ] && (exec </dev/tty) 2>/dev/null; then
 fi
 
 REPO=benjarogit/CoDCoop
-TAG=${COD_COOP_TAG:-0.6.0}
+TAG=${COD_COOP_TAG:-v0.6.1}
 ASSET=Install-CoD-Coop-Linux-x86_64.AppImage
-SHA256=${COD_COOP_APPIMAGE_SHA:-d47b399d311ccfea2f13aa9165ec46e40da899d5c5fb081e5da82a75d5534c66}
+SHA256=${COD_COOP_APPIMAGE_SHA:-e59cab1903c1de9cb8f025553c6ca7594de0a3d60114aee6dc1f19fc374ece44}
 URL=${COD_COOP_URL:-"https://github.com/$REPO/releases/download/$TAG/$ASSET"}
 
 # Run from an unpacked release: everything is already there.
