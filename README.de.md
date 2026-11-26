@@ -99,7 +99,7 @@ sh ./install-codcoop.sh --game "/Pfad/zu/Call of Duty" --language de
   ersetzt werden sollen.
 - Unter Linux verwendet der Launcher standardmäßig `wine`. Einen anderen
   kompatiblen Startbefehl trägst du unter **Erweiterte Startoptionen → Wine-/Proton-Befehl** ein.
-  [Wine und Proton einrichten](docs/linux.md#3-starting-the-game-from-the-launcher)
+  [Wine und Proton einrichten](docs/linux.de.md#3-das-spiel-über-den-launcher-starten)
 
 </details>
 
@@ -119,7 +119,7 @@ sh ./install-codcoop.sh --game "/Pfad/zu/Call of Duty" --language de
 <summary><strong>Steam für Host und Mitspieler einrichten</strong></summary>
 
 1. Alle melden sich mit einem eigenen Steam-Konto an und installieren **Spacewar** über `steam://install/480`.
-2. **Windows** kann das Spiel normal starten, während Steam läuft. **Linux** startet das Spiel über einen Steam-Eintrag mit Proton und den nötigen Startoptionen. [Steam-Einrichtung unter Linux](docs/linux.md#4-steam-friend-invites)
+2. **Windows** kann das Spiel normal starten, während Steam läuft. **Linux** startet das Spiel über einen Steam-Eintrag mit Proton und den nötigen Startoptionen. [Steam-Einrichtung unter Linux](docs/linux.de.md#4-steam-einrichten)
 3. Nutzt die Steam-ID des Hosts für den Beitritt. Der Steam-Transport wurde mit einer Ersatz-API getestet. Ein Beitritt mit zwei echten Konten ist noch ungeprüft.
 
 </details>
@@ -138,7 +138,7 @@ sh ./install-codcoop.sh --game "/Pfad/zu/Call of Duty" --language de
 | --- | --- |
 | **Windows-Setup findet die Suite nicht** | Prüfe, ob `suite/coop/variants.json` direkt neben der EXE erreichbar ist. Häufig steckt ein zusätzlicher Ordner dazwischen. |
 | **Installation prüfen schlägt fehl** | Lies die gemeldete Datei, starte das passende Setup erneut und prüfe danach wieder im Launcher. |
-| **Linux startet ohne Coop-Menü oder bricht beim Start ab** | Prüfe, ob Wine/Proton die mitgelieferte `ddraw.dll` lädt. [Linux-Start und Grafik](docs/linux.md#1-buffer-overrun-detected-right-after-the-intro) |
+| **Linux startet ohne Coop-Menü oder bricht beim Start ab** | Prüfe, ob Wine/Proton die mitgelieferte `ddraw.dll` lädt. [Linux-Start und Grafik](docs/linux.de.md#1-buffer-overrun-detected-direkt-nach-dem-intro) |
 | **Mitspieler kommen nicht rein** | Prüft Paketstand, Host-Adresse und die Firewall des Hosts. Bei Direkt-IP übers Internet prüft auch die Weiterleitung von UDP 28960. |
 | **United Fronts bricht in Foy oder Noville ab** | Beide Karten können im Standardbetrieb das Modelllimit erreichen. [Bekannte Grenzen und getestete Karten](docs/campaign-compatibility.md) |
 
@@ -146,7 +146,7 @@ sh ./install-codcoop.sh --game "/Pfad/zu/Call of Duty" --language de
 <summary><strong>Rücknahme, Teststand und Entwicklung</strong></summary>
 
 - **Windows:** Im Setup **Letzte Installation zurücknehmen** wählen.
-- **Linux:** Den Terminal-Installer mit `--game "/Pfad/zu/Call of Duty" --rollback latest` starten. [Terminal-Optionen](docs/linux.md#terminal-setup-with-installsh)
+- **Linux:** Den Terminal-Installer mit `--game "/Pfad/zu/Call of Duty" --rollback latest` starten. [Terminal-Optionen](docs/linux.de.md#terminal-setup-mit-installsh)
 - In der [Kompatibilitätsübersicht](docs/campaign-compatibility.md) stehen die getesteten Missionen und Mechaniken. Vollständige Kampagnendurchläufe sind noch ungeprüft. Call of Duty 2 ist experimentell.
 - [Changelog](CHANGELOG.md) · [Build und Tests](docs/development-0.6.md) · [Projektübergabe](docs/HANDOFF-0.6.md)
 

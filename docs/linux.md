@@ -1,6 +1,6 @@
 # Running CoD Coop on Linux (Proton / Wine)
 
-[Install](#0-install-on-linux) · [Launch fixes](#1-buffer-overrun-detected-right-after-the-intro) · [Steam setup](#4-steam-friend-invites) · [Main guide](../README.md) · [Deutsch](../README.de.md)
+[Install](#0-install-on-linux) · [Launch fixes](#1-buffer-overrun-detected-right-after-the-intro) · [Steam setup](#4-steam-friend-invites) · [Main guide](../README.md) · [Deutsch](linux.de.md)
 
 The mod is a Windows mod (DLLs loaded by the game) and runs on Linux through
 Proton. This guide is the setup that was tested end to end:
@@ -160,10 +160,9 @@ on **every** PC, host and client:
 1. **Steam is running and signed in.** The mod loads `steamclient.dll` from the
    running client; a Steam that is closed or still at the login screen is not
    enough.
-2. **Spacewar (AppID 480) is installed once.** It is Valve's free test app and
-   the co-op uses it to talk to Steam (that is why Steam shows "Playing
-   Spacewar"). Both installers offer to open it at the end; you can also do it
-   yourself: `steam://install/480`.
+2. **Install Spacewar (AppID 480)** using `steam://install/480`.
+   CoDCoop uses this test app for Steam connections. Steam can display
+   **Playing Spacewar** during play.
 3. **The game sees Steam.**
    * **Linux (Proton):** Steam only injects `steamclient.dll` and the overlay
      into processes it launched, so the game has to be started **through
@@ -341,9 +340,6 @@ the 1.51 patch does not change it. What matters is `uo/version.inf`
 
 ## 8. Both sides need the same versions
 
-Host and client must both be on **Call of Duty 1.5** and the **same mod version**.
-The game version matters, not how you got there (official patch or a 1.5 build
-shipped by your launcher).
-
-The menu patch from this repository only changes the menus, not the network code,
-so a client with the original menus can still join.
+Select **Check installation** in CoDCoop Launcher on the host and all
+joiners. Compare the displayed suite version and use the same CoDCoop release.
+Game language and graphics settings can differ. [Play together](../README.md#play-together)

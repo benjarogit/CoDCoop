@@ -1,67 +1,71 @@
 # AGENTS.md — CoDCoop
 
-## Platten-Hygiene (verbindlich)
+## Documentation languages
 
-`run/` ist **Wegwerf-Material** (steht in `.gitignore`). Trotzdem ist es der größte
-Verbraucher auf `/mnt/intern-1tb`: **jeder QA-Lauf legt eine komplette Spielkopie an
-(~15 GB)** — `run/<tag>/host/`, `join1/`, `join2/`, `prefix/`, `runtime/`.
+Use English as the default repository language. Keep player instructions for
+installation, configuration, and play equivalent in English and German. Update
+both language versions when changing a player workflow. Keep the changelog and
+release notes bilingual.
 
-Ist-Stand als Warnung: 266 Läufe ≈ **596 GB**, Platte war bei **99 %** (15 GB frei).
+## Disk space and QA cleanup
 
-### Vor jedem QA-Lauf
+`run/` holds disposable QA work and is listed in `.gitignore`. QA runs can
+create complete game copies under `run/<tag>/host/`, `join1/`, `join2/`,
+`prefix/`, and `runtime/`, taking about 15 GB per run. In a previous incident,
+266 runs took about 596 GB and left only 15 GB free on `/mnt/intern-1tb`.
+
+### Before each QA run
 
 ```bash
-df -h /mnt/intern-1tb          # < 60 GB frei? -> erst aufräumen, nicht starten
-home-cleanup --cod-status      # Anzahl + Top-Verbraucher der Läufe
+df -h /mnt/intern-1tb           # Clean up before starting if less than 60 GB is free
+home-cleanup --cod-status       # Count QA runs and show the largest ones
 ```
 
-### Nach jedem QA-Lauf (Pflicht, gleiche Session)
+### After each QA run, in the same session
 
-1. Nachweise sichern: `result.json`, `provenance.json`, `*.log`, `tree-watch.json`,
-   `*-proof.json` nach `run/<tag>/evidence/` kopieren.
-2. Schwere Kopien löschen: `run/<tag>/{host,join1,join2,join3,prefix,runtime}`.
-3. Läufe, die nicht mehr gebraucht werden: `home-cleanup --cod-runs` (siehe unten).
+1. Copy `result.json`, `provenance.json`, `*.log`, `tree-watch.json`,
+   and `*-proof.json` to `run/<tag>/evidence/`.
+2. Remove the temporary copies in `run/<tag>/{host,join1,join2,join3,prefix,runtime}`.
+3. Run `home-cleanup --cod-runs` for runs that are no longer needed. Follow the
+   protections below.
 
-Ein Lauf, der älter als 12 h ist und nicht in `docs/` referenziert wird, ist Müll.
+Treat a run older than 12 hours with no reference in `docs/` as disposable,
+subject to the cleanup protections.
 
-### Namensschema (macht das Aufräumen automatisierbar)
+### Run names
 
-`run/<familie><n>` — z. B. `qa-noville-m1-union1 … union7`.
-Der Prune behält pro Familie die neuesten N und erkennt Zusammen­gehörigkeit am
-Zahlen-Suffix. **Keine** Einmalnamen wie `switch-protocol9-bundled-final-final`.
+Use `run/<family><n>`, such as `qa-noville-m1-union1` through
+`qa-noville-m1-union7`. The cleanup tool uses the numeric suffix to group runs
+and keeps the newest N members of each family. Avoid names such as
+`switch-protocol9-bundled-final-final`.
 
-### Aufräumen
+### Cleanup commands
 
 ```bash
-home-cleanup --cod-status                  # Übersicht
-home-cleanup --cod-runs --dry-run          # zeigt, was weg würde
-home-cleanup --cod-runs                    # löscht überholte Iterationen
+home-cleanup --cod-status
+home-cleanup --cod-runs --dry-run          # Preview what would be deleted
+home-cleanup --cod-runs                    # Remove superseded QA runs
 home-cleanup --cod-runs --keep 2 --max-age-d 7
 ```
 
-Der Prune schützt automatisch:
+The cleanup tool protects runs referenced as `run/<name>` in `docs/`, `notes/`,
+`README*.md`, or `CHANGELOG.md`. It also protects runs younger than
+`--min-age-h` (12 hours by default) and stops if a process is using a run.
 
-- alles, was in `docs/`, `notes/`, `README*.md`, `CHANGELOG.md` als `run/<name>`
-  referenziert ist (Nachweis, z. B. `run/qa-noville-m1-union7`),
-- Läufe jünger als `--min-age-h` (Standard 12 h, also „aktiv“),
-- alles, worauf ein Prozess gerade arbeitet (er bricht dann ab).
+| Free space on `/mnt/intern-1tb` | Required action |
+| --- | --- |
+| More than 100 GB | Normal QA operation |
+| 60–100 GB | Run `home-cleanup --cod-runs` before starting the next QA run |
+| Under 60 GB | Clean up before starting any new QA run |
+| Under 20 GB | Emergency cleanup of old run families with `--keep 1 --max-age-d 3` |
 
-### Schwellen
+### Protected files
 
-| Frei auf /mnt/intern-1tb | Verhalten |
-|---|---|
-| > 100 GB | normal |
-| 60–100 GB | nächsten Lauf nur mit `--cod-runs` davor |
-| < 60 GB | **kein** neuer QA-Lauf, erst aufräumen |
-| < 20 GB | Notfall: alte Familien komplett löschen (`--keep 1 --max-age-d 3`) |
+- Keep `run/<tag>/evidence/` and runs referenced in the documentation.
+- Ask before removing anything from `game/` or `build/`.
+- Leave `run/` in place while a Wine, Xvfb, or QA process is running.
 
-### Nicht anfassen
+### Reporting
 
-- `run/<tag>/evidence/` und die in der Doku genannten Läufe (Nachweise).
-- `game/`, `build/` nur nach Rücksprache — die sind nicht Teil des QA-Mülls.
-- Nichts in `run/` löschen, während ein Wine/Xvfb/QA-Prozess läuft.
-
-### Regel für Berichte
-
-Jeder Abschlussbericht eines QA-Laufs nennt zusätzlich:
-`df -h /mnt/intern-1tb` (frei) und ob der Lauf aufgeräumt wurde.
+Every final QA report includes the free space from `df -h /mnt/intern-1tb`
+and confirms whether the test run was cleaned up.
