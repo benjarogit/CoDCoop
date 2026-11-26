@@ -1,5 +1,7 @@
 # Running CoD Coop on Linux (Proton / Wine)
 
+[Install](#0-install-on-linux) · [Launch fixes](#1-buffer-overrun-detected-right-after-the-intro) · [Steam setup](#4-steam-friend-invites) · [Main guide](../README.md) · [Deutsch](../README.de.md)
+
 The mod is a Windows mod (DLLs loaded by the game) and runs on Linux through
 Proton. This guide is the setup that was tested end to end:
 
@@ -224,10 +226,9 @@ the mod work, only the overlay/friends list is missing. Add the entry once and
 restart the launcher. `tools/steam-shortcut.py` only reads Steam's
 `shortcuts.vdf` to find the existing entry; it does not create one.
 
-Linux ↔ Windows works: the invite goes through Steam, not through the game, so
-the two sides can run different operating systems, different launchers and
-different copies of the game, as long as both are on **Call of Duty 1.5** with
-the **same mod version**.
+Both players need the same CoDCoop release. The Steam transport was tested
+locally with a stand-in API. Joins with two real Steam accounts, including
+between Linux and Windows, remain unverified.
 
 ## 5. "Your computer has changed" on the first start
 

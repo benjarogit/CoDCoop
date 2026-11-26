@@ -1,85 +1,159 @@
 # Call of Duty Coop
 
-Play the Call of Duty and United Offensive campaigns with 2–4 players on
-Windows or Linux. The suite also includes SP Improved and United Fronts.
+Play **Call of Duty** and **United Offensive** with **2–4 players** on Windows or Linux. The suite includes **SP Improved** and **United Fronts**.
 
-[Deutsch](README.de.md) · [Latest release](https://github.com/benjarogit/CoDCoop/releases/latest) · [Changelog](CHANGELOG.md)
+[![Install on Windows](https://img.shields.io/badge/Windows-Install-005A9C)](#windows-1011-64-bit)
+[![Install on Linux](https://img.shields.io/badge/Linux-Install-765400)](#linux-x86_64)
+[![Latest release](https://img.shields.io/github/v/release/benjarogit/CoDCoop?label=Release)](https://github.com/benjarogit/CoDCoop/releases/latest)
+
+[Install](#installation) · [Set up](#setup) · [Play](#play-together) · [Get help](#troubleshooting) · [Deutsch](README.de.md)
 
 ## Installation
 
-Start with an existing, complete Call of Duty installation. The game folder
-contains `CoDSP.exe`. Use matching downloads from the same release.
+Start with an **existing, complete Call of Duty installation**. The game folder contains `CoDSP.exe` and the `Main` folder. Use the same CoDCoop release on every machine.
 
 ### Windows 10/11 (64-bit)
 
-1. Download **both** `Install-CoD-Coop.exe` and the ZIP ending in
-   `-suite-windows.zip`. [Windows installer](https://github.com/benjarogit/CoDCoop/releases/latest/download/Install-CoD-Coop.exe) · [Windows suite ZIP under Assets](https://github.com/benjarogit/CoDCoop/releases/latest#assets)
-2. Extract the ZIP. Rename the extracted folder that directly contains
-   `coop` to `suite` and put it next to `Install-CoD-Coop.exe`.
-3. Run the EXE, select your existing **Call of Duty game folder** and install.
-   The installer finds the `suite` folder automatically.
-4. Open `Start-CoD-Coop.bat` in the game folder.
+1. Download **both files** from the same release. [Installer `Install-CoD-Coop.exe`](https://github.com/benjarogit/CoDCoop/releases/latest/download/Install-CoD-Coop.exe) · [ZIP ending in `-suite-windows.zip`](https://github.com/benjarogit/CoDCoop/releases/latest#assets)
+2. Extract the ZIP. Rename the folder that directly contains `coop` to **`suite`** and put it next to the EXE.
+
+   ```text
+   CoDCoop-Setup/
+   ├── Install-CoD-Coop.exe
+   └── suite/
+       └── coop/
+           └── variants.json
+   ```
+
+3. Run the EXE and select your **Call of Duty game folder**. The setup finds `suite` next to the EXE.
+4. When setup finishes, open **`Start-CoD-Coop.bat` in the game folder**.
 
 ### Linux (x86_64)
 
-1. Download just `Install-CoD-Coop-Linux-x86_64.AppImage`. The suite is bundled
-   inside it. [Linux AppImage](https://github.com/benjarogit/CoDCoop/releases/latest/download/Install-CoD-Coop-Linux-x86_64.AppImage)
-2. In the file properties, allow execution, then open the AppImage. You can
-   also run these commands in the download directory.
+You need **Wine or Proton** to play. The graphical setup requires **glibc 2.35 or newer**.
 
-   ```sh
-   chmod +x Install-CoD-Coop-Linux-x86_64.AppImage
-   ./Install-CoD-Coop-Linux-x86_64.AppImage
-   ```
-3. Select your existing **Call of Duty game folder** and install. Then run
-   `Start-CoD-Coop.sh` from the game folder.
+1. Download **one AppImage**. It includes the suite. [Download the Linux AppImage](https://github.com/benjarogit/CoDCoop/releases/latest/download/Install-CoD-Coop-Linux-x86_64.AppImage)
+2. Allow execution in the file properties and open the AppImage.
+3. Select your **Call of Duty game folder** and install. Then open **`Start-CoD-Coop.sh` in the game folder**.
 
-Linux needs Wine or Proton for the game. The graphical bundle requires glibc
-2.35 or newer. You can also use the [terminal installer with `install.sh`](docs/linux.md#terminal-setup-with-installsh).
-The [Linux guide](docs/linux.md) covers Steam setup, troubleshooting and rollback.
+<details>
+<summary><strong>Open the AppImage from a terminal</strong></summary>
 
-GitHub lists two **Source code** archives for building from source.
-`SHA256SUMS` is optional and lets you check the downloads.
+Run these commands in the download directory.
+
+```sh
+chmod +x Install-CoD-Coop-Linux-x86_64.AppImage
+./Install-CoD-Coop-Linux-x86_64.AppImage
+```
+
+If you get a FUSE error, run it this way.
+
+```sh
+APPIMAGE_EXTRACT_AND_RUN=1 ./Install-CoD-Coop-Linux-x86_64.AppImage
+```
+
+</details>
+
+<details>
+<summary><strong>Linux alternative: install from the terminal with install.sh</strong></summary>
+
+Copy the command under **Linux** in the [latest release](https://github.com/benjarogit/CoDCoop/releases/latest#linux). It saves the script as `install-codcoop.sh`. The script downloads the matching AppImage, verifies its SHA-256 and starts terminal setup. This method requires `python3`.
+
+If setup finds zero or several installations, give it the game folder.
+
+```sh
+sh ./install-codcoop.sh --game "/path/to/Call of Duty"
+```
+
+Add `--language de` to install in German.
+
+</details>
+
+<details>
+<summary><strong>Additional downloads and existing saves</strong></summary>
+
+- Setup can download additional files if United Offensive data or the selected German language pack is missing.
+- Setup keeps your saves and existing settings by default.
+- `SHA256SUMS` is optional for verifying the downloads. GitHub’s **Source code** archives contain the source for building the mod.
+
+</details>
+
+## Setup
+
+1. Open the launcher with `Start-CoD-Coop.bat` on Windows or `Start-CoD-Coop.sh` on Linux.
+2. Select **Check installation**. The launcher displays the verified suite version. Check that everyone in your group has the same version.
+3. Pick a **Campaign variant**. For your first session, start with **CoD + UO — Improved Coop**.
+4. Leave **Starting mission** blank to begin or resume the campaign in the game. The host chooses the difficulty for new campaigns. Existing saves retain their difficulty.
+
+| Launcher variant | What you play |
+| --- | --- |
+| **CoD + UO — Improved Coop** | Call of Duty with SP Improved on the UO engine, followed by United Offensive |
+| **Call of Duty — original** | The classic campaign on the CoD 1.5 engine |
+| **United Offensive — original** | The original expansion campaign with YAP |
+| **United Fronts** | Its own missions, campaign order options and special weapons |
+
+<details>
+<summary><strong>Change language, display or the Linux runner</strong></summary>
+
+- Run setup again to change the game language. In the same setup you can set
+  your player name, resolution, fullscreen mode and field of view. To update
+  display and player settings in an existing installation, enable the checkbox
+  for changing existing settings.
+- Under Linux, the launcher uses `wine` by default. To use another compatible
+  runner, enter its command under **Advanced launch options → Wine / Proton command**.
+  [Wine and Proton setup](docs/linux.md#3-starting-the-game-from-the-launcher)
+
+</details>
 
 ## Play together
 
-1. Open **CoDCoop Launcher** and choose a campaign.
-2. One player selects **Host** and starts a mission. Everyone else selects
-   **Join**. Use the host's local IP on a LAN. Direct-IP play over the internet
-   uses UDP port `28960` by default.
-3. Use the same suite release on every machine. Players can use different
-   languages. The host's save and mission progress are shared with the group,
-   so use the same host to continue later.
+1. The host selects **Host a game** → **Start campaign** and opens a mission or loads their save.
+2. Other players select **Join a game**, enter the **Host address**, then select **Join campaign**.
+3. Keep the launcher open during play. The host's progress is shared with the group. Use the same host to resume their save later.
 
-Steam joins use Spacewar (AppID 480) and a separate signed-in Steam account
-for each player. The Linux guide covers launching through Steam and Proton.
-The Steam transport has been tested locally with a stand-in Steam API.
-Joins with two real Steam accounts remain untested. [Linux Steam setup](docs/linux.md)
+| Connection | What to enter |
+| --- | --- |
+| **LAN** | The host's local IPv4 address, for example `192.168.1.50` |
+| **Direct IP over the internet** | The host's public IPv4 address. The host forwards **UDP 28960** to their PC by default. |
+| **Steam** | `steam:<SteamID64>` as the host address once Steam is set up |
 
-## Campaigns
+<details>
+<summary><strong>Set up Steam for the host and joiners</strong></summary>
 
-- **CoD + UO — Improved Coop** is the recommended route. Play the original
-  campaign with SP Improved through the UO engine, then continue into UO with
-  the same group.
-- **Call of Duty Classic** uses the original CoD 1.5 engine.
-- **United Offensive** starts the original expansion campaign.
-- **SP Improved** adds gameplay improvements to the CoD and UO missions.
-- **United Fronts** offers its own missions, campaign order and equipment.
-  Foy and Noville can hit the game's 255-model limit on the default path.
+1. Each player signs in to their own Steam account and installs **Spacewar** with `steam://install/480`.
+2. On **Windows**, start the game normally while Steam is running. On **Linux**, launch the game through a Steam entry with Proton and the required launch options. [Steam setup on Linux](docs/linux.md#4-steam-friend-invites)
+3. Use the host's Steam ID to join. The Steam transport was tested with a stand-in API. Joins with two real accounts remain untested.
 
-The campaign variants keep separate saves. Call of Duty 2 remains experimental.
-The [compatibility guide](docs/campaign-compatibility.md) records which missions
-and mechanics were sampled. Full campaign playthroughs remain unverified.
+</details>
 
-## Development
+<details>
+<summary><strong>Switch campaigns or test on your own</strong></summary>
 
-See the [build and test guide](docs/development-0.6.md), the
-[implementation handoff](docs/HANDOFF-0.6.md) and the
-[bilingual changelog](CHANGELOG.md) for release-specific changes.
+- **Switch campaigns.** The host selects the destination in the active launcher and chooses **Switch campaign**. Confirm and wait while the launcher saves at a safe point and reconnects the group.
+- **Test on your own.** You can start a mission solo. Automated Coop tests run extra, scripted game clients. A Coop slot currently has no AI teammate option.
 
-CoDCoop is an [MIT-licensed](LICENSE) fork of
-[TheTiranix/CoDCoop](https://github.com/TheTiranix/CoDCoop). YAP has its own
-[GPL-3.0 license](third_party/yap/LICENSE) and
-[source and compatibility notes](docs/yap-compatibility.md). SP Improved and
-United Fronts credit their respective authors. Call of Duty belongs to Activision
-and Steam components belong to Valve.
+</details>
+
+## Troubleshooting
+
+| Symptom | What to do |
+| --- | --- |
+| **Windows setup cannot find the suite** | Check that `suite/coop/variants.json` is reachable next to the EXE. Look for an extra directory level after extraction. |
+| **Check installation fails** | Read which file the launcher reports, run the matching installer again and repeat the check. |
+| **Linux starts without the Coop menu or closes at launch** | Check that Wine or Proton loads the supplied `ddraw.dll`. [Linux launch and graphics fixes](docs/linux.md#1-buffer-overrun-detected-right-after-the-intro) |
+| **Players cannot join** | Check the suite version, host address and the host’s firewall. For direct-IP internet play, also check the UDP 28960 port forwarding rule. |
+| **United Fronts closes in Foy or Noville** | Both maps can reach the engine’s model limit in the default configuration. [Known limits and tested maps](docs/campaign-compatibility.md) |
+
+<details>
+<summary><strong>Rollback, test coverage and development</strong></summary>
+
+- **Windows:** Select **Roll back last install** in setup.
+- **Linux:** Run the terminal installer with `--game "/path/to/Call of Duty" --rollback latest`. [Terminal options](docs/linux.md#terminal-setup-with-installsh)
+- The [compatibility guide](docs/campaign-compatibility.md) records tested missions and mechanics. Full campaign playthroughs remain unverified. Call of Duty 2 is experimental.
+- [Changelog](CHANGELOG.md) · [Build and test guide](docs/development-0.6.md) · [Implementation handoff](docs/HANDOFF-0.6.md)
+
+</details>
+
+## Credits and licenses
+
+CoDCoop is an [MIT-licensed](LICENSE) fork of [TheTiranix/CoDCoop](https://github.com/TheTiranix/CoDCoop). YAP has its own [GPL-3.0 license](third_party/yap/LICENSE) and [source and compatibility notes](docs/yap-compatibility.md). SP Improved and United Fronts credit their respective authors. Call of Duty belongs to Activision and Steam components belong to Valve.
