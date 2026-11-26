@@ -3,7 +3,7 @@
 # the complete pinned suite: CoD 1, UO, SP Improved, United Fronts and the YAP
 # plugin), verifies its SHA-256 and starts the terminal setup.
 #
-#   curl -fsSL https://raw.githubusercontent.com/benjarogit/CoDCoop/master/tools/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/benjarogit/CoDCoop/v0.6.0/tools/install.sh | sh
 #
 # or save it and run:  sh install.sh [--game "/path/to/Call of Duty"] [--check]
 #

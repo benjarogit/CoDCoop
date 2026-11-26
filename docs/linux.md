@@ -25,7 +25,7 @@ the Linux setup, verifies its pinned SHA-256 and starts the terminal setup
 inside the downloaded image:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/benjarogit/CoDCoop/master/tools/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/benjarogit/CoDCoop/v0.6.0/tools/install.sh | sh
 ```
 
 It finds the game folder itself (all Steam libraries, AnkerGames, current
