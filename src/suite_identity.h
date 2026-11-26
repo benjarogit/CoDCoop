@@ -105,4 +105,35 @@ inline bool LoadIdentity(bool uo, const char* fsGame, Identity& id, std::string&
     }
     return true;
 }
+
+inline bool PrepareDirectLaunch(uint8_t variant)
+{
+    const wchar_t* variants[] = {L"cod1", L"uo", L"sp_improved", L"united_fronts"};
+    if (IsQA() || variant == 0 || variant > 4) return false;
+
+    wchar_t path[MAX_PATH];
+    DWORD length = GetModuleFileNameW(nullptr, path, _countof(path));
+    if (length == 0 || length >= _countof(path)) return false;
+    std::wstring game(path, length);
+    const auto slash = game.find_last_of(L'\\');
+    if (slash == std::wstring::npos) return false;
+    game.resize(slash + 1);
+    const auto checker = game + L"coop\\suite-check.exe";
+    // A trailing separator would escape the closing quote. The dot also
+    // keeps the argument absolute when the game is at the root of a drive.
+    std::wstring command = L"\"" + checker + L"\" prepare " + variants[variant - 1] + L" \"" + game + L".\"";
+    STARTUPINFOW startup{};
+    startup.cb = sizeof startup;
+    PROCESS_INFORMATION child{};
+    if (!CreateProcessW(checker.c_str(), command.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW,
+                        nullptr, game.c_str(), &startup, &child)) return false;
+    CloseHandle(child.hThread);
+    DWORD exitCode = 1;
+    if (WaitForSingleObject(child.hProcess, 60000) == WAIT_OBJECT_0)
+        GetExitCodeProcess(child.hProcess, &exitCode);
+    else
+        TerminateProcess(child.hProcess, 1);
+    CloseHandle(child.hProcess);
+    return exitCode == 0;
+}
 }

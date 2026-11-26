@@ -232,6 +232,11 @@ bool PrepareIdentity()
 {
     std::string error;
     g_profileReady = suite::LoadIdentity(g::uo, g::CvarString("fs_game"), g_identity, error);
+    if (!g_profileReady && g_identity.variant && !suite::IsQA()) {
+        Log("suite: checking the installed campaign for direct launch");
+        if (suite::PrepareDirectLaunch(g_identity.variant))
+            g_profileReady = suite::LoadIdentity(g::uo, g::CvarString("fs_game"), g_identity, error);
+    }
     if (g_profileReady && !ConfigureBodyMemory(!suite::IsQA()||suite::PreparedQA())) return false;
     if (!g_profileReady) {
         Log("suite: %s", error.c_str());

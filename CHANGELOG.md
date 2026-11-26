@@ -2,6 +2,21 @@
 
 [English](#061--english) · [Deutsch](#061--deutsch)
 
+## Unreleased · Unveröffentlicht
+
+- **EN:** Direct AnkerGames, Steam and game-executable starts prepare a missing
+  or mismatched campaign profile when hosting or joining. Wine and Proton must
+  load the bundled `ddraw.dll`.
+- **EN:** Setup shows the active download, transferred size, percentage and
+  verification phase. Windows adds a **CoDCoop** shortcut in the game folder.
+  Linux can open the launcher when setup finishes.
+- **DE:** Beim direkten Start über AnkerGames, Steam oder die Spiel-EXE bereitet
+  die Mod ein fehlendes oder unpassendes Kampagnenprofil beim Hosten oder
+  Beitreten vor. Wine und Proton müssen die mitgelieferte `ddraw.dll` laden.
+- **DE:** Das Setup zeigt den laufenden Download, die übertragene Datenmenge,
+  den Prozentwert und die Prüfung an. Windows legt **CoDCoop** im Spielordner
+  an. Unter Linux lässt sich der Launcher nach der Installation direkt öffnen.
+
 ## 0.6.1 — English
 
 **Released 2026-11-26. Steam join fix. Steam with two real accounts and a

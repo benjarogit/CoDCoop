@@ -7,6 +7,7 @@ DISPLAY=<test-display> python3 -m unittest discover -s tests -p test_installer_n
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import unittest
 from unittest import mock
@@ -46,6 +47,38 @@ class NativeInterop(unittest.TestCase):
         result=self.native('capabilities')
         self.assertEqual(result.returncode,0,result.stderr)
         self.assertEqual(json.loads(result.stdout),{'kind':'codcoop_suite_checker','schema':1,'protocol':suite.PROTOCOL,'core_features_validation':True})
+
+    @unittest.skipUnless(os.environ.get('COOP_NATIVE_IDENTITY'), 'requires native identity probe')
+    def test_direct_launch_prepares_only_a_sealed_matching_installation(self):
+        game = self.game / 'Game folder with spaces'
+        game.mkdir()
+        for entry in self.game.iterdir():
+            if entry != game:
+                entry.rename(game / entry.name)
+        checker = Path(os.environ['COOP_NATIVE_CHECKER']).resolve()
+        shutil.copyfile(checker, game / 'coop/suite-check.exe')
+        exe = game / 'identity.exe'
+        shutil.copyfile(Path(os.environ['COOP_NATIVE_IDENTITY']).resolve(), exe)
+        env = dict(os.environ, WINEDEBUG='-all')
+        env.pop('CODCOOP_QA', None)
+        if os.name != 'nt':
+            env['WINEPREFIX'] = str(Path(env['COOP_WINE_PREFIX']).resolve())
+        command = (['wine'] if os.name != 'nt' else []) + [str(exe), '--direct-launch']
+
+        def run():
+            result = subprocess.run(command, env=env, capture_output=True, text=True, timeout=70)
+            return result.returncode
+
+        self.assertEqual(run(), 4)  # The runtime checker cannot create a trusted receipt.
+        suite.seal_installation(game)
+        suite.prepare(game, 'sp_improved')
+        self.assertEqual(run(), 0)
+        profile = game / 'coop/profile.ini'
+        self.assertIn('variant=cod1\n', profile.read_text())
+        profile.unlink()
+        (game / 'Main/extra.pk3').write_bytes(b'not present in the install receipt')
+        self.assertEqual(run(), 4)
+        self.assertFalse(profile.exists())
 
     def test_readonly_compiled_features_are_required_and_match_python(self):
         examples=[core_pe(suite.PROTOCOL,bits) for bits in (None,0,1,3,7,15,31)]

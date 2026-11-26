@@ -2,8 +2,10 @@
 """Linux graphical full-suite setup. Shares the exact command-line backend."""
 import argparse
 import importlib.util
+import json
 import os
 from pathlib import Path
+import subprocess
 import sys
 
 
@@ -48,10 +50,10 @@ def main(argv=None):
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         return module.main(['launch'] + remaining)
-    from PySide6.QtCore import QProcess
+    from PySide6.QtCore import QProcess, QProcessEnvironment, Qt
     from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QFileDialog,
                                    QFormLayout, QHBoxLayout, QLabel, QLineEdit,
-                                   QMessageBox, QPlainTextEdit, QPushButton,
+                                   QMessageBox, QPlainTextEdit, QProgressBar, QPushButton,
                                    QSpinBox, QVBoxLayout, QWidget)
     app = QApplication(sys.argv)
     window = QWidget()
@@ -85,14 +87,19 @@ def main(argv=None):
     game = folder_row('Game folder / Spielordner')
     suite = folder_row('0.6 suite payload / Paketordner')
     base = folder_row('Offline base (optional) / Basis (optional)')
-    detected = backend().detect_games()
+    installer = backend()
+    detected = installer.detect_games()
     if len(detected) == 1:
         game.setText(detected[0])
+        kind = installer.installation_info(detected[0])['kind']
+        if kind in ('Steam', 'AnkerGames'):
+            form.insertRow(0, 'Detected / Gefunden', QLabel(kind))
     elif detected:
         choices = QComboBox()
         choices.addItem('Choose an installation / Installation wählen', '')
         for path in detected:
-            choices.addItem(path, path)
+            kind = installer.installation_info(path)['kind']
+            choices.addItem(f'{kind} — {path}' if kind in ('Steam', 'AnkerGames') else path, path)
         choices.currentIndexChanged.connect(lambda _: game.setText(choices.currentData() or ''))
         form.insertRow(0, 'Detected / Gefunden', choices)
     found = bundled_suite()
@@ -131,22 +138,56 @@ def main(argv=None):
                        'Existing saves and personal settings are preserved. / Spielstände und Einstellungen bleiben erhalten.')
     downloads.setWordWrap(True)
     outer.addWidget(downloads)
+    status_label = QLabel()
+    status_label.setTextFormat(Qt.PlainText)
+    status_label.setWordWrap(True)
+    outer.addWidget(status_label)
+    progress = QProgressBar()
+    progress.hide()
+    outer.addWidget(progress)
     output = QPlainTextEdit()
     output.setReadOnly(True)
     outer.addWidget(output, 1)
     actions = QHBoxLayout()
     install = QPushButton('Install / Installieren')
+    play = QPushButton('Open CoDCoop / CoDCoop öffnen')
+    play.hide()
     verify = QPushButton('Check / Prüfen')
     actions.addWidget(install)
     actions.addWidget(verify)
     rollback = QPushButton('Roll back / Zurücknehmen')
     actions.addWidget(rollback)
+    actions.addWidget(play)
     outer.addLayout(actions)
     process = QProcess(window)
     process.setProcessChannelMode(QProcess.MergedChannels)
-    process.readyReadStandardOutput.connect(lambda: output.insertPlainText(bytes(process.readAllStandardOutput()).decode('utf-8', 'replace')))
+    environment = QProcessEnvironment.systemEnvironment()
+    environment.insert('CODCOOP_INSTALL_PROGRESS', '1')
+    process.setProcessEnvironment(environment)
+    operation, target = '', ''
+
+    def show_progress(en, de, percent=-1):
+        status_label.setText(f'{en}\n{de}')
+        progress.setRange(0, 0 if percent < 0 else 100)
+        if percent >= 0:
+            progress.setValue(percent)
+        progress.show()
+
+    def read_output():
+        while process.canReadLine():
+            line = bytes(process.readLine()).decode('utf-8', 'replace').rstrip('\r\n')
+            if line.startswith('CODCOOP_PROGRESS '):
+                try:
+                    show_progress(*json.loads(line.removeprefix('CODCOOP_PROGRESS ')))
+                    continue
+                except (TypeError, ValueError):
+                    pass
+            output.appendPlainText(line)
+
+    process.readyReadStandardOutput.connect(read_output)
 
     def start(mode='install'):
+        nonlocal operation, target
         if not game.text().strip() or (mode == 'install' and not suite.text().strip()):
             QMessageBox.warning(window, 'Missing folder / Ordner fehlt', 'Select the game folder and the complete 0.6 payload.\nSpielordner und vollständiges 0.6-Paket auswählen.')
             return
@@ -170,6 +211,14 @@ def main(argv=None):
             if configure.isChecked():
                 args.append('--configure')
         output.clear()
+        operation, target = mode, str(Path(game.text().strip()).expanduser().resolve())
+        if mode == 'check':
+            show_progress('Verifying the installation', 'Installation wird geprüft')
+        elif mode == 'rollback':
+            show_progress('Restoring the previous installation', 'Vorherige Installation wird wiederhergestellt')
+        else:
+            show_progress('Preparing the installation', 'Installation wird vorbereitet')
+        play.hide()
         install.setEnabled(False)
         verify.setEnabled(False)
         rollback.setEnabled(False)
@@ -179,15 +228,30 @@ def main(argv=None):
             process.start(sys.executable, [str(resource('install-linux.py'))] + args)
 
     def ended(code, status):
+        read_output()
+        rest = bytes(process.readAllStandardOutput()).decode('utf-8', 'replace').strip()
+        if rest:
+            output.appendPlainText(rest)
         install.setEnabled(True)
         verify.setEnabled(True)
         rollback.setEnabled(True)
         if status == QProcess.NormalExit and code == 0:
-            output.appendPlainText('\nOperation completed / Vorgang abgeschlossen.')
+            show_progress('Finished', 'Fertig', 100)
+            play.setVisible(operation == 'install')
         else:
-            output.appendPlainText('\nFAILED — see errors above. / FEHLGESCHLAGEN — siehe Fehler oben.')
+            show_progress('Failed. See details below.', 'Fehlgeschlagen. Details siehe unten.', 0)
+            progress.hide()
     process.finished.connect(ended)
-    process.errorOccurred.connect(lambda _: ended(-1, QProcess.CrashExit))
+    process.errorOccurred.connect(lambda error: ended(-1, QProcess.CrashExit) if error == QProcess.FailedToStart else None)
+
+    def open_launcher():
+        try:
+            subprocess.Popen([str(Path(target) / 'Start-CoD-Coop.sh')],
+                             env=installer.external_environment(), start_new_session=True)
+        except OSError as error:
+            QMessageBox.warning(window, 'CoDCoop', str(error))
+
+    play.clicked.connect(open_launcher)
     install.clicked.connect(lambda: start('install'))
     verify.clicked.connect(lambda: start('check'))
     rollback.clicked.connect(lambda: start('rollback'))

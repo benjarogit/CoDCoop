@@ -73,7 +73,10 @@ sh ./install-codcoop.sh --game "/Pfad/zu/Call of Duty" --language de
 Öffne für eine Coop-Partie den **CoDCoop Launcher** aus dem installierten
 Spielordner. Die Startdatei öffnet den Launcher mit deinem Spielordner.
 
-- **Windows** verwendet `Start-CoD-Coop.bat`.
+- **Windows 0.6.1** verwendet `Start-CoD-Coop.bat` im Spielordner. Falls
+  der falsche Pfad erscheint, öffne `coop\launcher\CoD-Coop-Launcher.exe`
+  und wähle den Ordner mit `CoDSP.exe`. Neuere Setups legen die Verknüpfung
+  **CoDCoop** im Spielordner an.
 - **Linux** verwendet `Start-CoD-Coop.sh`.
 
 <details>
@@ -83,9 +86,11 @@ Installiere CoDCoop einmal in den Spielordner, den AnkerGames bereits
 verwendet. Wenn **Spielen** dort `CoDSP.exe` startet, öffnet sich die
 Originalkampagne. Unter Linux lädt das CoDCoop-Startskript für `umu-run`
 die Mod und bereitet das Profil für diese Kampagne automatisch vor.
-Wer über `Start-CoD-Coop.bat` oder `Start-CoD-Coop.sh` mitspielt, wählt
-**Call of Duty — Original**. Nutzt alle dieselbe CoDCoop-Version.
-Für die anderen Kampagnen wählt ihr die passende Variante im CoDCoop Launcher.
+Steam kann `CoDSP.exe` ebenfalls direkt starten. Sobald eine neuere Version
+die Mod lädt, bereitet sie beim Hosten oder Beitreten ein fehlendes oder
+unpassendes Kampagnenprofil vor. Wer über den CoDCoop Launcher mitspielt,
+wählt **Call of Duty — Original**. Nutzt alle dieselbe CoDCoop-Version.
+Für die anderen Kampagnen wählt ihr die passende Variante im Launcher.
 [AnkerGames und Proton einrichten](docs/linux.de.md#3-das-spiel-über-den-launcher-starten)
 
 </details>
@@ -152,6 +157,7 @@ Für die anderen Kampagnen wählt ihr die passende Variante im CoDCoop Launcher.
 | **Windows-Setup findet die Suite nicht** | Prüfe, ob `suite/coop/variants.json` direkt neben der EXE erreichbar ist. Häufig steckt ein zusätzlicher Ordner dazwischen. |
 | **Installation prüfen schlägt fehl** | Lies die gemeldete Datei, starte das passende Setup erneut und prüfe danach wieder im Launcher. |
 | **Linux startet ohne Coop-Menü oder bricht beim Start ab** | Prüfe, ob Wine/Proton die mitgelieferte `ddraw.dll` lädt. [Linux-Start und Grafik](docs/linux.de.md#1-buffer-overrun-detected-direkt-nach-dem-intro) |
+| **Steam zeigt Spacewar, aber die Kampagne ist nicht bereit** | Schließe `CoDMP.exe`, falls es läuft. Öffne den CoDCoop Launcher, wähle die Kampagne des Hosts und klicke auf **Installation prüfen**. `CoDMP.exe` öffnet die klassischen Mehrspielermodi. |
 | **Mitspieler kommen nicht rein** | Prüft Paketstand, Host-Adresse und die Firewall des Hosts. Bei Direkt-IP übers Internet prüft auch die Weiterleitung von UDP 28960. |
 | **United Fronts bricht in Foy oder Noville ab** | Beide Karten können im Standardbetrieb das Modelllimit erreichen. [Bekannte Grenzen und getestete Karten](docs/campaign-compatibility.md) |
 

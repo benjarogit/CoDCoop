@@ -75,7 +75,10 @@ Add `--language de` to install in German.
 For a Coop session, open the **CoDCoop Launcher** from the installed game folder.
 The start file opens the launcher and points it to that installation.
 
-- **Windows** uses `Start-CoD-Coop.bat`.
+- **Windows 0.6.1** uses `Start-CoD-Coop.bat` in the game folder. If it
+  opens with the wrong path, run `coop\launcher\CoD-Coop-Launcher.exe` and
+  select the folder containing `CoDSP.exe`. Newer setups add a **CoDCoop**
+  shortcut in the game folder.
 - **Linux** uses `Start-CoD-Coop.sh`.
 
 <details>
@@ -84,10 +87,11 @@ The start file opens the launcher and points it to that installation.
 Install CoDCoop once into the game folder AnkerGames already uses. When
 **Play** starts `CoDSP.exe`, it opens the original campaign. On Linux,
 the CoDCoop wrapper for `umu-run` loads the mod and automatically prepares
-that campaign's profile. Friends using `Start-CoD-Coop.bat` or
-`Start-CoD-Coop.sh` select **Call of Duty — Original**. Everyone should
-use the same CoDCoop version. For other campaigns, select the matching
-variant in the CoDCoop Launcher.
+that campaign's profile. Steam can also start `CoDSP.exe` directly. When a
+newer build loads the mod, the game prepares a missing or mismatched
+campaign profile when you host or join. Friends using the CoDCoop Launcher
+select **Call of Duty — Original**. Everyone should use the same CoDCoop
+version. For other campaigns, select the matching variant in the launcher.
 [AnkerGames and Proton setup](docs/linux.md#3-starting-the-game-from-the-launcher)
 
 </details>
@@ -154,6 +158,7 @@ variant in the CoDCoop Launcher.
 | **Windows setup cannot find the suite** | Check that `suite/coop/variants.json` is reachable next to the EXE. Look for an extra directory level after extraction. |
 | **Check installation fails** | Read which file the launcher reports, run the matching installer again and repeat the check. |
 | **Linux starts without the Coop menu or closes at launch** | Check that Wine or Proton loads the supplied `ddraw.dll`. [Linux launch and graphics fixes](docs/linux.md#1-buffer-overrun-detected-right-after-the-intro) |
+| **Steam shows Spacewar but the campaign is not ready** | Close `CoDMP.exe` if you started it. Open the CoDCoop Launcher, select the host's campaign, and run **Check installation**. `CoDMP.exe` opens the standard multiplayer modes. |
 | **Players cannot join** | Check the suite version, host address and the host’s firewall. For direct-IP internet play, also check the UDP 28960 port forwarding rule. |
 | **United Fronts closes in Foy or Noville** | Both maps can reach the engine’s model limit in the default configuration. [Known limits and tested maps](docs/campaign-compatibility.md) |
 

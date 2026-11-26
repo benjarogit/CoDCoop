@@ -129,6 +129,13 @@ def say(*a):
     print(*a, flush=True)
 
 
+def install_progress(english, german, percent=-1):
+    if os.environ.get('CODCOOP_INSTALL_PROGRESS') == '1':
+        say('CODCOOP_PROGRESS ' + json.dumps([english, german, percent]))
+    else:
+        say(english)
+
+
 def die(msg):
     say("ERROR: " + msg)
     sys.exit(2)
@@ -298,15 +305,28 @@ def download(url, dest, expected_sha=None, expected_size=None):
     """Resume a pinned download; never promote partial or unverified bytes."""
     if not expected_sha or not expected_size:
         raise ValueError("a pinned SHA-256 and size are required for downloads")
+    name = os.path.basename(dest)
+
+    def verify():
+        install_progress(f'Verifying {name}', f'{name} wird geprüft')
+
+    def report(done):
+        percent = done * 100 // expected_size
+        size = f'{done / (1 << 20):.1f} / {expected_size / (1 << 20):.1f} MiB ({percent}%)'
+        install_progress(f'Downloading {name}  {size}', f'Download {name}  {size}', percent)
+
     os.makedirs(os.path.dirname(os.path.abspath(dest)), exist_ok=True)
-    if os.path.isfile(dest) and os.path.getsize(dest) == expected_size and sha256(dest) == expected_sha:
-        return dest
+    if os.path.isfile(dest) and os.path.getsize(dest) == expected_size:
+        verify()
+        if sha256(dest) == expected_sha:
+            return dest
     part = dest + ".part"
     offset = os.path.getsize(part) if os.path.isfile(part) else 0
     if offset > expected_size:
         os.unlink(part)
         offset = 0
     if offset == expected_size:
+        verify()
         if sha256(part) == expected_sha:
             os.replace(part, dest)
             return dest
@@ -315,7 +335,7 @@ def download(url, dest, expected_sha=None, expected_size=None):
     headers = {"User-Agent": "cod-coop-suite-installer/0.6", "Accept-Encoding": "identity"}
     if offset:
         headers["Range"] = "bytes=%d-" % offset
-    say("Downloading %s%s" % (url, " (resuming)" if offset else ""))
+    report(offset)
     req = urllib.request.Request(url, headers=headers)
     with urllib.request.urlopen(req, timeout=60) as r:
         partial = r.status == 206
@@ -329,13 +349,14 @@ def download(url, dest, expected_sha=None, expected_size=None):
             response_end = int(match[2]) + 1
         elif r.status != 200:
             raise ValueError("unexpected download response: %s" % r.status)
-        if not partial:
+        if not partial and offset:
             offset = 0  # A server ignoring Range must replace, never append.
+            report(offset)
         content_length = r.headers.get("Content-Length")
         if content_length is not None and (not re.fullmatch(r"[0-9]+", content_length.strip())
                                            or int(content_length) != response_end - offset):
             raise ValueError("server returned an invalid download length")
-        done, last = offset, -5
+        done, last = offset, offset * 100 // expected_size
         with open(part, "ab" if partial else "wb") as f:
             while True:
                 chunk = r.read(1 << 20)
@@ -346,11 +367,12 @@ def download(url, dest, expected_sha=None, expected_size=None):
                     raise ValueError("download exceeds the declared response range")
                 f.write(chunk)
                 pct = done * 100 // expected_size
-                if pct >= last + 5:
-                    say("  %d%%" % pct)
+                if pct >= last + 5 or (pct == 100 and last != 100):
+                    report(done)
                     last = pct
     if os.path.getsize(part) != expected_size:
         raise ValueError("download incomplete; rerun to resume")
+    verify()
     if sha256(part) != expected_sha:
         os.unlink(part)
         raise ValueError("download checksum mismatch; partial download removed")
@@ -1688,6 +1710,8 @@ def run_suite_validator(action, game):
 
 def safe_extract(path):
     from pathlib import Path
+    name = Path(path).name
+    install_progress(f'Extracting {name}', f'{name} wird entpackt')
     tmp = tempfile.mkdtemp(prefix='cod-coop-suite-')
     try:
         root = Path(tmp).resolve()
@@ -1724,7 +1748,7 @@ def write_suite_launchers(game, transaction):
 
         text = ('@echo off\r\ncd /d "%~dp0"\r\n'
                 'if not exist "%~dp0coop\\launcher\\CoD-Coop-Launcher.exe" (echo Windows launcher is missing. Repair with a Windows 0.6 package. & exit /b 2)\r\n'
-                'start "" "%~dp0coop\\launcher\\CoD-Coop-Launcher.exe" --game "%~dp0" --variant ' + variant + '\r\n')
+                'start "" "%~dp0coop\\launcher\\CoD-Coop-Launcher.exe" --game "%~dp0." --variant ' + variant + '\r\n')
         transaction.remember(stem + '.bat').write_bytes(text.encode('ascii'))
 
 
@@ -2025,6 +2049,7 @@ def suite_main(argv=None):
         remove_obsolete_owned_files(game, overlay, tx)
         remove_known_invalid_placeholder(game, overlay, tx)
         sources.append(overlay)  # Always replace old 0.5 binaries with the pinned 0.6 payload last.
+        install_progress('Copying the game files', 'Spieldateien werden kopiert')
         # Materialize only package-owned files; never import user saves/configs.
         for source in sources:
             for path in sorted(source.rglob('*')):
@@ -2083,6 +2108,7 @@ def suite_main(argv=None):
             tx.remember(rel)
         # seal verifies every pinned byte and writes the receipt/profile in the
         # same invocation. Later launches/checks independently rehash content.
+        install_progress('Verifying the installation', 'Installation wird geprüft')
         if run_suite_validator('seal', game) != 0:
             raise ValueError('full-suite validation failed; no successful installation receipt was accepted')
         tx.complete()

@@ -661,7 +661,16 @@ static bool DownloadPinned(const std::wstring& url, const std::wstring& path, co
                            const std::string& expected, DWORD expectedSize)
 {
     if (!suite::Hex(expected) || !expectedSize) return false;
-    if (Exists(path) && FileSize(path)==expectedSize && VerifyArchive(path,expected)) return true;
+    const auto verifying = L("Download wird geprueft...", "Verifying the download...");
+    if (Exists(path) && FileSize(path)==expectedSize) {
+        Say(verifying);
+        if (VerifyArchive(path,expected)) return true;
+    }
+    auto report = [&](DWORD received) {
+        const int percent = (int)(uint64_t(received)*100/expectedSize);
+        const auto mib = [](DWORD count) { return std::to_wstring(count / (1024*1024)); };
+        Say(label + L" " + mib(received) + L" / " + mib(expectedSize) + L" MiB (" + std::to_wstring(percent) + L"%)", percent);
+    };
     // WinINet is loaded dynamically so the existing build command stays valid.
     HMODULE library=LoadLibraryW(L"wininet.dll");
     if (!library) return false;
@@ -673,8 +682,15 @@ static bool DownloadPinned(const std::wstring& url, const std::wstring& path, co
     if (!open || !openUrl || !query || !read || !close) { FreeLibrary(library); return false; }
     std::wstring part=path+L".part";
     DWORD offset=Exists(part)?FileSize(part):0;
-    if (offset==expectedSize && VerifyArchive(part,expected)) return MoveFileExW(part.c_str(),path.c_str(),MOVEFILE_REPLACE_EXISTING);
+    if (offset==expectedSize) {
+        Say(verifying);
+        if (VerifyArchive(part,expected)) {
+            FreeLibrary(library);
+            return MoveFileExW(part.c_str(),path.c_str(),MOVEFILE_REPLACE_EXISTING);
+        }
+    }
     if (offset>=expectedSize) { DeleteFileW(part.c_str()); offset=0; }
+    report(offset);
     std::wstring headers=offset?L"Range: bytes="+std::to_wstring(offset)+L"-\r\n":L"";
     HINTERNET session=open(L"CoDCoop-Suite/0.6",INTERNET_OPEN_TYPE_PRECONFIG,nullptr,nullptr,0);
     HINTERNET request=session?openUrl(session,url.c_str(),headers.c_str(),(DWORD)headers.size(),
@@ -703,9 +719,10 @@ static bool DownloadPinned(const std::wstring& url, const std::wstring& path, co
                     if (!got) break;
                     if (got>responseEnd-total || !WriteFile(file,block,got,&written,nullptr) || written!=got) { ok=false; break; }
                     total+=got; int pct=(int)((unsigned long long)total*100/expectedSize);
-                    if (pct!=last) { Say(label,pct); last=pct; }
+                    if (pct!=last) { report(total); last=pct; }
                 }
                 FlushFileBuffers(file); CloseHandle(file);
+                if (total==expectedSize) Say(verifying);
                 const bool verified=total==expectedSize && VerifyArchive(part,expected);
                 ok=ok && verified;
                 if (total==expectedSize && !verified) DeleteFileW(part.c_str());
@@ -1315,8 +1332,7 @@ static std::wstring PreparePayload(std::wstring& err)
     std::wstring tmp;
     if (zip.empty()) {
         zip = TempPath(L"cod-coop-ready.zip");
-        if (!Download(READY_URL, zip, L("Lade Call of Duty - UO Coop Ready (~1 GB)...",
-                                        "Downloading Call of Duty - UO Coop Ready (~1 GB)..."))) {
+        if (!Download(READY_URL, zip, L("Download UO-Basispaket", "Downloading UO base pack"))) {
             err = L("Das Paket konnte nicht heruntergeladen werden.\n\n"
                     "Internetverbindung pruefen und noch einmal versuchen, oder\n"
                     "\"Call-of-Duty-UO-Coop-Ready.zip\" von\n"
@@ -1353,8 +1369,7 @@ static std::wstring PrepareGerman(std::wstring& err)
     std::wstring zip = FindLocalFile({L"CoD-UO-German-Language.zip"});
     if (zip.empty()) {
         zip = TempPath(L"CoD-UO-German-Language.zip");
-        if (!Download(GERMAN_URL, zip, L("Lade deutsches Sprachpaket (~630 MB)...",
-                                         "Downloading the German language pack (~630 MB)..."))) {
+        if (!Download(GERMAN_URL, zip, L("Download deutsches Sprachpaket", "Downloading German language pack"))) {
             err = L("Das deutsche Sprachpaket konnte nicht geladen werden.",
                     "The German language pack could not be downloaded.");
             return L"";
@@ -1456,9 +1471,30 @@ static void WriteLaunchers(const std::wstring& dir)
     for (const auto& profile:profiles) {
         std::string text="@echo off\r\ncd /d \"%~dp0\"\r\n"
             "if not exist \"%~dp0coop\\launcher\\CoD-Coop-Launcher.exe\" (echo Windows launcher missing. Repair with a Windows 0.6 package. & exit /b 2)\r\n"
-            "start \"\" \"%~dp0coop\\launcher\\CoD-Coop-Launcher.exe\" --game \"%~dp0\" --variant "+Narrow(profile[0])+"\r\n";
+            "start \"\" \"%~dp0coop\\launcher\\CoD-Coop-Launcher.exe\" --game \"%~dp0.\" --variant "+Narrow(profile[0])+"\r\n";
         if (!WriteAll(dir+L"\\"+profile[1],text)) throw std::runtime_error("cannot write campaign launcher");
     }
+}
+
+static bool WriteLauncherShortcut(const std::wstring& dir)
+{
+    IShellLinkW* link = nullptr;
+    HRESULT result = CoCreateInstance(CLSID_ShellLink, nullptr, CLSCTX_INPROC_SERVER,
+                                      IID_IShellLinkW, reinterpret_cast<void**>(&link));
+    if (FAILED(result)) return false;
+    const auto launcher = dir + L"\\coop\\launcher\\CoD-Coop-Launcher.exe";
+    const auto args = L"--game \"" + dir + L"\\.\"";
+    result = link->SetPath(launcher.c_str());
+    if (SUCCEEDED(result)) result = link->SetArguments(args.c_str());
+    if (SUCCEEDED(result)) result = link->SetWorkingDirectory(dir.c_str());
+    IPersistFile* file = nullptr;
+    if (SUCCEEDED(result)) result = link->QueryInterface(IID_IPersistFile, reinterpret_cast<void**>(&file));
+    if (SUCCEEDED(result)) {
+        result = file->Save((dir + L"\\CoDCoop.lnk").c_str(), TRUE);
+        file->Release();
+    }
+    link->Release();
+    return SUCCEEDED(result);
 }
 
 static bool InstallExtras(const std::wstring& dir, bool sp, bool uf, bool map, std::wstring& err)
@@ -1475,8 +1511,7 @@ static bool InstallExtras(const std::wstring& dir, bool sp, bool uf, bool map, s
         std::wstring zip = FindLocalFile({L"CoD-SP-Extras.zip"});
         if (zip.empty()) {
             zip = TempPath(L"CoD-SP-Extras.zip");
-            if (!Download(EXTRAS_URL, zip, L("Lade Zusatzinhalte (~880 MB)...",
-                                             "Downloading the extras (~880 MB)..."))) {
+            if (!Download(EXTRAS_URL, zip, L("Download Zusatzinhalte", "Downloading campaign extras"))) {
                 err = L("Die Zusatzinhalte konnten nicht geladen werden.",
                         "The extras could not be downloaded.");
                 return false;
@@ -1850,6 +1885,7 @@ static bool RunInstall(std::wstring& err)
             RememberFile(dir+L"\\coop\\install.json");
             RememberFile(dir+L"\\coop\\profile.ini");
             // Seal validates all pinned content and writes its receipt/profile in one pass.
+            Say(L("Installation wird geprueft...", "Verifying the installation..."));
             if (overlayStats.failed || !suite::Validate(dir,true,why)) {
                 err=L("Vollstaendigkeitspruefung fehlgeschlagen: ", "Full-suite verification failed: ")+Widen(why);
                 return false;
@@ -1861,10 +1897,13 @@ static bool RunInstall(std::wstring& err)
         DeleteFileW((dir + L"\\__CoDSP").c_str());
         DeleteFileW((dir + L"\\__CoDUOSP").c_str());
 
-        Line(L("\r\nZum Spielen Start-CoD-Coop.bat im Spielordner oeffnen.\r\n"
-               "Im CoDCoop Launcher Kampagne waehlen und hosten oder beitreten.",
-               "\r\nTo play, open Start-CoD-Coop.bat in the game folder.\r\n"
-               "Choose your campaign in CoDCoop Launcher and host or join."));
+        RememberFile(dir + L"\\CoDCoop.lnk");
+        if (WriteLauncherShortcut(dir))
+            Line(L("\r\nZum Spielen CoDCoop im Spielordner oeffnen.",
+                   "\r\nTo play, open CoDCoop in the game folder."));
+        else
+            Line(L("\r\nZum Spielen Start-CoD-Coop.bat im Spielordner oeffnen.",
+                   "\r\nTo play, open Start-CoD-Coop.bat in the game folder."));
     }
 
 #ifdef COOP_EXPERIMENTAL_COD2
@@ -1890,6 +1929,7 @@ static bool RunInstall(std::wstring& err)
 
 static DWORD WINAPI Worker(LPVOID)
 {
+    const HRESULT com = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     std::wstring err;
     bool ok=false;
     try { ok=g_rollbackMode?RollbackLastInstall(g_job.dir,err):RunInstall(err); }
@@ -1904,6 +1944,7 @@ static DWORD WINAPI Worker(LPVOID)
     } else if(ok) g_summary=L("Letzte Installation zurueckgenommen. Aktuelle Einstellungen und Spielstaende wurden behalten.","Last installation rolled back. Current settings and saves were retained.");
     std::wstring* msg = new std::wstring(ok ? g_summary : err);
     PostMessageW(g_dlg, WM_APP_DONE, ok ? 1 : 0, (LPARAM)msg);
+    if (SUCCEEDED(com)) CoUninitialize();
     return 0;
 }
 
@@ -2209,6 +2250,8 @@ static INT_PTR CALLBACK DlgProc(HWND dlg, UINT msg, WPARAM wParam, LPARAM lParam
             return TRUE;
         case IDC_INSTALL:
             if (g_state == S_IDLE) OnInstall(dlg);
+            else if (g_state == S_DONE && !g_rollbackMode)
+                ShellExecuteW(dlg, L"open", g_job.dir.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
             else if (g_state == S_DONE || g_state == S_FAILED) EndDialog(dlg, 0);
             return TRUE;
         case IDC_ROLLBACK:
@@ -2240,23 +2283,14 @@ static INT_PTR CALLBACK DlgProc(HWND dlg, UINT msg, WPARAM wParam, LPARAM lParam
         EnableInputs(dlg, TRUE);
         EnableWindow(GetDlgItem(dlg, IDC_QUIT), TRUE);
         EnableWindow(GetDlgItem(dlg, IDC_INSTALL), TRUE);
-        SetProgress(dlg, 100);
+        SetProgress(dlg, ok ? 100 : 0);
         SetWindowTextW(GetDlgItem(dlg, IDC_STATUS),
                        ok ? L("Fertig.", "Done.") : L("Fehlgeschlagen.", "Failed."));
-        SetWindowTextW(GetDlgItem(dlg, IDC_INSTALL), L("Schliessen", "Close"));
+        SetWindowTextW(GetDlgItem(dlg, IDC_INSTALL), ok && !g_rollbackMode
+                       ? L("Spielordner oeffnen", "Open game folder") : L("Schliessen", "Close"));
         MessageBoxW(dlg, text->c_str(), TITLE, ok ? MB_ICONINFORMATION : MB_ICONERROR);
         delete text;
 
-        // Steam invites need Valve's free test app Spacewar (AppID 480), once per PC
-        if (ok && !g_rollbackMode && MessageBoxW(dlg,
-                              L("Steam-Einladungen (\"Join <Name>\" im Co-op-Menue) brauchen einmalig\n"
-                                "Valves kostenlose Test-App Spacewar (AppID 480), mit laufendem Steam.\n\n"
-                                "Steam jetzt oeffnen, um Spacewar zu installieren?",
-                                "Steam invites (\"Join <name>\" in the Co-op menu) need Valve's free\n"
-                                "test app Spacewar (AppID 480) once, with Steam running.\n\n"
-                                "Open Steam now to install it?"),
-                              TITLE, MB_YESNO | MB_ICONQUESTION) == IDYES)
-            ShellExecuteW(nullptr, L"open", L"steam://install/480", nullptr, nullptr, SW_SHOWNORMAL);
         return TRUE;
     }
     }

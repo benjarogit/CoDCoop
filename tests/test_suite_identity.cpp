@@ -1,8 +1,15 @@
 #include "../src/suite_identity.h"
 #include <cassert>
 
-int main()
+int main(int argc, char** argv)
 {
+    if (argc == 2 && !strcmp(argv[1], "--direct-launch")) {
+        suite::Identity identity{};
+        std::string error;
+        if (suite::LoadIdentity(false, "", identity, error)) return 3;
+        if (!suite::PrepareDirectLaunch(identity.variant)) return 4;
+        return suite::LoadIdentity(false, "", identity, error) ? 0 : 5;
+    }
     const std::string root = suite::GameDir();
     FILE* marker = fopen((root + ".identity-test-owned").c_str(), "rb");
     if (!marker) return 2; // fixtures must never replace a real game's DLLs

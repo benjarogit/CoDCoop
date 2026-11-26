@@ -74,6 +74,7 @@ jobs:
           -o build/test-mt-epoch.exe
       - run: i686-w64-mingw32-g++ -std=c++17 -Wall -Wextra -Werror -O2 -static tests/test_asset_bootstrap.cpp -o build/test-asset-bootstrap.exe
       - run: i686-w64-mingw32-g++ -std=c++17 -O2 -s -static -municode -Wl,--no-insert-timestamp tests/native_download_probe.cpp -o build/native-download-probe.exe -lole32 -lshell32 -lurlmon -lcomctl32 -loleaut32 -luuid -ladvapi32
+      - run: i686-w64-mingw32-g++ -std=c++17 -O2 -static tests/test_suite_identity.cpp -o build/native-identity.exe -ladvapi32
       - name: Upload development binaries (not a gameplay certification)
         uses: actions/upload-artifact@v4
         with:
@@ -86,11 +87,13 @@ jobs:
             build/test-mt-epoch.exe
             build/test-asset-bootstrap.exe
             build/native-download-probe.exe
+            build/native-identity.exe
   native-checker-windows:
     needs: engine-build
     runs-on: windows-2022
     env:
       COOP_NATIVE_CHECKER: build/suite-check.exe
+      COOP_NATIVE_IDENTITY: build/native-identity.exe
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
