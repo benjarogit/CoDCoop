@@ -45,7 +45,7 @@ struct Message {
 };
 static_assert(sizeof(Identity) == 136 && offsetof(Message, peer) == 12, "SteamNetworkingMessage_t de 32 bits");
 
-const char* DIR = "D:\\CoDCoop\\run\\fakesteam";
+char DIR[MAX_PATH] = "D:\\CoDCoop\\run\\fakesteam";  // FAKESTEAM_DIR lo cambia (QA en Linux/Wine y en la VM)
 bool g_init, g_drop;
 uint64_t g_me;
 char g_name[64];
@@ -162,8 +162,12 @@ void Pump()
 API int SteamInternal_SteamAPI_Init(const char*, char* err)
 {
     if (g_init) return 0;
-    CreateDirectoryA("D:\\CoDCoop\\run", nullptr);
-    CreateDirectoryA(DIR, nullptr);
+    if (GetEnvironmentVariableA("FAKESTEAM_DIR", DIR, sizeof DIR)) {
+        CreateDirectoryA(DIR, nullptr);  // el padre ya existe: es la carpeta de la copia del juego
+    } else {
+        CreateDirectoryA("D:\\CoDCoop\\run", nullptr);
+        CreateDirectoryA(DIR, nullptr);
+    }
     char v[64];
     g_me = GetEnvironmentVariableA("FAKESTEAM_ID", v, sizeof v) ? _strtoui64(v, nullptr, 10)
                                                                  : 76561190000000000ull + GetCurrentProcessId();

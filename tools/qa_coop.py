@@ -267,6 +267,11 @@ def main(argv=None, *, scenario=None, allowed_error_markers=()):
     parser.add_argument('--timeout', type=int, default=120)
     parser.add_argument('--duration', type=int, default=12)
     parser.add_argument('--port', type=int, default=29860)
+    parser.add_argument('--steam-api', type=Path,
+                        help='fakesteam steam_api.dll copied into every player folder; joiners use the Steam transport '
+                             '(+coopjoin steam:<id>) instead of 127.0.0.1')
+    parser.add_argument('--steam-host-id', type=int, default=76561190000000001,
+                        help='fake SteamID64 of the host with --steam-api; joiners get the next IDs')
     parser.add_argument('--prepare-only', action='store_true')
     parser.add_argument('--host-delay', type=int, default=0, help='start a joiner first and wait this many real seconds before the host')
     parser.add_argument('--host-god', action='store_true',
@@ -281,6 +286,8 @@ def main(argv=None, *, scenario=None, allowed_error_markers=()):
     parser.add_argument('--chaos-profile', choices=('lan', 'good_wifi', 'bad_wifi', 'mobile_tether', 'transatlantic', 'hell'), default='bad_wifi')
     parser.add_argument('--chaos-seed', type=int, default=260621)
     args = parser.parse_args(argv)
+    if args.steam_api and not args.steam_api.is_file():
+        parser.error('--steam-api is not a file: ' + str(args.steam_api))
     try:
         ui_languages = parse_ui_languages(args.ui_languages, args.players)
     except ValueError as error:
@@ -336,6 +343,8 @@ def main(argv=None, *, scenario=None, allowed_error_markers=()):
             subprocess.run(['cp', '-a', '--reflink=auto', str(source) + '/.', str(folder)], check=True)
         for module in ('ddraw.dll', 'codcoop_core.dll'):
             shutil.copy2((peer_runtime if n else runtime) / module, folder / module)
+        if args.steam_api:
+            shutil.copy2(args.steam_api, folder / 'steam_api.dll')
         for root in ('Main', 'main', 'uo', 'sp_improved', 'UnitedFronts'):
             for config in ('config.cfg', 'config_mp.cfg', 'uoconfig.cfg', 'console.log'):
                 (folder / root / config).unlink(missing_ok=True)
@@ -348,10 +357,14 @@ def main(argv=None, *, scenario=None, allowed_error_markers=()):
                   'runner_sha256': runner_hash,
                   'ui_languages': ui_languages, 'ui_locale_banks': ui_locale_banks,
                   'runtime_source': str(runtime_source),
+                  'transport': 'steam-fake' if args.steam_api else 'ip',
                   'host_delay_seconds': args.host_delay, 'checkpoint_reloads': args.checkpoint_reloads,
                   'initial_expected_players': args.initial_expected_players or args.players,
                   'runtime': {p: hashlib.sha256((runtime / p).read_bytes()).hexdigest() for p in ('ddraw.dll', 'codcoop_core.dll')},
                   'coverage': 'connection/liveness/movement smoke only; no campaign completion claim'}
+    if args.steam_api:
+        provenance['steam_api'] = hashlib.sha256(args.steam_api.read_bytes()).hexdigest()
+        provenance['steam_host_id'] = args.steam_host_id
     if peer_source is not None:
         provenance['peer_runtime_source'] = str(peer_source)
         provenance['peer_runtime'] = {p: hashlib.sha256((peer_runtime / p).read_bytes()).hexdigest()
@@ -435,8 +448,20 @@ def main(argv=None, *, scenario=None, allowed_error_markers=()):
                    '+set', 'r_mode_auto', '0', '+set', 'com_introplayed', '1', '+set', 'logfile', '2',
                    '+set', 'com_hunkmegs', '512' if args.variant == 'united_fronts' else '256',
                    '+set', 'sv_cheats', '1', '+devmap', args.map]
-            cmd += ['+coophost', str(args.port)] if n == 0 else ['+coopjoin', '127.0.0.1:' + str(join_port)]
-            processes.append(subprocess.Popen(cmd, env=env, cwd=folder, stdout=log, stderr=log))
+            if n == 0:
+                cmd += ['+coophost', str(args.port)]
+            elif args.steam_api:
+                cmd += ['+coopjoin', 'steam:%d' % args.steam_host_id]
+            else:
+                cmd += ['+coopjoin', '127.0.0.1:' + str(join_port)]
+            player_env = env
+            if args.steam_api:
+                player_env = env.copy()
+                player_env.pop('CODCOOP_QA_NO_STEAM', None)
+                player_env['FAKESTEAM_ID'] = str(args.steam_host_id + n)
+                player_env['FAKESTEAM_NAME'] = 'QA%d' % n
+                player_env['FAKESTEAM_DIR'] = zpath(output / 'fakesteam')
+            processes.append(subprocess.Popen(cmd, env=player_env, cwd=folder, stdout=log, stderr=log))
             wait_for(lambda: read_state(folder), processes, args.timeout, 'core initialization for slot %d' % n)
             # Engine UI calls, no desktop mouse injection and no direct world-state teleport.
             start = 'coopuiclick 320 240\ncoopqastart'
