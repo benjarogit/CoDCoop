@@ -35,6 +35,15 @@ mkdir -p "$APPDIR/usr/bin"
 cp -a build/appimage-dist/CoDCoop-Setup "$APPDIR/usr/bin/"
 cat > "$APPDIR/AppRun" <<'APP'
 #!/bin/sh
+# Bundled OpenSSL may use the build distribution's CA paths.
+if [ -z "${SSL_CERT_FILE:-}" ] && [ -z "${SSL_CERT_DIR:-}" ]; then
+    for bundle in /etc/ssl/certs/ca-certificates.crt /etc/pki/tls/certs/ca-bundle.crt /etc/ssl/cert.pem; do
+        if [ -r "$bundle" ]; then
+            export SSL_CERT_FILE="$bundle"
+            break
+        fi
+    done
+fi
 exec "${APPDIR:-$(dirname -- "$0")}/usr/bin/CoDCoop-Setup/CoDCoop-Setup" "$@"
 APP
 chmod +x "$APPDIR/AppRun"

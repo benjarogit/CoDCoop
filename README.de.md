@@ -74,7 +74,7 @@ sh ./install-codcoop.sh --game "/Pfad/zu/Call of Duty" --language de
 Spielordner. Die Startdatei öffnet den Launcher mit deinem Spielordner.
 
 - **Windows:** Öffne **CoDCoop** im Spielordner. Das Setup legt die
-  Verknüpfung ab Version 0.6.2 an. `Start-CoD-Coop.bat` öffnet den Launcher
+  Verknüpfung an. `Start-CoD-Coop.bat` öffnet den Launcher
   ebenfalls.
 - **Linux** verwendet `Start-CoD-Coop.sh`.
 

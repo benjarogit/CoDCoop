@@ -76,7 +76,7 @@ For a Coop session, open the **CoDCoop Launcher** from the installed game folder
 The start file opens the launcher and points it to that installation.
 
 - **Windows:** Open **CoDCoop** in the game folder. The setup creates this
-  shortcut starting with 0.6.2. `Start-CoD-Coop.bat` also opens the launcher.
+  shortcut. `Start-CoD-Coop.bat` also opens the launcher.
 - **Linux** uses `Start-CoD-Coop.sh`.
 
 <details>

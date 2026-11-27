@@ -21,7 +21,7 @@ fi
 REPO=benjarogit/CoDCoop
 TAG=${COD_COOP_TAG:-v0.6.3}
 ASSET=Install-CoD-Coop-Linux-x86_64.AppImage
-SHA256=${COD_COOP_APPIMAGE_SHA:-3d3b876df0e7d7b997389add9f8c3478bdd9a90349d1e7ab71f27396971ce3fa}
+SHA256=${COD_COOP_APPIMAGE_SHA:-6ffa3837e072b97c7641301084f1b55263d0dfb5765a746aa268a2b4ec6c3cfd}
 URL=${COD_COOP_URL:-"https://github.com/$REPO/releases/download/$TAG/$ASSET"}
 
 # Run from an unpacked release: everything is already there.
