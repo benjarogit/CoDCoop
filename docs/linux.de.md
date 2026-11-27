@@ -209,9 +209,10 @@ einem vorhandenen Eintrag für `CoDSP.exe` und kann den Start an Steam
 weitergeben. Lege den Eintrag einmal mit Proton und den Startoptionen an
 und starte den Launcher danach neu. Die Steam-Suche liest `shortcuts.vdf`.
 
-Alle Spieler brauchen dasselbe CoDCoop-Release. Der Steam-Transport wurde
-lokal mit einer Ersatz-API getestet. Beitritte mit zwei echten Steam-Konten
-bleiben ungeprüft, auch zwischen Linux und Windows.
+Alle Spieler brauchen dasselbe CoDCoop-Release. Der Steam-ID-Beitritt unter
+0.6.2 mit zwei echten Konten endete in einem Timeout. Direkt-IP zwischen
+demselben Linux-Host und der Windows-VM funktionierte. Die
+[Verbindungsanleitung](connect.de.md#steam) zeigt den Teststand und die Beitrittswege.
 
 ## 5. „Ihr Computer wurde geändert“ beim ersten Start
 

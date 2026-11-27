@@ -274,6 +274,7 @@ def main(argv=None, *, scenario=None, allowed_error_markers=(), network=None):
     parser.add_argument('--steam-host-id', type=int, default=76561190000000001,
                         help='fake SteamID64 of the host with --steam-api; joiners get the next IDs')
     parser.add_argument('--prepare-only', action='store_true')
+    parser.add_argument('--start-in-lobby', action='store_true', help='verify a menu lobby before starting the host mission')
     parser.add_argument('--host-delay', type=int, default=0, help='start a joiner first and wait this many real seconds before the host')
     parser.add_argument('--host-god', action='store_true',
                         help='pin host player health with the mod coopgod command while peers connect and during the scenario; '
@@ -376,6 +377,7 @@ def main(argv=None, *, scenario=None, allowed_error_markers=(), network=None):
                   'runtime_source': str(runtime_source),
                   'transport': 'steam-fake' if args.steam_api else 'ip',
                   'network_scope': network.scope if network is not None else 'same-host',
+                  'starts_in_lobby': args.start_in_lobby,
                   'host_delay_seconds': args.host_delay, 'checkpoint_reloads': args.checkpoint_reloads,
                   'initial_expected_players': args.initial_expected_players or args.players,
                   'runtime': {p: hashlib.sha256((runtime / p).read_bytes()).hexdigest() for p in ('ddraw.dll', 'codcoop_core.dll')},
@@ -479,7 +481,9 @@ def main(argv=None, *, scenario=None, allowed_error_markers=(), network=None):
                    '+set', 'r_mode', '-1', '+set', 'r_customwidth', '640', '+set', 'r_customheight', '480',
                    '+set', 'r_mode_auto', '0', '+set', 'com_introplayed', '1', '+set', 'logfile', '2',
                    '+set', 'com_hunkmegs', '512' if args.variant == 'united_fronts' else '256',
-                   '+set', 'sv_cheats', '1', '+devmap', args.map]
+                   '+set', 'sv_cheats', '1']
+            if not args.start_in_lobby:
+                cmd += ['+devmap', args.map]
             if n == 0:
                 cmd += ['+coophost', str(args.port)]
             elif args.steam_api:
@@ -507,7 +511,25 @@ def main(argv=None, *, scenario=None, allowed_error_markers=(), network=None):
                 # (src/join_guard.h, M20); the fixture still makes no damage or death
                 # claim.
                 start += '\ncoopgod 0 1'
-            command(folder, start, joiner=n != 0)
+            if not args.start_in_lobby:
+                command(folder, start, joiner=n != 0)
+        if args.start_in_lobby:
+            def lobby_ready():
+                for index, folder in enumerate(folders):
+                    log = folder / ('codcoop_join.log' if index else 'codcoop.log')
+                    state = read_state(folder)
+                    if (not state or state['map'] not in ('', 'nomap') or state['snapshot_num'] or
+                            state['joined'] or any(p['active'] for p in state['players'][1:])):
+                        return False
+                    if not log.is_file() or f'lobby: {args.players} players' not in log.read_text(errors='replace'):
+                        return False
+                return True
+            wait_for(lobby_ready, processes, args.timeout, 'all players are listed in the menu lobby before a mission')
+            results['checks'].append('all players listed in the lobby before native slot allocation')
+            command(folders[0], f'devmap {args.map}')
+            wait_for(lambda: (read_state(folders[0]) or {}).get('map') == args.map, processes, args.timeout,
+                     'host started the mission from the lobby')
+            command(folders[0], start + ('\ncoopgod 0 1' if args.host_god else ''))
         if args.host_kill_during_join:
             # Esperar a que un peer este de verdad cargando: el host escribe esta
             # linea cuando acepta su B_REQUEST, o sea ya dentro de la ventana.

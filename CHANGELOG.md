@@ -2,7 +2,16 @@
 
 [English](#061--english) · [Deutsch](#061--deutsch)
 
-## 0.6.3 · Unreleased / Unveröffentlicht
+## 0.6.3
+
+- **EN:** Players can join the in-game lobby before the host starts or loads a
+  mission. The Co-op menu shows who is waiting, and the regular mission join
+  takes over when the world is ready. The lobby is based on
+  [TheTiranix's upstream change](https://github.com/TheTiranix/CoDCoop/commit/185533d).
+- **DE:** Mitspieler können der Lobby beitreten, bevor der Host eine Mission
+  startet oder lädt. Das Coop-Menü zeigt, wer wartet. Sobald die Mission bereit
+  ist, übernimmt der normale Beitritt. Grundlage ist
+  [die Upstream-Änderung von TheTiranix](https://github.com/TheTiranix/CoDCoop/commit/185533d).
 
 - **EN:** The game and launcher distinguish the LAN address from the public
   internet IPv4 address. Request the public address on demand. The launcher
@@ -13,6 +22,16 @@
 - **EN:** The main menu shows join progress and reports whether Steam or UDP
   timed out before the host handshake. Steam callbacks also work with an
   already initialized Steam client interface.
+- **EN:** The launcher defaults to **CoD + UO — Improved Coop**. Individual
+  campaign profiles remain available in the advanced options. After the United
+  Offensive credits, the launchers save and take the group into United Fronts.
+  **Continue to United Fronts** retries the change.
+- **EN:** The Linux wrapper preserves the campaign and join arguments when
+  starting Proton. The game logs Steam Overlay readiness and activation.
+  Steam join information is retried if Steam rejects the update. The game also
+  logs changes in Steam relay availability.
+- **EN:** In a match, **P** opens the console when the key is free.
+  The [connection guide](docs/connect.md) covers LAN, internet, Steam and VPN.
 - **DE:** Spiel und Launcher kennzeichnen Heimnetz-Adresse und öffentliche IPv4
   getrennt. Die öffentliche Adresse wird auf Klick ermittelt. Der Launcher
   kopiert beide Adressen samt Port und erklärt die UDP-Weiterleitung.
@@ -23,6 +42,17 @@
 - **DE:** Das Hauptmenü zeigt den Verbindungsfortschritt und meldet, ob der
   Beitritt über Steam oder UDP vor der Antwort des Hosts abgelaufen ist.
   Die Steam-Ereignisse werden auch bei bereits initialisierter API verarbeitet.
+- **DE:** Der Launcher startet vorausgewählt mit **CoD + UO — Verbesserter
+  Coop**. Einzelne Kampagnen bleiben unter den erweiterten Optionen erreichbar.
+  Nach dem United-Offensive-Abspann speichern die Launcher und nehmen die Gruppe
+  mit nach United Fronts. **Weiter zu United Fronts** wiederholt den Wechsel.
+- **DE:** Das Linux-Startskript übergibt Kampagne und Beitrittsadresse an Proton.
+  Das Spiel protokolliert, wann das Steam-Overlay bereit ist und geöffnet wird.
+  Lehnt Steam die Beitrittsdaten ab, veröffentlicht das Spiel sie erneut.
+  Änderungen an der Steam-Relay-Verfügbarkeit erscheinen im Log.
+- **DE:** Im Spiel öffnet **P** die Konsole, wenn die Taste frei ist.
+  Die [Verbindungsanleitung](docs/connect.de.md) erklärt Heimnetz, Internet,
+  Steam und VPN.
 
 ## 0.6.2 · Hotfix
 

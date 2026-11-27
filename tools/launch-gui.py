@@ -66,7 +66,7 @@ TEXT = {
         "ended": "Session ended. You can start or join another game.", "failed": "The session could not continue. Read the details, correct the problem and retry.",
         "invalid": "This installation is incomplete or has changed. Run the installer to repair it, then check again.",
         "need_folder": "Choose the game folder first.", "need_host": "Enter the host's address before joining.",
-        "details": "Details", "retry": "Retry", "language": "Language", "close_title": "Leave the session?",
+        "details": "Details", "retry": "Retry", "continue_uf": "Continue to United Fronts", "language": "Language", "close_title": "Leave the session?",
         "cancel_check": "Cancel check", "cancelled": "Installation check cancelled.",
         "switch": "Switch campaign", "cancel_switch": "Cancel switch", "switching": "Preparing the campaign change with your squad…",
         "switch_waiting": "Campaign change is waiting. Retry or cancel; your squad stays together.",
@@ -111,7 +111,7 @@ TEXT = {
         "failed": "Die Sitzung konnte nicht fortgesetzt werden. Details lesen, Ursache beheben und erneut versuchen.",
         "invalid": "Diese Installation ist unvollständig oder wurde verändert. Mit dem Installer reparieren und erneut prüfen.",
         "need_folder": "Zuerst den Spielordner auswählen.", "need_host": "Zum Beitreten zuerst die Host-Adresse eingeben.",
-        "details": "Details", "retry": "Erneut versuchen", "language": "Sprache", "close_title": "Sitzung verlassen?",
+        "details": "Details", "retry": "Erneut versuchen", "continue_uf": "Weiter zu United Fronts", "language": "Sprache", "close_title": "Sitzung verlassen?",
         "cancel_check": "Prüfung abbrechen", "cancelled": "Installationsprüfung abgebrochen.",
         "switch": "Kampagne wechseln", "cancel_switch": "Wechsel abbrechen", "switching": "Kampagnenwechsel wird mit deinem Trupp vorbereitet…",
         "switch_waiting": "Der Kampagnenwechsel wartet. Erneut versuchen oder abbrechen; dein Trupp bleibt zusammen.",
@@ -284,6 +284,7 @@ def main(argv=None):
             self.output = ""
             self.event_buffer = ""
             self.active_variant = None
+            self.mainline_finished = False
             self.switching = False
             self.recovering = False
             self.status_key = "ready"
@@ -368,9 +369,10 @@ def main(argv=None):
                 item = QListWidgetItem()
                 item.setData(Qt.ItemDataRole.UserRole, variant)
                 self.campaigns.addItem(item)
-            selected = args.variant or self.settings.value("variant", "sp_improved")
-            self.campaigns.setCurrentRow(VARIANTS.index(selected) if selected in VARIANTS else VARIANTS.index("sp_improved"))
+            selected = args.variant or "sp_improved"
+            self.campaigns.setCurrentRow(VARIANTS.index(selected))
             self.campaigns.currentRowChanged.connect(self.campaign_changed)
+            self.campaigns.hide()
             campaign_row.addWidget(self.campaigns)
             info = QVBoxLayout()
             self.variant_label = QLabel()
@@ -472,6 +474,7 @@ def main(argv=None):
             self.advanced_toggle = QPushButton()
             self.advanced_toggle.setCheckable(True)
             self.advanced_toggle.toggled.connect(lambda checked: self.advanced.setVisible(checked))
+            self.advanced_toggle.toggled.connect(self.campaigns.setVisible)
             outer.addWidget(self.advanced_toggle, 0, Qt.AlignmentFlag.AlignLeft)
             self.advanced = QWidget()
             advanced_form = QFormLayout(self.advanced)
@@ -524,7 +527,7 @@ def main(argv=None):
             self.switch.clicked.connect(self.switch_campaign)
             self.switch.hide()
             self.retry_session = QPushButton()
-            self.retry_session.clicked.connect(lambda: self.send_control("retry"))
+            self.retry_session.clicked.connect(self.retry_transition)
             self.retry_session.hide()
             self.cancel_switch = QPushButton()
             self.cancel_switch.clicked.connect(lambda: self.send_control("cancel"))
@@ -598,7 +601,7 @@ def main(argv=None):
                               ("language_label", "language"), ("notice", "notice")):
                 getattr(self, name).setText(self.text(key))
             self.switch.setText(self.text("switch"))
-            self.retry_session.setText(self.text("retry"))
+            self.set_retry_text()
             self.cancel_switch.setText(self.text("stop" if self.recovering else "cancel_switch"))
             self.campaigns.setAccessibleName(self.text("variant"))
             self.mode.setItemText(0, self.text("hosting"))
@@ -931,6 +934,8 @@ def main(argv=None):
             if not value:
                 self.switching = False
                 self.recovering = False
+                self.mainline_finished = False
+                self.set_retry_text()
                 self.retry_session.hide()
                 self.cancel_switch.hide()
             self.runner.setEnabled(not value and os.name != "nt")
@@ -985,6 +990,8 @@ def main(argv=None):
                     phase = event.get("phase") if isinstance(event, dict) else None
                     if phase in {"reconnecting", "recovery_waiting"} or (phase == "running" and event.get("recovering") is True):
                         self.active_variant = event.get("variant", self.active_variant)
+                        if self.campaigns.isHidden() and self.active_variant in VARIANTS:
+                            self.campaigns.setCurrentRow(VARIANTS.index(self.active_variant))
                         self.recovering = True
                         self.switching = True
                         self.clear_authoritative_roster()
@@ -993,10 +1000,16 @@ def main(argv=None):
                         self.cancel_switch.show()
                         self.set_status("recovery_waiting" if phase == "recovery_waiting" else "reconnecting")
                         self.set_busy(True)
+                    elif phase == "mainline_finished":
+                        self.mainline_finished = True
+                        self.set_retry_text()
+                        self.retry_session.show()
                     elif phase in {"running", "resumed"}:
                         self.active_variant = event.get("variant", self.active_variant)
                         self.recovering = False
                         self.switching = False
+                        self.mainline_finished = False
+                        self.set_retry_text()
                         self.retry_session.hide()
                         self.cancel_switch.hide()
                         self.set_status("active")
@@ -1013,7 +1026,7 @@ def main(argv=None):
                         self.recovering = False
                         self.switching = False
                         self.cancel_switch.hide()
-                        self.retry_session.hide()
+                        self.retry_session.setVisible(self.mainline_finished and self.mode.currentData() == "hosting")
                         self.set_status("active")
                         self.set_busy(True)
                     elif phase == "waiting":
@@ -1038,6 +1051,12 @@ def main(argv=None):
         def send_control(self, action, **fields):
             if self.session and self.busy and not self.stopping:
                 self.process.write((json.dumps({"action": action, **fields}) + "\n").encode("utf-8"))
+
+        def set_retry_text(self):
+            self.retry_session.setText(self.text("continue_uf" if self.mainline_finished else "retry"))
+
+        def retry_transition(self):
+            self.send_control("continue_mainline" if self.mainline_finished else "retry")
 
         def switch_campaign(self):
             variant = self.campaigns.currentItem().data(Qt.ItemDataRole.UserRole)
@@ -1135,7 +1154,6 @@ def main(argv=None):
                 return
             self.settings.setValue("language", self.lang)
             self.settings.setValue("game", self.folder.text().strip())
-            self.settings.setValue("variant", self.campaigns.currentItem().data(Qt.ItemDataRole.UserRole))
             self.settings.setValue("host", self.host.text().strip())
             self.settings.setValue("runner", self.runner.text().strip())
             self.settings.setValue("difficulty", self.difficulty.currentData())

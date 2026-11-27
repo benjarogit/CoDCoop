@@ -745,6 +745,26 @@ class CampaignPatchTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Unknown original CoD credits'):
             patch.transform_mainline_credits(b'unknown')
 
+    def test_uo_mainline_signals_after_credits_without_changing_standalone_exit(self):
+        from unittest.mock import patch as override
+
+        source = b'''
+        main() { level.flag["credits done"] = false; }
+        endLevel() {
+            level waittill("credits_are_over");
+            wait 59;
+            missionSuccess("bastogne1", false);
+        }
+        '''
+        with override.object(patch, 'MAINLINE_UO_CREDITS_HASH', hashlib.sha256(source).hexdigest()):
+            result = patch.transform_mainline_uo_credits(source).decode()
+        self.assertIn('setcvar("coop_mainline_finished", "0");', result)
+        self.assertLess(result.index('wait 59;'), result.index('coop_mainline_handoff'))
+        self.assertIn('setcvar("coop_mainline_finished", "1");', result)
+        self.assertIn('missionSuccess("bastogne1", false);', result)
+        with self.assertRaisesRegex(ValueError, 'Unknown United Offensive credits'):
+            patch.transform_mainline_uo_credits(b'unknown')
+
     def test_mainline_sound_aliases_keep_only_original_credit_rows(self):
         source = b'name,file,loadspec\nshared,shared.wav,\nother,other.wav,berlin\n' + b''.join(
             ('credit%d,c%d.wav,dawnville credits\n' % (i, i)).encode() for i in range(4))

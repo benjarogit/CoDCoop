@@ -114,12 +114,16 @@ esac
 
 case "$1" in
   *CoDSP.exe|*CoDMP.exe|*CoDUOSP.exe)
-    if steam_launch "$1"; then
+    # The Steam shortcut starts its saved command line. In a supervised
+    # session the arguments after the executable select the campaign, role
+    # and endpoint. They must arrive intact at Proton.
+    if [ "$#" -gt 1 ]; then
+      echo "CoD Coop: using Proton with the requested game arguments." >&2
+    elif steam_launch "$1"; then
       exit 0
+    else
+      echo "CoD Coop: no Steam shortcut for this install; starting without the overlay." >&2
     fi
-    echo "CoD Coop: no Steam shortcut for this install - starting without the" >&2
-    echo "  Steam overlay. Add the game once: Steam -> Games -> Add a Non-Steam" >&2
-    echo "  Game -> CoDSP.exe (see docs/linux.md)." >&2
     ;;
 esac
 

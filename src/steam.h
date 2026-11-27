@@ -57,9 +57,11 @@ struct Api {
     void (*release)(Message*);
     void* (*utilsIf)();
     uint32_t (*appId)(void*);
+    bool (*overlayEnabled)(void*);
     void* (*netUtilsIf)();
     void (*debugOutput)(void*, int level, void (*fn)(int, const char*));
     void (*initRelay)(void*);
+    int (*relayStatus)(void*, void*);
     void *users, *friends, *msgs;
 };
 inline Api a;
@@ -178,7 +180,11 @@ inline bool Start()
         // la red de relés de Steam lista desde ya: si no, la arma la primera conexion (el juego se traba ~1 s justo al unirse)
         a.initRelay(net);
     }
+    a.relayStatus = reinterpret_cast<decltype(a.relayStatus)>(
+        GetProcAddress(a.dll, "SteamAPI_ISteamNetworkingUtils_GetRelayNetworkStatus"));
     void* utils = a.utilsIf();
+    a.overlayEnabled = reinterpret_cast<decltype(a.overlayEnabled)>(
+        GetProcAddress(a.dll, "SteamAPI_ISteamUtils_IsOverlayEnabled"));
     if (log) log("steam: app %u (480 = Spacewar)", utils ? a.appId(utils) : 0);
     return true;
 }
@@ -191,7 +197,7 @@ inline void Stop()
 
 inline uint64_t MyId() { return up ? a.steamID(a.users) : 0; }
 inline const char* Name(uint64_t id) { return up ? a.friendName(a.friends, id) : ""; }  // UTF-8
-inline void SetPresence(const char* key, const char* value) { if (up) a.setPresence(a.friends, key, value); }
+inline bool SetPresence(const char* key, const char* value) { return up && a.setPresence(a.friends, key, value); }
 
 inline bool ReadLaunchCommand(char (&command)[256])
 {
@@ -211,6 +217,23 @@ inline bool ReadLaunchCommand(char (&command)[256])
 inline void Poll(void (*onJoin)(const char* connect), void (*onFailure)(uint64_t) = nullptr)
 {
     if (!up) return;
+    static int overlayReady = -1;
+    static DWORD lastOverlayCheck;
+    const DWORD now = GetTickCount();
+    if (now - lastOverlayCheck >= 1000) {
+        lastOverlayCheck = now;
+        if (void* utils = a.overlayEnabled ? a.utilsIf() : nullptr) {
+            const bool ready = a.overlayEnabled(utils);
+            if (log && ready != overlayReady) log("steam: overlay %s", ready ? "ready" : "unavailable");
+            overlayReady = ready;
+        }
+        if (void* net = a.relayStatus ? a.netUtilsIf() : nullptr) {
+            static int previous = -1000;
+            const int availability = a.relayStatus(net, nullptr);
+            if (log && availability != previous) log("steam: relay availability=%d", availability);
+            previous = availability;
+        }
+    }
     int pipe = a.pipe();
     a.runFrame(pipe);
     CallbackMsg m;
@@ -223,6 +246,8 @@ inline void Poll(void (*onJoin)(const char* connect), void (*onFailure)(uint64_t
             const auto peer = reinterpret_cast<const Identity*>(m.param)->id;
             if (log) log("steam: session failure for %I64u", peer);
             if (onFailure) onFailure(peer);
+        } else if (m.id == 331 && m.param && m.size >= 1) {
+            if (log) log("steam: overlay %s", m.param[0] ? "opened" : "closed");
         } else if (m.id == 337 && onJoin) {
             const char* connect = m.param && m.size > 8 ? reinterpret_cast<const char*>(m.param + 8) : nullptr;
             if (connect && memchr(connect, '\0', m.size - 8)) onJoin(connect);

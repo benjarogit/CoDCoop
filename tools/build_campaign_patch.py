@@ -38,6 +38,7 @@ UF_HELMET_MODELS = ('xmodel/gear_US_helmet_82nd', 'xmodel/gear_US_helmet_82nd_ne
                     'xmodel/gear_US_helmet_82nd_camo')
 MAINLINE_BERLIN_HASH = '1561a1717779b2d51399897c54dc84f193e0de9b08faf988bd0ef7648c5736f0'
 MAINLINE_CREDITS_HASH = '1dd840242c8ebee02910c6b1c7e198b6415a16f3a081da685467adc73f611e06'
+MAINLINE_UO_CREDITS_HASH = 'b884e48abfacbea0ba312cfa0011204372d893c3f5e10f25f508d70e2db92637'
 MAINLINE_CREDITS = 'coop_cod1_credits'
 MAINLINE_ASSET_HASHES = {
     'maps/credits.bsp': 'fdda2f3834f1563f724b35409b792aca94328fbe8861fc979ea65399f666cd02',
@@ -584,6 +585,28 @@ def transform_mainline_credits(data):
     return (text[:start] + body + text[end:]).encode('latin-1')
 
 
+def transform_mainline_uo_credits(data):
+    if hashlib.sha256(data).hexdigest() != MAINLINE_UO_CREDITS_HASH:
+        raise ValueError('Unknown United Offensive credits revision')
+    text = data.decode('latin-1')
+    start, end = function_span(text, 'main')
+    init = replace_active(text[start:end], r'level\.flag\["credits done"\]\s*=\s*false\s*;',
+                          'level.flag["credits done"] = false;\n'
+                          '    setcvar("coop_mainline_finished", "0");', expected=1)
+    text = text[:start] + init + text[end:]
+    start, end = function_span(text, 'endLevel')
+    body = replace_active(text[start:end], r'\bmissionSuccess\s*\(\s*"bastogne1"\s*,\s*false\s*\)\s*;',
+                          'if (getcvar("coop_mainline_handoff") == "1")\n'
+                          '    {\n'
+                          '        level.player unlink();\n'
+                          '        level.player freezeControls(false);\n'
+                          '        setcvar("coop_mainline_finished", "1");\n'
+                          '        return;\n'
+                          '    }\n'
+                          '    missionSuccess("bastogne1", false);', expected=1)
+    return (text[:start] + body + text[end:]).encode('latin-1')
+
+
 def build_mainline_patch(game, output):
     """Keep CoD credits distinct from UO credits and chain the real endings."""
     from campaign_inventory import layer_files
@@ -591,8 +614,9 @@ def build_mainline_patch(game, output):
     base = {}
     sound_source = None
     packages = layer_files(game, 'Main')
+    uo_packages = layer_files(game, 'uo')
     mod = game / 'sp_improved/sp_improved_1.5.pk3'
-    if any(output.resolve() == p.resolve() for p in packages + [mod]):
+    if any(output.resolve() == p.resolve() for p in packages + uo_packages + [mod]):
         raise ValueError('Cannot overwrite original mainline source packages')
     for package in packages:
         try:
@@ -613,7 +637,19 @@ def build_mainline_patch(game, output):
         raise ValueError('Unknown original CoD credits sound aliases')
     with zipfile.ZipFile(mod) as z:
         berlin = z.read('maps/berlin.gsc')
-    entries = [('maps/berlin.gsc', transform_mainline_berlin(berlin))]
+    uo_credits = None
+    for package in uo_packages:
+        try:
+            with zipfile.ZipFile(package) as z:
+                for name in z.namelist():
+                    if name.lower() == 'maps/credits.gsc':
+                        uo_credits = z.read(name)
+        except zipfile.BadZipFile:
+            continue
+    if uo_credits is None:
+        raise ValueError('United Offensive credits required for the mainline handoff')
+    entries = [('maps/berlin.gsc', transform_mainline_berlin(berlin)),
+               ('maps/credits.gsc', transform_mainline_uo_credits(uo_credits))]
     entries.extend(mainline_sound_entries(sound_source))
     for name, data in sorted(base.items()):
         target = name.replace('maps/credits', 'maps/' + MAINLINE_CREDITS, 1)
@@ -627,12 +663,12 @@ def build_mainline_patch(game, output):
             data = text.encode('latin-1')
         entries.append((target, data))
     metadata = {'schema': 1, 'profile': 'sp_improved',
-                'changes': ['cod1-movie-original-credits-uo-mainline'],
+                'changes': ['cod1-movie-original-credits-uo-mainline', 'uo-credits-united-fronts-handoff'],
                 'runtime_verified': False,
                 'source_berlin_sha256': hashlib.sha256(berlin).hexdigest(),
                 'source_credits_sound_sha256': hashlib.sha256(sound_source).hexdigest(),
                 'credits_sources': {name: hashlib.sha256(data).hexdigest() for name, data in sorted(base.items())},
-                'route': ['berlin', 'cod_end.roq', MAINLINE_CREDITS, 'bastogne1'],
+                'route': ['berlin', 'cod_end.roq', MAINLINE_CREDITS, 'bastogne1', 'credits', 'united_fronts'],
                 'enable_cvar': 'coop_mainline=1'}
     entries.append(('codcoop/mainline-overlay.json', (json.dumps(metadata, sort_keys=True) + '\n').encode()))
     output.parent.mkdir(parents=True, exist_ok=True)

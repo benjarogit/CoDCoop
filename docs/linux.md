@@ -233,9 +233,10 @@ the mod work, only the overlay/friends list is missing. Add the entry once and
 restart the launcher. `tools/steam-shortcut.py` only reads Steam's
 `shortcuts.vdf` to find the existing entry; it does not create one.
 
-Both players need the same CoDCoop release. The Steam transport was tested
-locally with a stand-in API. Joins with two real Steam accounts, including
-between Linux and Windows, remain unverified.
+Both players need the same CoDCoop release. A real two-account Steam-ID join
+on 0.6.2 reached the Steam transport and timed out. The same Linux host and
+Windows VM connected by direct IP. See the [connection guide](connect.md#steam)
+for the current status and other ways to join.
 
 ## 5. "Your computer has changed" on the first start
 

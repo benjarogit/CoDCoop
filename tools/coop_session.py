@@ -204,6 +204,13 @@ def waiting_switch(state):
     return transaction, retry
 
 
+def mainline_finished(state, variant, hosting):
+    return (hosting and variant == 'sp_improved' and isinstance(state, dict)
+            and state.get('variant') == variant and state.get('role') == 'host'
+            and str(state.get('map', '')).lower() == 'credits'
+            and state.get('mainline_finished') is True)
+
+
 def clear_command_files(game):
     """Commands belong to one owned game lifetime, never to its successor."""
     for name in ('codcoop.cmd', 'codcoop_join.cmd'):
@@ -277,6 +284,8 @@ def supervise(args):
     command_queue = []
     pending_reply = None
     last_wait_state = None
+    mainline_announced = False
+    state = {}
     awaiting_launch = True
     next_map = args.map_name
     try:
@@ -294,6 +303,8 @@ def supervise(args):
                 recovery_wait = False
                 recovery_started = time.monotonic() if recovery is not None else None
                 awaiting_launch = False
+                mainline_announced = False
+                state = {}
                 event('running', variant=variant, pid=current.pid, recovering=recovery is not None)
                 if recovery is not None:
                     event('reconnecting', variant=variant, pid=current.pid, committed=True)
@@ -302,6 +313,20 @@ def supervise(args):
                 if not isinstance(control, dict):
                     event('error', error='local control must be an object'); continue
                 action = control.get('action')
+                if action == 'continue_mainline':
+                    if recovery is not None:
+                        action = 'retry'
+                    elif mainline_finished(state, variant, hosting):
+                        change = state.get('switch', {})
+                        if isinstance(change, dict) and change.get('phase'):
+                            action = 'retry'
+                        elif pending_reply is None and not command_queue:
+                            action = 'switch'
+                            control = {'variant': 'united_fronts', 'difficulty': difficulty}
+                        else:
+                            continue
+                    else:
+                        continue
                 if action == 'stop': stopping.set()
                 elif action == 'switch':
                     if recovery is not None:
@@ -401,6 +426,10 @@ def supervise(args):
             if current.poll() is None and runtime_state.exists():
                 try:
                     state = json.loads(runtime_state.read_bytes())
+                    if not mainline_announced and mainline_finished(state, variant, hosting):
+                        mainline_announced = True
+                        event('mainline_finished', variant=variant)
+                        controls.put({'action': 'continue_mainline'})
                     waiting = waiting_switch(state) if restart is None and recovery is None else None
                     if waiting is not None and waiting != last_wait_state:
                         event('waiting', transaction=waiting[0], retry_round=waiting[1],

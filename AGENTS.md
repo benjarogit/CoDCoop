@@ -7,12 +7,28 @@ installation, configuration, and play equivalent in English and German. Update
 both language versions when changing a player workflow. Keep the changelog and
 release notes bilingual.
 
+## Upstream integration
+
+For each development or release cycle, review incoming commits from
+`TheTiranix/CoDCoop`. Cherry-pick applicable features, bug fixes, and required
+dependencies. Adapt conflicting patches to the fork and record the source
+commit. Keep the existing player workflows and compatibility checks covered by
+regression tests. Record the platforms, transport, and build actually tested.
+
 ## Disk space and QA cleanup
 
 `run/` holds disposable QA work and is listed in `.gitignore`. QA runs can
 create complete game copies under `run/<tag>/host/`, `join1/`, `join2/`,
 `prefix/`, and `runtime/`, taking about 15 GB per run. In a previous incident,
 266 runs took about 596 GB and left only 15 GB free on `/mnt/intern-1tb`.
+
+### Interactive workstation
+
+Keep the host desktop usable during QA. Use a private display or the existing
+VM for graphical game tests. Run heavyweight game checks sequentially, lower
+their scheduling priority when practical, and cap the frame rate for tests
+that do not measure rendering performance. When an actual desktop Steam
+interaction is necessary, target only the QA game window.
 
 ### Before each QA run
 

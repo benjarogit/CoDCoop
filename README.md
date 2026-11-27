@@ -131,24 +131,10 @@ Leave **Starting mission** blank to start the campaign or load a save in the gam
 2. Other players open the CoDCoop Launcher, select **Join a game**, enter the **Host address**, then select **Join campaign**.
 3. Keep the launcher open during play. The host's progress is shared with the group. Use the same host to resume their save later.
 
-If the game menu is already open, select **Co-op**, enter the address in
-**Host IP**, and click **Join**. For Steam, select **Join [name]** or accept an
-invitation. The host stays in the mission while players join.
+Use the path that matches your group. The connection guide covers same-network play,
+public IPv4 with a UDP port forward, Steam invitations and a VPN fallback.
 
-| Connection | What to enter |
-| --- | --- |
-| **LAN** | The host's local IPv4 address, for example `192.168.1.50` |
-| **Direct IP over the internet** | The host's public IPv4 address. The host forwards **UDP 28960** to their PC by default. |
-| **Steam** | `steam:<SteamID64>` as the host address once Steam is set up |
-
-<details>
-<summary><strong>Set up Steam for the host and joiners</strong></summary>
-
-1. Each player signs in to their own Steam account and installs **Spacewar** with `steam://install/480`.
-2. On **Windows**, start the game normally while Steam is running. On **Linux**, launch the game through a Steam entry with Proton and the required launch options. [Steam setup on Linux](docs/linux.md#4-steam-friend-invites)
-3. Use the host's Steam ID to join. The Steam transport was tested with a stand-in API. Joins with two real accounts remain untested.
-
-</details>
+[Windows and Linux connection guide](docs/connect.md)
 
 <details>
 <summary><strong>Switch campaigns or test on your own</strong></summary>

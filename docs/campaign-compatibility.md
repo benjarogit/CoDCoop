@@ -384,8 +384,13 @@ Its local mainline overlay changes the final Berlin objective handler only after
 the existing objective checks and preserves `cod_end.roq`. With `coop_mainline=1`,
 the normal transition enters a private alias of the original CoD credits map.
 The alias retains the original credits script and its timing, then calls the
-original `missionSuccess` transition to `bastogne1`. The UO credits remain intact
-for the end of the UO campaign. Other profiles do not enable this route.
+original `missionSuccess` transition to `bastogne1`. The UO credits retain their
+own ending. At their completion a supervised Improved Coop host requests a
+group restart in United Fronts. **Continue to United Fronts** repeats a stalled
+request. The same transition protocol checks the party and saves the current
+campaign before restarting. Other profiles retain their original endings.
+The native credits signal and full supervisor restart have separate acceptance
+criteria.
 
 An alias is necessary because UO replaces `maps/credits.bsp` and its script:
 simply entering `credits` after Berlin would show the UO ending. The builder

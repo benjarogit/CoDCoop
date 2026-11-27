@@ -204,6 +204,32 @@ python3 tools/qa_coop.py --source "/path/to/owned/Call of Duty" \
   --run run/qa-checkpoint --variant cod1 --map training --players 2 --checkpoint-reloads 3
 ```
 
+For a Steam presence regression test, build the local Steam fixture with
+`i686-w64-mingw32-g++ -std=c++17 -O2 -shared -static tools/fakesteam.cpp -lws2_32 -o /tmp/codcoop-fake-steam-api.dll`.
+Add `--steam-api /tmp/codcoop-fake-steam-api.dll` to the two-player smoke command
+and set `FAKESTEAM_REJECT_FIRST_CONNECT=1` in its environment. The host log
+must show `steam: join presence rejected; retrying` before
+`steam: join presence published`. The fixture tests the retry and the local
+join flow. Test Steam invitations and Internet transport with real accounts.
+
+Für den Wiederholungsversuch beim Veröffentlichen der Steam-Beitrittsdaten
+gilt derselbe Testaufruf. Die Test-DLL lehnt den ersten Eintrag ab. Im Host-Log
+müssen zuerst die Ablehnung und dann die erfolgreiche Veröffentlichung stehen.
+Steam-Einladungen und Verbindungen übers Internet mit echten Konten prüfen.
+
+To smoke-test the lobby, add `--start-in-lobby` to the two-player command.
+The runner waits for the roster on both sides while the game is still at the
+menu and no native slot is allocated. Then it starts the host mission and
+checks the normal join and player input. Use `--steam-api` with the local fixture
+to cover the Steam packet path. Real Steam invitations require a signed-in
+session test.
+
+Für den Lobby-Smoke-Test `--start-in-lobby` an den Zwei-Spieler-Aufruf anhängen.
+Der Test wartet im Hauptmenü auf die Spielerliste beider Seiten bei unbelegten
+nativen Slots. Danach startet er die Host-Mission und prüft den Beitritt und
+die Spielereingabe. `--steam-api` mit der lokalen Test-DLL prüft den Steam-Paketpfad.
+Echte Steam-Einladungen brauchen einen Test mit angemeldeten Konten.
+
 The network gate uses the real UDP relay from
 [Co-op Anything](https://github.com/cranebeaker/coop-anything/tree/e83fc578ad2c3d3bb30b06f98ba11d965d11e105/tools/chaos),
 pinned to the reviewed revision below. The runner rejects another revision or
@@ -261,6 +287,24 @@ unshare -Urn python3 tools/qa_home_network.py --transport wireguard \
   --variant cod1 --map training --players 2 --checkpoint-reloads 1
 ```
 
+#### Native Windows and Linux with real Steam / Natives Windows und Linux mit echtem Steam
+
+Use matching core and loader DLL hashes and two different signed-in Steam accounts.
+Start a mission on the host, then join by Steam ID. Swap host roles and repeat
+from freshly started game processes. Save both logs and two game-state samples
+several seconds apart. Verify that the remote slot is active, both games are on
+the same map, and snapshots advance on both sides. Record the transport selected
+by Steam, the physical uplinks, and whether the client joined by Steam ID or
+accepted an invitation.
+
+Core- und Loader-DLLs müssen übereinstimmen, und beide Spieler brauchen ein
+eigenes angemeldetes Steam-Konto. Der Host startet eine Mission, der Mitspieler
+tritt per Steam-ID bei. Mit frisch gestarteten Spielprozessen und getauschten
+Host-Rollen wiederholen. Beide Logs und zwei Spielzustände im Abstand von einigen
+Sekunden sichern. Der Mitspieler-Slot muss aktiv sein, beide Spiele müssen auf
+derselben Karte laufen und die Schnappschüsse auf beiden Seiten weiterlaufen.
+Gewählten Steam-Transport, Internetanschlüsse und Beitrittsweg festhalten.
+
 #### Release check across two internet connections / Release-Abnahme über zwei Internetanschlüsse
 
 Use the matching release installers, the same campaign, and two separate
@@ -303,6 +347,21 @@ relevante Ausschnitte aus `codcoop.log` und `codcoop_join.log` beider Seiten
 sichern. Radmin VPN ist für Windows dokumentiert und erhält bei einem Test
 einen eigenen Windows-zu-Windows-Eintrag.
 [Radmin VPN system requirements / Systemanforderungen](https://www.radmin-vpn.com/help/)
+
+Record Steam overlay availability, invite delivery, and successful arrival in the
+mission as separate observations. A Steam-ID join tests the transport without
+the invite callback. On 0.6.2, two signed-in accounts on a Linux/Proton host
+and native Windows 11 guest reproduced Steam timeout `5003` on QEMU user NAT.
+The same game processes joined `10.0.2.2:28960` via direct IP and the Windows
+client received live training snapshots. This run used one physical uplink.
+
+Overlay, Zustellung der Einladung und Ankunft in der Mission getrennt
+protokollieren. Ein Steam-ID-Beitritt prüft den Transport ohne
+Einladungs-Callback. Unter 0.6.2 trat der Steam-Timeout `5003` mit zwei echten
+Konten auf einem Linux-/Proton-Host und einem nativen Windows-11-Gast hinter
+QEMU-NAT auf. Dieselben Prozesse verbanden sich direkt über `10.0.2.2:28960`.
+Windows empfing laufende Spielzustände der Trainingsmission. Beide nutzten
+denselben physischen Internetanschluss.
 
 ### Recovery probes / Wiederverbindungstests
 

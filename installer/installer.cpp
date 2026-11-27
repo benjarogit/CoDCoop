@@ -41,7 +41,9 @@
 
 static const wchar_t* TITLE = L"Call of Duty Coop - Setup";
 static const DWORD CODSP_SIZE = 1716224;   // CoDSP.exe 1.5: the mod uses fixed addresses of that exe
-static const DWORD COD2SP_SIZE = 1761280;  // CoD2SP_s.exe 1.3, same
+#ifdef COOP_EXPERIMENTAL_COD2
+static const char COD2SP_BUILD[] = "Thu Mar 30 2006 07:35:42PM";
+#endif
 
 // Release files. If they sit next to the installer they are used as they are;
 // otherwise they are downloaded once.
@@ -1908,9 +1910,12 @@ static bool RunInstall(std::wstring& err)
 
 #ifdef COOP_EXPERIMENTAL_COD2
     if (games & COD2) {
-        if (WrongSize(dir + L"\\CoD2SP_s.exe", COD2SP_SIZE)) {
-            Line(L("Hinweis: CoD2SP_s.exe ist nicht 1.3 - der Co-op braucht 1.3.",
-                   "Note: CoD2SP_s.exe is not 1.3 - the co-op needs 1.3."));
+        // Steam may ship the same single-player build in a differently sized executable.
+        const auto cod2Image = ReadAll(dir + L"\\CoD2SP_s.exe");
+        if (cod2Image.find("%s %s build %s %s") != std::string::npos &&
+            cod2Image.find(COD2SP_BUILD) == std::string::npos) {
+            Line(L("Hinweis: CoD2 Coop braucht die Einzelspieler-Version aus Patch 1.2 oder 1.3.",
+                   "Note: CoD2 Coop requires the single-player build from patch 1.2 or 1.3."));
         }
         Say(L("Call of Duty 2...", "Call of Duty 2..."), -1);
         CreateDirectoryW((dir + L"\\main").c_str(), nullptr);

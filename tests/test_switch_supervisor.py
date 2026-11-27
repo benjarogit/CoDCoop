@@ -85,6 +85,64 @@ class RunnerEnvironmentTests(unittest.TestCase):
             qa.assess_runner_environment(self.environ, self.prefix, self.bundle)
 
 class SupervisorLifetimeTests(unittest.TestCase):
+    def test_auto_advance_requires_the_host_and_completed_uo_credits(self):
+        from coop_session import mainline_finished
+
+        state = {'variant': 'sp_improved', 'role': 'host', 'map': 'credits', 'mainline_finished': True}
+        self.assertTrue(mainline_finished(state, 'sp_improved', True))
+        self.assertFalse(mainline_finished(state, 'sp_improved', False))
+        self.assertFalse(mainline_finished(state, 'uo', True))
+        for change in ({'role': 'joiner'}, {'variant': 'uo'}, {'map': 'coop_cod1_credits'},
+                       {'map': 'bastogne1'}, {'mainline_finished': False}, {'mainline_finished': 'true'}):
+            with self.subTest(change=change):
+                self.assertFalse(mainline_finished({**state, **change}, 'sp_improved', True))
+
+    def test_supervisor_queues_one_native_united_fronts_switch(self):
+        import argparse
+        import io
+        import json
+        import tempfile
+        from unittest.mock import Mock, patch
+        import coop_session as session
+
+        class Finished(Exception):
+            pass
+
+        with tempfile.TemporaryDirectory() as directory:
+            game = Path(directory)
+            (game / 'coop').mkdir()
+            state = game / 'coop/runtime-state.json'
+            command = game / 'codcoop.cmd'
+            sent = []
+            attempts = 0
+
+            def advance(_):
+                nonlocal attempts
+                attempts += 1
+                if attempts == 1:
+                    state.write_text(json.dumps({'variant': 'sp_improved', 'role': 'host',
+                                                 'map': 'credits', 'mainline_finished': True}))
+                if command.exists():
+                    sent.append(command.read_text().strip())
+                    command.unlink()
+                if attempts == 7:
+                    raise Finished()
+
+            args = argparse.Namespace(game=game, variant='sp_improved', host=None, hosting=True,
+                                      port=28960, difficulty=2, map_name='credits', runner=None)
+            process = Mock(pid=100)
+            process.poll.return_value = None
+            with patch.object(session, 'check_installation', return_value={'ok': True}), \
+                 patch.object(session, 'launch_arguments', return_value=(['fake-game'], {})), \
+                 patch.object(session, 'spawn_owned', return_value=process), \
+                 patch.object(session, 'stop_owned'), patch.object(session, 'event') as event, \
+                 patch.object(session.time, 'sleep', side_effect=advance), \
+                 patch.object(session.signal, 'signal'), patch.object(session.sys, 'stdin', io.StringIO('')):
+                with self.assertRaises(Finished):
+                    session.supervise(args)
+            self.assertEqual(sent, ['coopswitch united_fronts default 2'])
+            event.assert_any_call('mainline_finished', variant='sp_improved')
+
     def test_supervisor_loop_clears_previous_quit_before_restart(self):
         import argparse
         import io

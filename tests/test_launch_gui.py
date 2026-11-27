@@ -128,6 +128,9 @@ class LauncherBehavior(unittest.TestCase):
             self.assertEqual(gui.VARIANTS[window.campaigns.currentRow()], "sp_improved")
             self.assertIn("CoD + UO", window.variant_label.text())
             self.assertIn("SP Improved 1.5", window.description.text())
+            self.assertTrue(window.campaigns.isHidden())
+            window.advanced_toggle.setChecked(True)
+            self.assertFalse(window.campaigns.isHidden())
         self.run_window(operation)
 
     def test_verified_summary_follows_variant_and_is_cleared_for_another_folder(self):

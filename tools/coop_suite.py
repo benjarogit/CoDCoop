@@ -341,6 +341,8 @@ def launch_arguments(game, variant_id, runner=None, host=None, map_name=None, ho
     variant = prepare(game, variant_id)
     args = [] if os.name == "nt" else shlex.split(runner or "wine")
     args += [str(resolve(game, variant["exe"])), "+set", "fs_basepath", str(game), "+set", "fs_homepath", str(game), "+set", "fs_cdpath", str(game), "+set", "fs_game", variant["fs_game"], "+set", "com_introplayed", "1", "+set", "coop_mainline", "1" if variant_id == "sp_improved" else "0"]
+    args += ["+set", "coop_mainline_handoff", "1" if hosting and variant_id == "sp_improved" else "0",
+             "+set", "coop_mainline_finished", "0"]
     if not isinstance(difficulty, int) or not 0 <= difficulty <= 3:
         raise ValueError("invalid difficulty")
     if type(expected_players) is not int or not 1 <= expected_players <= 4:

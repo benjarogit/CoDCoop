@@ -46,7 +46,7 @@ struct Message {
 static_assert(sizeof(Identity) == 136 && offsetof(Message, peer) == 12, "SteamNetworkingMessage_t de 32 bits");
 
 char DIR[MAX_PATH] = "D:\\CoDCoop\\run\\fakesteam";  // FAKESTEAM_DIR lo cambia (QA en Linux/Wine y en la VM)
-bool g_init, g_drop;
+bool g_init, g_drop, g_rejectFirstConnect;
 uint64_t g_me;
 char g_name[64];
 SOCKET g_sock = INVALID_SOCKET;
@@ -174,6 +174,7 @@ API int SteamInternal_SteamAPI_Init(const char*, char* err)
     if (!GetEnvironmentVariableA("FAKESTEAM_NAME", g_name, sizeof g_name))
         snprintf(g_name, sizeof g_name, "Fake%lu", GetCurrentProcessId());
     g_drop = GetEnvironmentVariableA("FAKESTEAM_DROP", v, sizeof v) && v[0] == '1';
+    g_rejectFirstConnect = GetEnvironmentVariableA("FAKESTEAM_REJECT_FIRST_CONNECT", v, sizeof v) && v[0] == '1';
     WSADATA wsa;
     WSAStartup(MAKEWORD(2, 2), &wsa);
     g_sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
@@ -243,6 +244,10 @@ API const char* SteamAPI_ISteamFriends_GetFriendRichPresence(void*, uint64_t id,
 }
 API bool SteamAPI_ISteamFriends_SetRichPresence(void*, const char* key, const char* value)
 {
+    if (g_rejectFirstConnect && value && *value && !strcmp(key, "connect")) {
+        g_rejectFirstConnect = false;
+        return false;
+    }
     if (value && *value) g_presence[key] = value;
     else g_presence.erase(key);
     WriteMe();

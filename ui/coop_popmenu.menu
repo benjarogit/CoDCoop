@@ -240,6 +240,8 @@
 			type ITEM_TYPE_TEXT
 			style 1
 			cvar "ui_coop_steam"
+			cvarTest "ui_coop_lobby"
+			hideCvar { "1" }
 			textalign ITEM_ALIGN_CENTER
 			textalignx 127
 			textaligny 12
@@ -316,6 +318,74 @@
 			action { play "mouse_click"; exec "coopjoinfriend 3"; }
 			mouseEnter { setitemcolor friend3 backcolor UI_BUTTON_BACK_COLOR_HOVER play "mouse_over" }
 			mouseExit { setitemcolor friend3 backcolor UI_BUTTON_BACK_COLOR }
+		}
+
+		itemDef
+		{
+			name lobbyplayer1
+			rect 20 220 255 19
+			type ITEM_TYPE_TEXT
+			cvar "ui_coop_player1"
+			cvarTest "ui_coop_lobby"
+			showCvar { "1" }
+			textalign ITEM_ALIGN_CENTER
+			textalignx 127
+			textaligny 15
+			textscale .22
+			forecolor 1 1 1 1
+			visible 1
+			decoration
+		}
+
+		itemDef
+		{
+			name lobbyplayer2
+			rect 20 241 255 19
+			type ITEM_TYPE_TEXT
+			cvar "ui_coop_player2"
+			cvarTest "ui_coop_lobby"
+			showCvar { "1" }
+			textalign ITEM_ALIGN_CENTER
+			textalignx 127
+			textaligny 15
+			textscale .22
+			forecolor 1 1 1 1
+			visible 1
+			decoration
+		}
+
+		itemDef
+		{
+			name lobbyplayer3
+			rect 20 262 255 19
+			type ITEM_TYPE_TEXT
+			cvar "ui_coop_player3"
+			cvarTest "ui_coop_lobby"
+			showCvar { "1" }
+			textalign ITEM_ALIGN_CENTER
+			textalignx 127
+			textaligny 15
+			textscale .22
+			forecolor 1 1 1 1
+			visible 1
+			decoration
+		}
+
+		itemDef
+		{
+			name lobbyplayer4
+			rect 20 283 255 19
+			type ITEM_TYPE_TEXT
+			cvar "ui_coop_player4"
+			cvarTest "ui_coop_lobby"
+			showCvar { "1" }
+			textalign ITEM_ALIGN_CENTER
+			textalignx 127
+			textaligny 15
+			textscale .22
+			forecolor 1 1 1 1
+			visible 1
+			decoration
 		}
 
 		// estado (lo escribe el mod en ui_coop_status)

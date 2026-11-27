@@ -5,17 +5,18 @@ complete installation and starts the local session supervisor. It remains open
 while the game runs so the squad can follow a campaign change across process
 restarts.
 
-English is the initial interface language; German is available from the
-language selector. The recommended initial selection is **CoD + UO — Improved
-Coop**, using SP Improved 1.5 and the UO engine: CoD 1's campaign, its original
-credits, then United Offensive. Its weapon, balance and AI improvements remain
-enabled. The classic CoD 1 engine profile is optional; United Fronts remains a
-separate campaign variant. Existing explicit user selections are remembered.
-Per-user preferences do not change campaign files or saves.
+English is the initial interface language. German is available from the
+language selector. The normal entry starts with **CoD + UO — Improved Coop**.
+It uses SP Improved 1.5 on the UO engine and runs the CoD 1 campaign, its
+original credits, and United Offensive. After the UO credits the host's
+supervisor starts the United Fronts transition. The launchers verify the
+party, save the current campaign and reconnect after the restart. The host
+can use **Continue to United Fronts** to retry the transition.
 
 ## Controls
 
-- Choose the complete game installation and a campaign variant.
+- Choose the complete game installation. **Advanced launch options** shows
+  the campaign selector for individual profiles and their existing saves.
 - Host a game, or join using the host's IP endpoint or Steam ID.
 - The host selects Recruit, Regular, Hardened or Veteran for a new campaign
   (Regular is the default). Joiners follow the host; existing saves retain

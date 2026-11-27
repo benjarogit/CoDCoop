@@ -26,6 +26,7 @@
 #include "game.h"
 #include "hook.h"
 #include "steam.h"
+#include "lobby.h"
 #include "suite_identity.h"
 #include "anim_fragments.h"
 #include "packet_buffer.h"
@@ -513,6 +514,85 @@ using ArchiveWriter = void(__cdecl*)(int);
 ArchiveWriter g_archiveOriginal;
 archive_rules::Swap g_archiveSwap;
 bool g_archiveEnabled;
+// The waiting room is populated only by compatible hello packets. Native player
+// slots and resource transfers remain subject to the regular mission handshake.
+lobby::List g_lobby{};
+DWORD g_lobbySent, g_lobbySeen;
+int g_lobbyShown;
+constexpr DWORD LOBBY_INTERVAL = 1000;
+constexpr DWORD LOBBY_MEMBER_TIMEOUT = 10000;
+
+void LobbyName(char out[lobby::NAME])
+{
+    char raw[64]{};
+    if (steam::up) steam::Latin1(steam::Name(steam::MyId()), raw, sizeof raw);
+    lobby::CleanName(raw, out);
+}
+
+void ShowLobby(const char (*names)[lobby::NAME], int count)
+{
+    if (g_lobbyShown != count) {
+        g::Cvar_Set("ui_coop_lobby", count ? "1" : "0");
+        Log("lobby: %d players", count);
+    }
+    for (int i = 0; i < lobby::MAX_PLAYERS; ++i) {
+        char key[32];
+        snprintf(key, sizeof key, "ui_coop_player%d", i + 1);
+        const char* value = i < count ? names[i] : "";
+        if (strcmp(g::CvarString(key), value)) g::Cvar_Set(key, value);
+    }
+    g_lobbyShown = count;
+}
+
+void ClearLobby()
+{
+    if (g_lobbyShown) ShowLobby(nullptr, 0);
+    g_lobbySeen = 0;
+    g_lobby.Clear();
+    g_lobbySent = 0;
+}
+
+void HostLobbyTick()
+{
+    if (g::sv_state == 2) {
+        if (g_lobbyShown) ClearLobby();
+        return;
+    }
+    const DWORD now = GetTickCount();
+    if (g_lobbyShown && now - g_lobbySent < LOBBY_INTERVAL) return;
+    g_lobbySent = now;
+    g_lobby.Expire(now, LOBBY_MEMBER_TIMEOUT);
+    char names[lobby::MAX_PLAYERS][lobby::NAME]{}, mine[lobby::NAME]{};
+    LobbyName(mine);
+    lobby::Display(mine, 0, names[0]);
+    for (int i = 0; i < g_lobby.n; ++i) lobby::Display(g_lobby.e[i].name, i + 1, names[i + 1]);
+    const int count = g_lobby.n + 1;
+    ShowLobby(names, count);
+    uint8_t packed[1 + lobby::MAX_PLAYERS * lobby::NAME];
+    const int size = lobby::Pack(packed, sizeof packed, names, count);
+    if (size < 0) return;
+    Writer roster(lobby::M_LOBBY);
+    roster.Put(packed, size);
+    for (int i = 0; i < g_lobby.n; ++i) SendTo(g_lobby.e[i].addr, roster.buf, roster.len);
+}
+
+bool HostLobbyHello(const sockaddr_in& from, const Reader& reader)
+{
+    const auto size = reader.end - reader.p;
+    if (size < 1 || size > lobby::NAME || memchr(reader.p, 0, size) != reader.end - 1)
+        return false; // an older client uses the existing mission handshake
+    const DWORD now = GetTickCount();
+    g_lobby.Expire(now, LOBBY_MEMBER_TIMEOUT);
+    if (!g_lobby.Touch(from, reinterpret_cast<const char*>(reader.p), now)) {
+        // An unseated player can keep waiting for a seat to expire.
+        Writer reject(suite::REJECT);
+        const char message[] = "The lobby already has 4 players.";
+        reject.Put(message, sizeof message);
+        SendTo(from, reject.buf, reject.len);
+    }
+    return true;
+}
+
 constexpr uint8_t kArchivePrologue[] = {0x81, 0xec, 0x04, 0x04, 0x00, 0x00};
 void __cdecl Hook_ArchiveVariables(int file)
 {
@@ -4014,6 +4094,9 @@ void JoinerSendJoin()
             return;
         }
         Writer hello(suite::HELLO);
+        char name[lobby::NAME];
+        LobbyName(name);
+        hello.Put(name, (int)strlen(name) + 1);
         SendTo(S->host, hello.buf, hello.len);
         S->lastJoinTry = GetTickCount();
         return;
@@ -4173,6 +4256,7 @@ void JoinerControl(uint8_t type, Reader r)
         break;
     case suite::READY:
         if(!BootAcceptReady(r))break;
+        ClearLobby();
         if (!S->compatible && !S->joined) {
             S->compatible = true;
             ShowJoinStatus("Host found. Joining the campaign...");
@@ -4183,6 +4267,7 @@ void JoinerControl(uint8_t type, Reader r)
     case suite::REJECT: {
         const char* reason = (const char*)r.p;
         if (!memchr(r.p, 0, (size_t)(r.end - r.p))) return;
+        ClearLobby();
         Log("suite: rejected: %.200s", reason);
         ShowJoinStatus(reason);
         if (S->recoveringConnection) { JoinerLeave(reason); break; }
@@ -4420,6 +4505,7 @@ void JoinerLeave(const char* why)
     HookCgame(false);  // como un juego recien abierto: si no, el mapa local no termina de cargar al volver a entrar
     HookUsercmd(false);
     g_hostSeen = 0;
+    ClearLobby();
     memset(S->downed, 0, sizeof S->downed);
     g::Com_Printf("^3COOP: %s\n", why);
     ShowJoinStatus(why);
@@ -4480,7 +4566,7 @@ void HideFriendButtons(int k)
 void SteamFrame()
 {
     if (suite::IsQA() && getenv("CODCOOP_QA_NO_STEAM")) return;
-    static bool wasUp, presence, triedOnce, checkedLaunchCommand;
+    static bool wasUp, presence, presenceKnown, triedOnce, checkedLaunchCommand;
     bool up = steam::Start();
     if (up != wasUp || !triedOnce) {
         if (up) Log("steam: listo como '%s' (%I64u)", steam::Name(steam::MyId()), steam::MyId());
@@ -4514,19 +4600,42 @@ void SteamFrame()
         if (S->role == JOINER && !S->compatible && peer && peer == steam::IdOf(S->steamPeer, S->host))
             ShowJoinStatus("Steam could not connect to the host. Retrying...");
     });
-    if ((S->role == HOST) != presence) {  // al crear partida y al dejar de ser anfitrion (coopleave)
-        presence = S->role == HOST;
+    const bool hosting = S->role == HOST;
+    static DWORD lastPresenceAttempt;
+    static bool presenceRetryLogged;
+    const DWORD nowTick = GetTickCount();
+    if ((!presenceKnown || hosting != presence) && nowTick - lastPresenceAttempt >= 2000) {
+        lastPresenceAttempt = nowTick;
         char connect[64];
         snprintf(connect, sizeof connect, "+coopjoin steam:%I64u", steam::MyId());
-        steam::SetPresence("codcoop", presence ? "host" : "");
-        steam::SetPresence("connect", presence ? connect : "");
-        steam::SetPresence("status", presence ? "Hosting CoD Coop" : "");
+        const bool connectReady = steam::SetPresence("connect", hosting ? connect : "");
+        const bool listingReady = steam::SetPresence("codcoop", hosting ? "host" : "");
+        steam::SetPresence("status", hosting ? "Hosting CoD Coop" : "");
+        if (connectReady && listingReady) {
+            presence = hosting;
+            presenceKnown = true;
+            presenceRetryLogged = false;
+            Log("steam: join presence %s", hosting ? "published" : "cleared");
+        } else {
+            presenceKnown = false;
+            if (!presenceRetryLogged) {
+                presenceRetryLogged = true;
+                Log("steam: join presence rejected; retrying");
+            }
+        }
     }
     static DWORD lastScan;
     if (GetTickCount() - lastScan < 2000) return;
     lastScan = GetTickCount();
     struct { char text[3][96], id[3][24]; } now = {};
     static decltype(now) prev = {{"-"}};
+    if (g_lobbyShown) {
+        if (strcmp(prev.text[0], "-")) {
+            HideFriendButtons(1);
+            prev = {{"-"}};
+        }
+        return;
+    }
     int found = 0;
     steam::ForEachHost([&](uint64_t id) {
         if (found == 3) return;
@@ -4632,6 +4741,7 @@ void Cmd_CoopHost()
         CoopStatus("Could not open UDP port %d (is another program using it?)", port);
         return;
     }
+    if (S->role != HOST) ClearLobby();
     S->role = HOST;
     const char* ip = LocalIp();
     char note[128];
@@ -4708,6 +4818,7 @@ void Cmd_CoopJoin()
         S->host.sin_port = htons((u_short)port);
         freeaddrinfo(res);
     }
+    ClearLobby();
     S->role = JOINER;
     S->joined = false;
     S->hostMap[0] = 0;
@@ -4737,6 +4848,9 @@ void Cmd_CoopLeave()
         JoinerLeave("You left the co-op game.");
     } else if (S->role == HOST) {
         w.Put(S->reloadToken);
+        for (int i = 0; i < g_lobby.n; ++i)
+            for (int k = 0; k < 3; ++k) SendTo(g_lobby.e[i].addr, w.buf, w.len);
+        ClearLobby();
         for (int n = 1; n < g::MAX_CLIENTS; ++n) {
             const auto& pending = S->reloadPending[n];
             bool loading = pending.address.sin_port && pending.delivery.token.session == S->reloadToken.session;
@@ -5165,6 +5279,31 @@ void Cmd_CoopAnims()
 
 #include "session_switch.inc"
 
+bool NativeConsoleSupported()
+{
+    const auto address = g::A(0x407dc0, 0x4087f0);
+    static constexpr uint8_t cod[] = {0x8b, 0x15, 0x30, 0xee, 0x56, 0x00, 0x33, 0xc0, 0x57, 0xb9, 0x40, 0, 0, 0};
+    static constexpr uint8_t uo[] = {0x8b, 0x15, 0x68, 0x11, 0x57, 0x00, 0x33, 0xc0, 0x57, 0xb9, 0x40, 0, 0, 0};
+    return memcmp(reinterpret_cast<const void*>(address), g::uo ? uo : cod, sizeof(cod)) == 0;
+}
+
+void Cmd_CoopConsole()
+{
+    if (!NativeConsoleSupported()) return;
+    // The stock command toggles the console catcher and resets its input field.
+    reinterpret_cast<void (__cdecl*)()>(g::A(0x407dc0, 0x4087f0))();
+    Log("console: toggled through coopconsole");
+}
+
+void SetDefaultConsoleBinding()
+{
+    if (!NativeConsoleSupported()) return;
+    // Each native key record has three 32-bit fields: down, repeat count, binding.
+    const auto keys = g::A(0x1423dc0, 0x48ca620);
+    const char* binding = *reinterpret_cast<const char* const*>(keys + 12 * 'p' + 8);
+    if (!binding || !*binding) g::Cbuf_AddText("bind p coopconsole\n");
+}
+
 struct CmdDef {
     const char* name;
     void (*fn)();
@@ -5176,7 +5315,7 @@ const CmdDef kCmds[] = {
     {"coophealth", Cmd_CoopHealth}, {"coopkill", Cmd_CoopKill}, {"cooplists", Cmd_CoopLists}, {"coopbodyoverlap",Cmd_CoopBodyOverlap},
     {"cooprejoin", Cmd_CoopRejoin}, {"coopendlevel", Cmd_CoopEndLevel}, {"coopweapons", Cmd_CoopWeapons}, {"coopuiclick", Cmd_CoopUiClick}, {"coopnet", Cmd_CoopNet},
     {"coopjoinfriend", Cmd_CoopJoinFriend}, {"coopgive", Cmd_CoopGive}, {"coopleave", Cmd_CoopLeave},
-    {"coopinternet", Cmd_CoopInternet},
+    {"coopinternet", Cmd_CoopInternet}, {"coopconsole", Cmd_CoopConsole},
 };
 
 }  // namespace
@@ -5195,6 +5334,7 @@ EXPORT void Coop_Init(const CoreApi* api, void* state, int fresh)
     if (fresh) {
         S->sock = INVALID_SOCKET;
         S->role = NONE;
+        SetDefaultConsoleBinding();
     }
     if (!fresh && S->role != NONE && !PrepareIdentity()) {
         S->role = NONE; S->joined = S->frozen = false;
@@ -5216,6 +5356,7 @@ EXPORT void Coop_Init(const CoreApi* api, void* state, int fresh)
 
 EXPORT void Coop_Shutdown()
 {
+    ClearLobby();
     if (g_publicLookup) CloseHandle(g_publicLookup);
     g_publicLookup = nullptr;
     WatchGameDll(false);  // el aviso apunta a esta DLL, que se va a descargar
@@ -5349,6 +5490,7 @@ EXPORT int __cdecl Coop_GetPacket(int sock, msg_t* msg, netadr_t* from)
     StatsTick();
     PollPublicAddress();
     SteamFrame();
+    if (S->role == HOST) HostLobbyTick();
     UiPausedFrame();
     MainlineContinue();
     MainlineStartMission();
@@ -5361,8 +5503,15 @@ EXPORT int __cdecl Coop_GetPacket(int sock, msg_t* msg, netadr_t* from)
         HostCheckReload();
         HostNoPause();
     }
+    const bool lobbyHostPoll = S->role == HOST && g::sv_state == 0 && sock == NS_CLIENT;
     const bool waitingReload = S->role == NONE && S->waitingForMap && sock == NS_CLIENT;
-    if (!((S->role == HOST && sock == NS_SERVER) || (S->role == JOINER && sock == NS_CLIENT) || waitingReload)) return 0;
+    if (!((S->role == HOST && sock == NS_SERVER) || (S->role == JOINER && sock == NS_CLIENT) || waitingReload || lobbyHostPoll)) return 0;
+    if (S->role == JOINER && g_lobbySeen && GetTickCount() - g_lobbySeen >= LOBBY_MEMBER_TIMEOUT) {
+        ClearLobby();
+        // Retire the vanished lobby session before the next roster arrives.
+        if (!S->compatible) S->reloadToken = {};
+        ShowJoinStatus("Lobby stopped responding. Retrying the connection...");
+    }
     if (S->role == JOINER && !S->joined && GetTickCount() - S->lastJoinTry > 1000) JoinerSendJoin();
     if (S->role == JOINER) JoinerKeepAlive();
 
@@ -5382,6 +5531,8 @@ EXPORT int __cdecl Coop_GetPacket(int sock, msg_t* msg, netadr_t* from)
         const bool fromHost = a.sin_addr.s_addr == S->host.sin_addr.s_addr && a.sin_port == S->host.sin_port;
         const int peerSlot = S->role == HOST ? FindSlot(a) : -1;
         if (S->role == JOINER && !fromHost) continue;
+        if (lobbyHostPoll && (n < 5 || *(uint32_t*)buf != CTRL ||
+                (buf[4] != suite::HELLO && (buf[4] != M_BYE || peerSlot > 0)))) continue;
         if (n >= 5 && *(uint32_t*)buf == CTRL) {
             ++g_statCtrl;
             const uint8_t type = buf[4];
@@ -5409,6 +5560,8 @@ EXPORT int __cdecl Coop_GetPacket(int sock, msg_t* msg, netadr_t* from)
                     SendTo(a, reject.buf, reject.len);
                     continue;
                 }
+                if (type == suite::HELLO && g::sv_state != 2 &&
+                    HostLobbyHello(a, Reader{buf + CONTROL_HEADER, buf + n})) continue;
                 if (type == suite::HELLO || !world_wire::Current(token, S->reloadToken)) {
                     Writer ready(suite::READY);BootWriteReady(ready); SendTo(a, ready.buf, ready.len);
                     continue; // a join must echo the current negotiated world
@@ -5417,6 +5570,23 @@ EXPORT int __cdecl Coop_GetPacket(int sock, msg_t* msg, netadr_t* from)
             if (type != suite::REJECT && mismatch) continue;
             if (!hasHeader) continue;
             Reader r{buf + CONTROL_HEADER, buf + n};
+            if (S->role == JOINER && type == lobby::M_LOBBY) {
+                if (S->compatible || S->joined || !reload_delivery::Valid(token)) continue;
+                if (reload_delivery::Valid(S->reloadToken) &&
+                    !world_wire::Transition(token, S->reloadToken)) continue;
+                char names[lobby::MAX_PLAYERS][lobby::NAME]{};
+                const int count = lobby::Unpack(r.p, int(r.end - r.p), names);
+                if (count < 1) continue;
+                S->reloadToken = token;
+                g_lobbySeen = S->joinStarted = GetTickCount();
+                if (g_lobbyShown != count) {
+                    char status[96];
+                    snprintf(status, sizeof status, "Lobby: %d/4 players. Waiting for the host to start a mission.", count);
+                    ShowJoinStatus(status);
+                }
+                ShowLobby(names, count);
+                continue;
+            }
             if (S->role == NONE && S->waitingForMap) {
                 if (fromHost && !mismatch && type == M_RELOAD && world_wire::Current(token, S->reloadToken)) {
                     Reader pending = r;
@@ -5461,6 +5631,7 @@ EXPORT int __cdecl Coop_GetPacket(int sock, msg_t* msg, netadr_t* from)
                 StaleWorldPacket(type); continue;
             }
             if(S->role==HOST&&type==M_BYE&&peerSlot<1) {
+                if (r.end - r.p == 1 && *r.p == 1) g_lobby.Remove(a);
                 for(int slot=1;slot<g::MAX_CLIENTS;++slot) {
                     auto& seat=S->inventories.slots[slot];
                     if(S->remote[slot].active||!peer_inventory::ReservedDeparture(seat,slot,token,
@@ -5519,7 +5690,7 @@ EXPORT int __cdecl Coop_GetPacket(int sock, msg_t* msg, netadr_t* from)
                 HostDropRemote(peerSlot, explicitLeave);
             }
             else if (S->role == JOINER) {
-                if (type != suite::READY && type != suite::REJECT && !S->compatible) continue;
+                if (type != suite::READY && type != suite::REJECT && type != M_BYE && !S->compatible) continue;
                 g_hostSeen = GetTickCount();
                 JoinerControl(type, r);
             }

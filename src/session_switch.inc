@@ -293,9 +293,12 @@ void WriteSupervisorState()
     if (!f) return;
     bool rendered = g::cgvm && g::cls_state == 2 && g::cl_snapNum > 0 && g::cl_snapServerTime > 0;
     bool switchWaiting=g_switch.phase && uint32_t(now-g_switch.started)>120000;
-    fprintf(f, "{\"variant\":\"%s\",\"role\":\"%s\",\"joined\":%s,\"render_ready\":%s,\"live_players\":%d,\"tick\":%lu,\"map\":\"%s\",\"switch\":{\"transaction\":%u,\"phase\":%d,\"retry_round\":%u,\"waiting\":%s}}\n",
+    const char* map = g::CvarString("mapname");
+    const bool mainlineFinished = S->role == HOST && g_identity.variant == 3 &&
+        !_stricmp(map, "credits") && CvarInt("coop_mainline_handoff") == 1 && CvarInt("coop_mainline_finished") == 1;
+    fprintf(f, "{\"variant\":\"%s\",\"role\":\"%s\",\"joined\":%s,\"render_ready\":%s,\"live_players\":%d,\"tick\":%lu,\"map\":\"%s\",\"mainline_finished\":%s,\"switch\":{\"transaction\":%u,\"phase\":%d,\"retry_round\":%u,\"waiting\":%s}}\n",
             VariantName(g_identity.variant), S->role == HOST ? "host" : S->role == JOINER ? "joiner" : "none",
-            S->joined ? "true" : "false", rendered ? "true" : "false", live, now, g::CvarString("mapname"),
+            S->joined ? "true" : "false", rendered ? "true" : "false", live, now, map, mainlineFinished ? "true" : "false",
             g_switch.id,g_switch.phase,g_switch.retryRound,switchWaiting?"true":"false");
     fclose(f);
     MoveFileExA((dir + "runtime-state.tmp").c_str(), (dir + "runtime-state.json").c_str(), MOVEFILE_REPLACE_EXISTING);
