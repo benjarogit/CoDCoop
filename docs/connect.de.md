@@ -1,50 +1,103 @@
-# Gemeinsam verbinden
+# Gemeinsam spielen mit CoDCoop
 
-[English](connect.md) · [Installation](../README.de.md#installation)
+[Installation](../README.de.md#installation) · [CoDCoop starten](../README.de.md#codcoop-starten) · [Probleme beim Beitritt](#probleme-beim-beitritt) · [English](connect.md)
 
-1. Startet auf beiden Rechnern den **CoDCoop Launcher** und verwendet dieselbe Mod-Version. Wählt dieselbe Kampagne.
-2. Der Host wählt **Spiel hosten → Kampagne starten**, lädt eine Mission und bleibt darin, während der andere beitritt.
-3. Der Mitspieler wählt **Spiel beitreten**, trägt die Adresse mit Port ein und klickt **Kampagne beitreten**. Wenn das Spielmenü schon offen ist, geht das auch über **Co-op → Host IP → Join**.
+## Verbindung auswählen
 
-### Vor dem Missionsstart in der Lobby treffen
+| Wo spielt ihr? | Was der Mitspieler verwendet |
+| --- | --- |
+| Im selben WLAN oder kabelgebundenen Netz | [Heimnetz (LAN)](#im-selben-heimnetz), z. B. `192.168.1.50:28960` |
+| Von verschiedenen Anschlüssen, mit UDP-Portweiterleitung beim Host | [Öffentliche IPv4](#über-das-internet-per-direkt-ip), z. B. `203.0.113.42:28960` |
+| Von verschiedenen Anschlüssen, über Steam-Freunde | [Steam-Einladung oder Steam-ID](#steam) |
+| Von verschiedenen Anschlüssen, über Tailscale | [Tailscale-IPv4](#über-tailscale), z. B. `100.64.10.20:28960` |
 
-Öffnet dieselbe Kampagne und wählt im Hauptmenü
-**Co-op**. Der Host klickt **Host game**. Die anderen können schon im Menü über
-die Host-Adresse oder Steam beitreten. In der Lobby seht ihr, wer angekommen ist.
-Der Host geht zurück und startet ein neues Spiel oder lädt einen Spielstand.
-Die wartenden Mitspieler folgen automatisch. Der Beitritt zur bereits laufenden
-Mission geht weiterhin.
+Die Adressen sind Beispiele. Verwendet die Adresse der Person, die euer Spiel hostet.
+
+## Hosten und beitreten
+
+Alle brauchen dieselbe CoDCoop-Version und Kampagne. Für die kombinierte Kampagne lasst ihr im Launcher **CoD + UO — Verbesserter Coop** ausgewählt.
+
+1. **Host:** Unter **Spielweise** wählst du **Spiel hosten** und klickst auf **Kampagne starten**. Wähle im Spielmenü **Co-op**, um deine Lobby zu sehen. Wenn du das Spiel direkt über Steam geöffnet hast, wähle dort **Host game**, um die Lobby zu öffnen. Du kannst auch zuerst eine Mission starten oder laden und deine Mitspieler danach beitreten lassen.
+2. **Mitspieler:** Wähle im Launcher **Spiel beitreten**, trage die **Host-Adresse** ein und klicke auf **Kampagne beitreten**. Wenn die passende Kampagne bereits offen ist, geht es im Spiel über **Co-op → Host IP → Join**. Für Einladungen folge den [Steam-Schritten](#steam).
+3. **Wenn ihr euch in der Lobby trefft:** Warte, bis die Mitspieler in der Liste stehen. Der Host geht zurück ins Spielmenü und startet oder lädt eine Mission. Die wartenden Mitspieler folgen automatisch.
+
+Wenn ihr die Partie über den CoDCoop Launcher gestartet habt, lasst ihn offen, damit die Gruppe einem Kampagnenwechsel folgen kann. Wenn sich beide in derselben Mission bewegen können, steht die Verbindung.
+
+<details>
+<summary>Launcher-Ansichten für Host und Mitspieler anzeigen</summary>
+
+**Host.** Die Heimnetz-Adresse ist direkt kopierbar. Mit **Ermitteln und kopieren** fragst du bei Bedarf die Internet-Adresse ab.
+
+![CoDCoop Launcher auf Spiel hosten mit Kopieren für Heimnetz, Ermitteln und kopieren für Internet und Kampagne starten](screenshots/coop-launcher-host-de.png)
+
+**Mitspieler.** Wähle **Spiel beitreten**, füge die Adresse samt Port ein und klicke auf **Kampagne beitreten**.
+
+![CoDCoop Launcher auf Spiel beitreten mit Beispieladresse im Feld Host-Adresse und der Schaltfläche Kampagne beitreten](screenshots/coop-launcher-join-de.png)
+
+</details>
 
 ## Im selben Heimnetz
 
-Der Host teilt seine lokale IPv4-Adresse mit Port, etwa `192.168.1.50:28960`. Die Mitspieler tragen diese Adresse ein. Der Standard-Spielport ist **UDP 28960**. Der Host erlaubt eingehendes UDP auf dem Spielport in seiner lokalen Firewall.
+1. **Host:** Klicke im Launcher neben **Heimnetz (LAN)** auf **Kopieren** und teile die Adresse samt Port, zum Beispiel `192.168.1.50:28960`.
+2. **Mitspieler:** Füge sie als **Host-Adresse** ein und klicke auf **Kampagne beitreten**. Beide Rechner müssen sich im erreichbaren Heimnetz befinden. Ein Gast-WLAN kann die Geräte voneinander trennen.
+3. Falls der Beitritt abläuft, erlaube auf dem Host eingehendes **UDP 28960** in der Firewall. Im Heimnetz braucht ihr keine Portweiterleitung im Router.
 
 ## Über das Internet per Direkt-IP
 
-1. Der Host leitet im Router einen externen **UDP-Port** an die lokale IPv4 und den Spielport seines Rechners weiter. In der Host-Firewall muss der interne Spielport erlaubt sein.
-2. Der Host ermittelt seine öffentliche IPv4 und teilt sie **mit dem externen Port**. Wenn der Router außen UDP `3202` auf intern `28960` weiterleitet, lautet der Eintrag beispielsweise `203.0.113.42:3202`.
-3. Der Mitspieler verwendet diese öffentliche Adresse über einen anderen Internetanschluss. Falls der Anbieter keine eingehende IPv4-Verbindung zulässt, könnt ihr den VPN-Weg verwenden.
+1. **Host:** Leite im Router **UDP 28960** an die lokale IPv4 deines Rechners und Port **28960** weiter. Erlaube dort eingehendes UDP auf diesem Port in der Firewall.
+2. Klicke im Launcher unter **Internet (öffentliche IPv4)** auf **Ermitteln und kopieren**. Teile diese Adresse. Wenn der Router einen anderen externen Port nutzt, ersetze den kopierten Port. Bei extern `3202` und intern `28960` trägt der Mitspieler zum Beispiel `203.0.113.42:3202` ein.
+3. **Mitspieler:** Füge von einem anderen Internetanschluss die öffentliche Adresse als **Host-Adresse** ein und klicke auf **Kampagne beitreten**.
+
+Falls der Anschluss des Hosts keine eingehende IPv4-Verbindung zulässt, probiert [Steam](#steam) oder [Tailscale](#über-tailscale).
 
 ## Steam
 
-1. Meldet euch mit je einem Steam-Konto an und aktiviert das Steam-Overlay für den Spieleintrag.
-2. Startet den passenden Spieleintrag **über Steam**, wenn ihr das Overlay verwenden wollt. **Original** verwendet `CoDSP.exe`. **Verbesserter Coop** verwendet `CoDUOSP.exe` mit `+set fs_game sp_improved +set coop_mainline 1` in den Startoptionen. Wer über den Steam-Chat annimmt, kann CoDCoop über den Launcher öffnen. Unter Linux braucht der Steam-Eintrag Proton und die CoDCoop-Startoptionen für Grafik und Mod-DLL. [Proton und Steam einrichten](linux.de.md#4-steam-einrichten) · [Valve zum Overlay](https://partner.steamgames.com/doc/features/overlay)
-3. Fügt euch als Steam-Freunde hinzu und lasst CoDCoop auf beiden Rechnern offen. Der Host lädt eine Mission, öffnet mit **Umschalt+Tab** die Freundesliste und wählt **Zum Spiel einladen**. Der Mitspieler klickt im Steam-Chat auf **Spiel spielen**. Im Coop-Menü gibt es, falls verfügbar, **Join [Name]**. Der Launcher nimmt auch `steam:<SteamID64>` an.
-4. Prüft nach dem Beitritt, ob beide in derselben Mission sind und sich bewegen können. Falls der Mitspieler im Menü bleibt, probiert Direkt-IP oder VPN und sichert die Logs beider Seiten.
+1. Meldet euch mit getrennten Steam-Konten an und fügt euch als Freunde hinzu. Falls Steam die Installation von Spacewar verlangt, öffnet angemeldet `steam://install/480` und wartet, bis Steam fertig ist.
+2. **Host:** Aktiviere für den Spieleintrag das Steam-Overlay und starte den Eintrag über Steam. Wähle **Co-op → Host game** und lade eine Mission. Öffne mit **Umschalt+Tab** das Overlay, wähle deinen Freund und klicke auf **Zum Spiel einladen**.
+3. **Mitspieler:** Öffne dieselbe Kampagne mit dem CoDCoop Launcher, bevor du die Einladung annimmst. Klicke im Steam-Chat auf **Spiel spielen**. Wenn im **Co-op**-Menü **Join [Name]** erscheint, kannst du auch dort beitreten. Für einen Beitritt per Steam-ID trägst du im Launcher `steam:<SteamID64>` als **Host-Adresse** ein.
 
-**Teststand:** CoDCoop 0.6.3 bestand den Beitritt per Steam-ID mit zwei echten Konten und getauschten Host-Rollen. Linux als Host nutzte Steam Relay, natives Windows als Host Steam-P2P mit ICE. Windows lief in einer VM am selben physischen Internetanschluss. Eine Overlay-Einladung vom Linux-Host kam im Steam-Chat unter Windows an und führte bei bereits geöffnetem CoDCoop in die Mission. Bei geschlossenem CoDCoop kann Steam stattdessen die separate Anwendung Spacewar oder deren Einrichtungsdialog öffnen. Startet zuerst CoDCoop und nehmt dann die Einladung an. Der Test per öffentlicher IPv4 über zwei physische Anschlüsse steht noch aus. Die Anzeige **Spacewar** bestätigt die Steam-Anmeldung des Spiels.
+<details>
+<summary>Steam-Eintrag für deine Kampagne einrichten</summary>
+
+Wähle in Steam **Spiele → Steam-fremdes Spiel meiner Bibliothek hinzufügen → Durchsuchen** und wähle die EXE im installierten Spielordner. **Original** verwendet `CoDSP.exe`. **Verbesserter Coop** verwendet `CoDUOSP.exe` mit `+set fs_game sp_improved +set coop_mainline 1` unter **Eigenschaften → Startoptionen**. Unter Linux braucht der Eintrag außerdem Proton und die CoDCoop-Startoptionen für Grafik und Mod-DLL. [Proton und Steam einrichten](linux.de.md#4-steam-einrichten) · [Valve zum Overlay](https://partner.steamgames.com/doc/features/overlay)
+
+</details>
+
+Falls Steam einen separaten **Spacewar**-Einrichtungsdialog öffnet, startet CoDCoop und nehmt die Einladung erneut an. Die Anzeige Spacewar bedeutet, dass das Spiel bei Steam angemeldet ist. Prüft, ob beide in derselben Mission landen.
 
 ## Über Tailscale
 
-Tailscale gibt jedem Rechner eine private VPN-Adresse. So könnt ihr aus verschiedenen Netzen spielen, ohne den Spielport im Router weiterzuleiten.
+Ihr verwendet das IP-Feld im Launcher. Die Portweiterleitung im Router kann geschlossen bleiben.
 
-1. Installiert Tailscale auf **beiden** Rechnern. Unter Windows öffnet ihr das Tailscale-Symbol im Infobereich und meldet euch an. Unter Linux installiert ihr das Paket für eure Distribution, startet den Tailscale-Dienst und führt `sudo tailscale up` aus. Öffnet danach den Anmeldelink. [Windows-Installation](https://tailscale.com/docs/install/windows) · [Linux-Installation](https://tailscale.com/docs/install/linux)
-2. Der Mitspieler muss den Host in Tailscale sehen. Nutzt ein gemeinsames Tailscale-Netz oder gebt nur den Host-Rechner für den Freund frei. Bei einer Gerätefreigabe kann der Empfänger dem freigegebenen Host beitreten. Wenn ihr die Rollen tauscht, gebt auch den neuen Host frei oder nutzt ein gemeinsames Netz. [Geräte freigeben](https://tailscale.com/docs/features/sharing)
-3. Der Host öffnet CoDCoop und wählt **Spiel hosten**. Seine Tailscale-IPv4 steht in der Tailscale-App oder unter `tailscale ip -4`. Bei einer Gerätefreigabe kann der Mitspieler die Adresse aus seiner eigenen Tailscale-Geräteliste nehmen. Tragt sie unter **Spiel beitreten** mit dem Spielport ein, etwa `100.64.10.20:28960`. Die Firewall des Hosts und eigene Tailscale-Zugriffsregeln müssen eingehendes Spiel-UDP über Tailscale erlauben.
-4. Wenn der Beitritt scheitert, führt der Mitspieler `tailscale ping <Host-Adresse>` aus. Ist der Host darüber erreichbar, prüft Spielport, Firewall und ob CoDCoop hostet. Während des Spiels zeigt `tailscale status` den Weg an. `direct` steht für direkt, `relay` für einen DERP-Relay und `peer-relay` für einen Relay über ein anderes Gerät. Relays können die Verzögerung erhöhen. [Verbindungsarten](https://tailscale.com/docs/reference/connection-types)
+1. Installiert Tailscale auf beiden Rechnern und meldet euch an. Unter Windows nutzt ihr das Tailscale-Symbol im Infobereich. Unter Linux installiert ihr das Paket eurer Distribution, startet den Dienst, führt `sudo tailscale up` aus und öffnet den Anmeldelink. [Windows einrichten](https://tailscale.com/docs/install/windows) · [Linux einrichten](https://tailscale.com/docs/install/linux)
+2. Nutzt ein gemeinsames Tailscale-Netz oder gebt nur den Host-Rechner für den Mitspieler frei. Der Mitspieler sollte den Host in seiner Tailscale-Geräteliste sehen. Wenn ihr die Host-Rolle tauscht, gebt auch den anderen Rechner frei. [Gerät freigeben](https://tailscale.com/docs/features/sharing)
+3. **Host:** Kopiere die Tailscale-IPv4 aus der App oder rufe `tailscale ip -4` auf. Ergänze den Spielport und teile das Ergebnis, etwa `100.64.10.20:28960`. Erlaube eingehendes Spiel-UDP über Tailscale in der Host-Firewall und in eigenen Tailscale-Zugriffsregeln.
+4. **Mitspieler:** Füge die Tailscale-Adresse samt Port als **Host-Adresse** ein und klicke auf **Kampagne beitreten**.
 
-Die Portweiterleitung im Router kann geschlossen bleiben. Ihr nutzt das CoDCoop-IP-Feld und braucht dafür keine Steam-Einladung.
+<details>
+<summary>Tailscale-Verbindung prüfen</summary>
 
-Ab CoDCoop 0.6.3 öffnet **P** im laufenden Spiel die Konsole, wenn die Taste noch frei war. Die ursprüngliche Konsolentaste unter **Esc** (auf einer deutschen Tastatur meistens **^**) funktioniert auch im Menü und schließt die Konsole. Aktiviere bei Bedarf **Konsole** in den Spieloptionen. Eine vorhandene Belegung kannst du in der Konsole mit `bind p coopconsole` ändern. Für die Beitrittswege oben reichen Launcher oder Coop-Menü.
+Führe `tailscale ping 100.64.10.20` mit der tatsächlichen Host-Adresse aus, ohne den Spielport. Antwortet Tailscale und scheitert der Spielbeitritt trotzdem, prüft, ob das Spiel hostet und ob UDP-Port und Firewall stimmen. Während der Partie zeigt `tailscale status`, ob die Verbindung direkt, über einen DERP-Relay oder über einen Peer-Relay läuft. Relays können die Verzögerung erhöhen. [Tailscale-Verbindungsarten](https://tailscale.com/docs/reference/connection-types)
 
-Wenn ein Beitritt scheitert, sichert aus dem Spielordner auf beiden Rechnern `codcoop.log` und, soweit vorhanden, `codcoop_join.log`. Gebt Mod-Version, Kampagne und Verbindungsweg an.
+</details>
+
+## Probleme beim Beitritt
+
+- **„Campaign is not prepared“.** Schließe `CoDMP.exe`, falls du den Standard-Mehrspielermodus gestartet hast. Öffne den CoDCoop Launcher, wähle die Kampagne des Hosts und klicke auf **Installation prüfen**. Wenn eine Datei fehlt, führe das Setup erneut aus.
+- **Nach „Kampagne wird gestartet“ bleibst du im Hauptmenü.** Prüfe beim IP-Beitritt die Adresse und den Port. Wenn die Kampagne bereits offen ist, verwende **Co-op → Host IP → Join**. Bei Steam lasst ihr CoDCoop auf beiden Rechnern offen und nehmt die Einladung erneut an.
+- **Die Verbindung läuft ab.** Prüft, ob der Host eine Lobby oder Mission geöffnet hat. Bei öffentlicher IP kontrolliert ihr die UDP-Regel im Router und die Host-Firewall. Bei Tailscale hilft dessen Ping-Prüfung.
+- **Ihr braucht weitere Hilfe.** Sichert auf beiden Rechnern `codcoop.log` und, falls vorhanden, `codcoop_join.log` aus dem Ordner neben `CoDSP.exe`. Gebt CoDCoop-Version, Kampagne und Verbindungsweg an.
+
+<details>
+<summary>Konsole öffnen</summary>
+
+Drücke während einer Mission **P**, wenn die Taste beim Einrichten der Belegung frei war. Die ursprüngliche Taste unter **Esc** (auf deutschen Tastaturen meist **^**) funktioniert auch im Menü. Aktiviere bei Bedarf **Konsole** in den Spieloptionen. Um **P** neu zu belegen, gib in der Konsole `bind p coopconsole` ein.
+
+</details>
+
+<details>
+<summary>Getestete Verbindungswege für 0.6.3</summary>
+
+Der Steam-ID-Beitritt wurde mit zwei Konten von einer Windows-VM zu einem Linux-Host über Steam Relay geprüft. Die beiden Rechner nutzten denselben physischen Internetanschluss. Die Release-Notizen führen die noch offenen Prüfungen für den endgültigen Build auf, darunter die Overlay-Einladung, den Spielbeitritt per öffentlicher IPv4 über zwei physische Anschlüsse und den Spielbeitritt in einem echten Tailscale-Netz. [Teststand im Release](https://github.com/benjarogit/CoDCoop/releases/tag/v0.6.3)
+
+</details>

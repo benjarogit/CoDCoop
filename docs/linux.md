@@ -29,6 +29,12 @@ Make the AppImage executable and open it. Select the game folder in the
 setup. The supplied suite is already selected. After installation, open
 `Start-CoD-Coop.sh` in the game folder. [Download the AppImage](https://github.com/benjarogit/CoDCoop/releases/latest/download/Install-CoD-Coop-Linux-x86_64.AppImage)
 
+If the AppImage reports a FUSE error, run this command in the download folder.
+
+```sh
+APPIMAGE_EXTRACT_AND_RUN=1 ./Install-CoD-Coop-Linux-x86_64.AppImage
+```
+
 ### Terminal setup with install.sh
 
 Download and run the script from a terminal. It requires `python3` and

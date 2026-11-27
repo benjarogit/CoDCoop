@@ -1,50 +1,103 @@
-# Joining a CoDCoop game
+# Play together in CoDCoop
 
-[Deutsch](connect.de.md) · [Installation](../README.md#installation)
+[Installation](../README.md#installation) · [Start CoDCoop](../README.md#start-codcoop) · [Troubleshoot a join](#troubleshoot-a-join) · [Deutsch](connect.de.md)
 
-1. Open the **CoDCoop Launcher** on both computers and use the same mod release. Use the same campaign on both sides.
-2. The host selects **Host a game → Start campaign**, loads a mission, and stays in it while the other player joins.
-3. The other player selects **Join a game**, enters the address and port, and selects **Join campaign**. From the game menu, use **Co-op → Host IP → Join**.
+## Choose your connection
 
-### Meet in the in-game lobby
+| Where are you playing? | What the guest uses |
+| --- | --- |
+| On the same Wi-Fi or wired network | [Home network (LAN)](#on-the-same-home-network), e.g. `192.168.1.50:28960` |
+| At different homes, with UDP forwarding on the host’s router | [Public IPv4](#direct-ip-over-the-internet), e.g. `203.0.113.42:28960` |
+| At different homes, using Steam friends | [Steam invitation or Steam ID](#steam) |
+| At different homes, using Tailscale | [Tailscale IPv4](#over-tailscale), e.g. `100.64.10.20:28960` |
 
-Enter the same campaign on both computers and
-open **Co-op** in the main menu. The host chooses **Host game**. The other players
-can join with the host address or a Steam join while everyone is still at the
-menu. The lobby shows each player as they arrive. The host goes back and starts
-a new game or loads a save. The waiting players follow automatically. Players
-can still join after the mission has started.
+The addresses here are examples. Use the address of the player hosting your game.
+
+## Host and join
+
+Everyone needs the same CoDCoop release and campaign. Start with **CoD + UO — Improved Coop** selected in the launcher for the combined campaign.
+
+1. **Host:** Set **Play as** to **Host a game**, then click **Start campaign**. When the game menu opens, select **Co-op** to see your lobby. If you opened the game directly through Steam, select **Host game** in that menu to begin hosting. You can also start or load a mission first and have friends join while you play.
+2. **Guest:** In the launcher, choose **Join a game**, enter the host’s address under **Host address**, then click **Join campaign**. If the right campaign is already open, use **Co-op → Host IP → Join** in the game. For Steam invitations, follow the [Steam steps](#steam).
+3. **If you meet in the lobby:** Wait until you see your friends in the lobby. The host goes back to the game menu and starts or loads a mission. Waiting players follow automatically.
+
+For games started from the CoDCoop Launcher, keep it open during play so the group can follow campaign changes. When both players can move in the same mission, the connection is ready.
+
+<details>
+<summary>Show what the host and guest select in the launcher</summary>
+
+**Host.** The home-network address is ready to copy. Use **Find and copy** to look up the internet address when you need it.
+
+![CoDCoop launcher set to Host a game with LAN Copy, internet Find and copy, and Start campaign](screenshots/coop-launcher-host-en.png)
+
+**Guest.** Choose **Join a game**, paste the address including the port, then click **Join campaign**.
+
+![CoDCoop launcher set to Join a game with the example address in Host address and Join campaign below](screenshots/coop-launcher-join-en.png)
+
+</details>
 
 ## On the same home network
 
-The host shares their local IPv4 address and port, such as `192.168.1.50:28960`. The other players enter that address. The default game port is **UDP 28960**. The host allows inbound UDP on the game port in their local firewall.
+1. **Host:** In the launcher, click **Copy** next to **Home network (LAN)** and share the address and port, such as `192.168.1.50:28960`.
+2. **Guest:** Paste it into **Host address** and click **Join campaign**. Both computers must be on the same reachable network. Guest Wi-Fi may isolate devices.
+3. If the guest times out, allow incoming **UDP 28960** on the host’s firewall. Router port forwarding is unnecessary for LAN play.
 
 ## Direct IP over the internet
 
-1. The host forwards an external **UDP port** on the router to their computer's local IPv4 and game port. The host firewall allows the internal game port.
-2. The host looks up their public IPv4 and shares it **with the external port**. For example, if the router forwards external UDP `3202` to internal port `28960`, players enter an address such as `203.0.113.42:3202`.
-3. The other player connects to that public address from a different internet connection. If the host's provider cannot accept inbound IPv4 connections, use the VPN path.
+1. **Host:** Forward **UDP 28960** on your router to your computer’s local IPv4 on port **28960**. Allow incoming UDP on that port in the host firewall.
+2. In the launcher, click **Find and copy** under **Internet (public IPv4)** and share the result. If the router uses a different external port, replace the port in the copied address. For example, external `3202` forwarded to internal `28960` means the guest enters `203.0.113.42:3202`.
+3. **Guest:** From a different internet connection, paste that public address into **Host address** and click **Join campaign**.
+
+If the host’s internet service does not provide reachable inbound IPv4, try [Steam](#steam) or [Tailscale](#over-tailscale).
 
 ## Steam
 
-1. Sign in to separate Steam accounts and enable the Steam overlay for the game entry.
-2. Launch the matching game entry **through Steam** to use the overlay. **Original** uses `CoDSP.exe`. **Improved Coop** uses `CoDUOSP.exe` with `+set fs_game sp_improved +set coop_mainline 1` in the launch options. A player accepting through Steam chat can open CoDCoop from its launcher. On Linux the Steam entry needs Proton and the CoDCoop launch options for graphics and the mod DLL. [Set up Proton and Steam](linux.md#4-steam-friend-invites) · [Valve overlay documentation](https://partner.steamgames.com/doc/features/overlay)
-3. Add each other as Steam friends and leave CoDCoop open on both computers. The host loads a mission, opens the friends list with **Shift+Tab**, and selects **Invite to Play**. The other player selects **Play Game** in Steam chat. The **Co-op** menu also offers **Join [name]** when available, and the launcher accepts `steam:<SteamID64>`.
-4. Verify that both players enter the same mission and can move. If the joiner remains in the menu, try direct IP or a VPN and save the logs from both sides.
+1. Sign in to separate Steam accounts and add each other as friends. If Steam prompts for Spacewar, open `steam://install/480` while signed in and let Steam finish the installation.
+2. **Host:** Enable the Steam overlay for the game entry and start that entry through Steam. Choose **Co-op → Host game** and load a mission. Open the overlay with **Shift+Tab**, select your friend and choose **Invite to Play**.
+3. **Guest:** Open the same campaign with the CoDCoop Launcher before accepting the invitation. In Steam chat choose **Play Game**. If the entry appears in the game’s **Co-op** menu, you can also use **Join [name]**. To join by Steam ID, enter `steam:<SteamID64>` in the launcher’s **Host address** field.
 
-**Test status.** CoDCoop 0.6.3 passed direct Steam-ID joins with two real accounts and swapped host roles. The Linux host used Steam Relay, and the native Windows host used Steam P2P with ICE. Windows ran in a VM behind the same physical internet connection. A Linux host also sent an overlay invitation that the Windows player accepted in Steam chat with CoDCoop already running. If CoDCoop is closed, Steam can open the separate Spacewar app or its setup dialog. Open CoDCoop first, then accept the invitation. The public IPv4 test across two physical connections is still pending. The **Spacewar** label confirms the game signed in to Steam.
+<details>
+<summary>Set up the Steam entry for your campaign</summary>
+
+In Steam, choose **Games → Add a Non-Steam Game to My Library → Browse** and select the executable in your installed game folder. **Original** uses `CoDSP.exe`. **Improved Coop** uses `CoDUOSP.exe` with `+set fs_game sp_improved +set coop_mainline 1` in **Properties → Launch Options**. On Linux, the entry also needs Proton and the CoDCoop launch options for graphics and the mod DLL. [Set up Proton and Steam](linux.md#4-steam-friend-invites) · [Valve overlay documentation](https://partner.steamgames.com/doc/features/overlay)
+
+</details>
+
+If Steam opens a separate **Spacewar** setup dialog, start CoDCoop and accept the invite again. Seeing Spacewar in Steam means the game signed in to Steam. Check that both players enter the same mission.
 
 ## Over Tailscale
 
-Tailscale gives each computer a private VPN address. Use it when you're on different networks and want to play without forwarding the game port on your router.
+This works through the launcher’s IP field. The host can leave router forwarding for the game port closed.
 
-1. Install Tailscale on **both** computers. On Windows, open the Tailscale tray icon and sign in. On Linux, install the package for your distribution, start the Tailscale service and run `sudo tailscale up`. Follow the sign-in link. [Windows installation](https://tailscale.com/docs/install/windows) · [Linux installation](https://tailscale.com/docs/install/linux)
-2. Make sure the guest can see the host in Tailscale. Use an existing shared tailnet, or share just the host device with your friend. With a shared device, the recipient can join the sharer's game. To swap host roles, share the new host too or use a joint tailnet. [Device sharing](https://tailscale.com/docs/features/sharing)
-3. The host opens CoDCoop and selects **Host game**. Find the host's Tailscale IPv4 in the tray app or run `tailscale ip -4`. For a shared device, the guest can use the address shown in their own Tailscale device list. Enter it with the game port in **Join game**, for example `100.64.10.20:28960`. Allow inbound game UDP on the host's Tailscale connection and in any custom tailnet policy.
-4. If joining fails, run `tailscale ping <host-address>` on the guest. If Tailscale can reach the host, check the game port, host firewall and whether CoDCoop is hosting. During play, `tailscale status` shows `direct`, `relay` (DERP), or `peer-relay`. Relays can add latency. [Connection types](https://tailscale.com/docs/reference/connection-types)
+1. Install and sign in to Tailscale on both computers. On Windows, use the Tailscale tray icon. On Linux, install the package for your distribution, start the service, run `sudo tailscale up`, and open the sign-in link. [Windows setup](https://tailscale.com/docs/install/windows) · [Linux setup](https://tailscale.com/docs/install/linux)
+2. Use a shared Tailscale network or share just the host’s device with the guest. The guest should see that device in their Tailscale list. Share the other device too if you swap host roles. [Device sharing](https://tailscale.com/docs/features/sharing)
+3. **Host:** Copy your Tailscale IPv4 from the app or run `tailscale ip -4`. Add the game port and share the result, for example `100.64.10.20:28960`. Allow incoming game UDP on the Tailscale interface in your firewall and any custom Tailscale access policy.
+4. **Guest:** Paste the Tailscale address and port into **Host address**, then click **Join campaign**.
 
-You can leave router forwarding for the game port closed. This route uses the CoDCoop IP join field and works without a Steam invitation.
+<details>
+<summary>Check the Tailscale connection</summary>
 
-Starting with CoDCoop 0.6.3, press **P** during a match to open the console if the key was free. The original console key below **Esc** (backtick/tilde on US layouts) also works in the menu and closes the console. Enable **Console** in the game options if needed. To change an existing binding, open the console and enter `bind p coopconsole`. The launcher and Co-op menu cover the connection steps above.
+Run `tailscale ping 100.64.10.20`, substituting the actual host address and leaving off the game port. If Tailscale responds but the game times out, check that the game is hosting, and check the UDP port and firewall. During play, `tailscale status` shows whether the route is direct, via a DERP relay, or via a peer relay. Relay connections may add latency. [Tailscale connection types](https://tailscale.com/docs/reference/connection-types)
 
-For failed joins, save `codcoop.log` and, when present, `codcoop_join.log` from the game folder on both computers. Include the release, campaign, and connection method.
+</details>
+
+## Troubleshoot a join
+
+- **“Campaign is not prepared.”** Close `CoDMP.exe` if you launched standard multiplayer. Open the CoDCoop Launcher, select the host’s campaign, and click **Check installation**. If it reports a missing file, run setup again.
+- **“Starting the campaign” ends at the main menu.** For IP joins, check the address and port. If the campaign is already open, use **Co-op → Host IP → Join**. For Steam, keep CoDCoop open on both computers and accept the invite again.
+- **The join times out.** Check that the host has opened a lobby or loaded a mission. For a public IP, check the router’s UDP rule and the host firewall. For Tailscale, try its ping check.
+- **You still need help.** Save `codcoop.log` and, if present, `codcoop_join.log` from the folder containing `CoDSP.exe` on both computers. Include the CoDCoop release, campaign and connection method.
+
+<details>
+<summary>Open the console</summary>
+
+Press **P** during a match if the key was free when the mod set up the binding. The original key below **Esc** (backtick/tilde on a US keyboard) also works in the menu. Enable **Console** in the game options if needed. To rebind **P**, enter `bind p coopconsole` in the console.
+
+</details>
+
+<details>
+<summary>Connection test coverage for 0.6.3</summary>
+
+The Steam-ID join was verified with two accounts, from a Windows VM to a Linux host over Steam Relay. The two machines used one physical internet connection. The release notes track the outstanding checks for the exact release build, including the overlay invitation, public IPv4 gameplay across two physical connections and gameplay in a live Tailscale network. [Release test notes](https://github.com/benjarogit/CoDCoop/releases/tag/v0.6.3)
+
+</details>

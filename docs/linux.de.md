@@ -29,6 +29,12 @@ Die enthaltene Suite ist bereits ausgewählt. Öffne nach der Installation
 `Start-CoD-Coop.sh` im Spielordner.
 [AppImage herunterladen](https://github.com/benjarogit/CoDCoop/releases/latest/download/Install-CoD-Coop-Linux-x86_64.AppImage)
 
+Wenn das AppImage einen FUSE-Fehler meldet, führe diesen Befehl im Download-Ordner aus.
+
+```sh
+APPIMAGE_EXTRACT_AND_RUN=1 ./Install-CoD-Coop-Linux-x86_64.AppImage
+```
+
 ### Terminal-Setup mit install.sh
 
 Lade das Skript aus einem Terminal herunter und starte es. Es benötigt
