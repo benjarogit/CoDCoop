@@ -222,9 +222,89 @@ python3 tools/qa_coop.py --source "/path/to/owned/Call of Duty" \
   --chaos-seed 260621 --duration 30
 ```
 
-This is a real-client impairment test, not proof of every campaign or Steam.
-Dies ist ein echter Netzwerktest mit Spielinstanzen, kein Nachweis für jede
-Kampagne oder die Steam-Verbindung.
+The relay adds packet loss and delay while both game instances run on one machine.
+Der Relay simuliert Paketverlust und Verzögerung auf demselben Rechner.
+
+### Separate home networks / Getrennte Heimnetze
+
+The Linux runner creates two private subnets and two NAT routers inside an
+isolated network namespace. Direct IP checks that the game port stays blocked
+without forwarding and with the host firewall closed, then connects through the
+translated public port. WireGuard carries game UDP over an encrypted tunnel
+while the public game port stays closed. CI runs the UDP probes. Add game
+arguments after `--` to run two actual game processes under Wine, each with its own
+prefix. The JSON reports identify the topology and transport.
+
+Der Linux-Runner erzeugt zwei private Netze mit je einem NAT-Router in einem
+isolierten Netzwerk-Namespace. Der Direkt-IP-Test prüft die fehlende Weiterleitung
+und die geschlossene Host-Firewall und verbindet anschließend über den
+übersetzten Außenport. Der WireGuard-Test überträgt Spiel-UDP im verschlüsselten
+Tunnel bei geschlossenem öffentlichem Spielport. CI führt die UDP-Tests aus.
+Mit Spielargumenten nach `--` laufen zwei echte Spielinstanzen unter Wine mit
+eigenen Prefixes. Topologie und Transport stehen in den JSON-Berichten.
+
+The test needs Linux network namespaces, `iproute2`, and `nftables`. Install
+`wireguard-tools` for tunnel mode and Wine and Xvfb for gameplay.
+Keep game input and output on the same filesystem.
+
+Der Test benötigt Linux-Netzwerk-Namespaces, `iproute2` und `nftables`. Für den
+Tunnel kommen `wireguard-tools` hinzu, für die Spieltests Wine und Xvfb.
+Spielquelle und Ausgabe müssen auf demselben Dateisystem liegen.
+
+```sh
+mkdir -p run
+unshare -Urn python3 tools/qa_home_network.py --transport direct \
+  --report run/home-direct-network.json
+unshare -Urn python3 tools/qa_home_network.py --transport wireguard \
+  --report run/home-vpn-network.json -- \
+  --source "/path/to/owned/Call of Duty" --run run/qa-home-vpn1 \
+  --variant cod1 --map training --players 2 --checkpoint-reloads 1
+```
+
+#### Release check across two internet connections / Release-Abnahme über zwei Internetanschlüsse
+
+Use the matching release installers, the same campaign, and two separate
+internet connections. A home connection and a mobile hotspot on the other
+computer work. Test once with a Linux host and Windows joiner, then swap roles.
+
+Beide Rechner brauchen die passenden Installationspakete, dieselbe Kampagne und
+getrennte Internetanschlüsse. Ein Heimanschluss und ein Mobilfunk-Hotspot am
+anderen Rechner genügen. Erst Linux als Host und Windows als Mitspieler testen,
+dann die Rollen tauschen.
+
+1. **Direct IP / Direkt-IP.** Join using the host's public IPv4 and the router's
+   external UDP port. Verify that forwarding leads to the game port and the
+   host firewall allows it. / Öffentliche IPv4 und externen UDP-Port des Hosts
+   verwenden. Weiterleitung zum Spielport und Host-Firewall prüfen.
+2. **Tailscale.** Join using the host's Tailscale IPv4 and the game port. Keep the
+   public game port closed. Record `tailscale status` during play and test direct
+   and relayed connections separately. An initial relay ping followed by a direct
+   game connection counts as direct. / Tailscale-IPv4 des Hosts und dessen
+   Spielport verwenden. Öffentlichen Spielport geschlossen halten. Während des
+   Spiels den Verbindungsweg mit `tailscale status` erfassen und direkte sowie
+   Relay-Verbindungen getrennt testen. Ein erster Ping über den Relay mit
+   anschließend direktem Spielverkehr zählt als direkte Verbindung.
+   [Tailscale connection types / Verbindungsarten](https://tailscale.com/docs/reference/connection-types)
+3. **Steam.** Use two signed-in accounts and join through a real Steam invite.
+   A session with the test Steam API covers the local join flow only. /
+   Zwei angemeldete Konten und eine echte Steam-Einladung verwenden. Die
+   Test-Steam-API deckt den lokalen Beitrittsablauf ab.
+
+For each run, confirm that both players enter the mission, can move, and can
+continue after a checkpoint reload. Leave and rejoin once. Record the
+release, host and joiner OS, campaign, transport, outcome, and the relevant
+`codcoop.log` and `codcoop_join.log` excerpts from each side. Radmin VPN's
+documented platform is Windows. If tested, record it as a separate Windows-to-Windows case.
+
+Pro Lauf prüfen, ob beide in die Mission gelangen, sich bewegen und nach dem
+Laden eines Checkpoints weiterspielen können. Einmal das Spiel verlassen und
+erneut beitreten. Release, Betriebssysteme, Kampagne, Transport, Ergebnis und
+relevante Ausschnitte aus `codcoop.log` und `codcoop_join.log` beider Seiten
+sichern. Radmin VPN ist für Windows dokumentiert und erhält bei einem Test
+einen eigenen Windows-zu-Windows-Eintrag.
+[Radmin VPN system requirements / Systemanforderungen](https://www.radmin-vpn.com/help/)
+
+### Recovery probes / Wiederverbindungstests
 
 To target loss of the actual map-reload controls, use a bounded two-second
 server-to-client partition. The probe requires packet-log evidence, automatic
@@ -253,15 +333,15 @@ python3 tools/qa_world_replay_probe.py --source "/path/to/owned/Call of Duty" \
   --chaos-checkout run/reference/coop-anything
 ```
 
-Each run copies game files, freezes one build of the runtime for all slots, owns
-its Xvfb/Wine prefix, checks real user-command advancement and movement, requests
-game screenshots, and verifies clean exit. Never uses hardlinks or global
-`wineserver -k`. QA identities cannot join regular sessions.
+Each run uses private configs and saves, freezes the tested runtime, owns its
+Xvfb and Wine processes, and checks user-command advancement, movement, and
+clean exit. The two-home runner hardlinks immutable game archives. QA identities
+can only join other QA sessions.
 
-Jeder Lauf kopiert die Spieldaten, verwendet denselben Laufzeit-Build für alle
-Instanzen und besitzt ein eigenes Xvfb/Wine-Prefix. Mitspielerbefehle, Bewegung,
-Spielbilder und sauberes Beenden werden geprüft. Keine Hardlinks und kein
-globales Beenden von Wineserver. QA-Sitzungen sind von normalen Sitzungen getrennt.
+Jeder Lauf nutzt eigene Konfigurationen und Spielstände, sichert den getesteten
+Laufzeitstand, startet eigene Xvfb- und Wine-Prozesse und prüft Mitspielerbefehle,
+Bewegung und sauberes Beenden. Der Heimnetztest verlinkt unveränderliche
+Spieldatenarchive. QA-Instanzen können nur anderen QA-Sitzungen beitreten.
 
 **A smoke PASS is not a campaign completion. / Ein kurzer erfolgreicher Test ist
 kein Nachweis einer durchgespielten Kampagne.**

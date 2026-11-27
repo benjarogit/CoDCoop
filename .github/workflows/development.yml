@@ -29,7 +29,19 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - run: sudo apt-get update && sudo apt-get install -y g++-mingw-w64-i686 libssl-dev
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends g++-mingw-w64-i686 libssl-dev nftables wireguard-tools
+      - name: UDP across simulated home routers (no game)
+        timeout-minutes: 2
+        run: |
+          mkdir -p network-qa
+          sudo unshare --net python3 tools/qa_home_network.py --transport direct --report network-qa/direct.json
+          sudo unshare --net python3 tools/qa_home_network.py --transport wireguard --report network-qa/wireguard.json
+      - name: Upload simulated home-network reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulated-home-network
+          path: network-qa/*.json
       - run: ./build.sh
       - run: g++ -std=c++17 -Wall -Wextra -fsanitize=address,undefined tests/test_suite_protocol.cpp -o build/test_suite_protocol && ./build/test_suite_protocol
       - run: g++ -std=c++17 -Wall -Wextra -fsanitize=address,undefined tests/test_anim_fragments.cpp -o build/test_anim_fragments && ./build/test_anim_fragments

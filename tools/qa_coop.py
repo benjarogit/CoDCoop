@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Real Wine host/joiner smoke tests. A smoke PASS is not a campaign playthrough.
 
-Copies (never hardlinks) the source installation. Owns its X server, Wine prefix,
+Owns its test installation, X server, Wine prefixes,
 processes, command files and saves. No global wineserver/Steam manipulation.
 """
 import argparse
@@ -250,7 +250,7 @@ def validate_scenario_result(value):
     return value
 
 
-def main(argv=None, *, scenario=None, allowed_error_markers=()):
+def main(argv=None, *, scenario=None, allowed_error_markers=(), network=None):
     if scenario is not None and not callable(scenario): raise ValueError('scenario is a trusted Python callable only')
     allowed = tuple(marker for marker in allowed_error_markers if marker)
     parser = argparse.ArgumentParser(description=__doc__)
@@ -287,6 +287,8 @@ def main(argv=None, *, scenario=None, allowed_error_markers=()):
     parser.add_argument('--chaos-profile', choices=('lan', 'good_wifi', 'bad_wifi', 'mobile_tether', 'transatlantic', 'hell'), default='bad_wifi')
     parser.add_argument('--chaos-seed', type=int, default=260621)
     args = parser.parse_args(argv)
+    if network is not None and (args.players != 2 or args.steam_api or args.chaos_checkout):
+        parser.error('two-home network QA requires two direct-IP players and its own routers')
     if args.steam_api and not args.steam_api.is_file():
         parser.error('--steam-api is not a file: ' + str(args.steam_api))
     try:
@@ -337,11 +339,25 @@ def main(argv=None, *, scenario=None, allowed_error_markers=()):
             shutil.copy2(peer_source / module, peer_runtime / module)
     folders = []
     ui_locale_banks = []
+    if network is not None:
+        from build_coop_localization import INSTALLED_PATH
+
+        def copy_input(src, dst):
+            # Keep the generated locale bank private along with configs and saves.
+            relative = Path(src).relative_to(source)
+            if relative.suffix.lower() == '.pk3' and relative.as_posix().lower() != INSTALLED_PATH.lower():
+                return os.link(src, dst)
+            return shutil.copy2(src, dst)
+
     for n in range(args.players):
         folder = output / ('host' if n == 0 else 'join%d' % n)
         if not folder.exists():
-            folder.mkdir()
-            subprocess.run(['cp', '-a', '--reflink=auto', str(source) + '/.', str(folder)], check=True)
+            if network is None:
+                folder.mkdir()
+                subprocess.run(['cp', '-a', '--reflink=auto', str(source) + '/.', str(folder)], check=True)
+            else:
+                shutil.copytree(source, folder, copy_function=copy_input,
+                                ignore=shutil.ignore_patterns('backups', 'launcher', 'codcoop_tmp'))
         for module in ('ddraw.dll', 'codcoop_core.dll'):
             shutil.copy2((peer_runtime if n else runtime) / module, folder / module)
         if args.steam_api:
@@ -359,6 +375,7 @@ def main(argv=None, *, scenario=None, allowed_error_markers=()):
                   'ui_languages': ui_languages, 'ui_locale_banks': ui_locale_banks,
                   'runtime_source': str(runtime_source),
                   'transport': 'steam-fake' if args.steam_api else 'ip',
+                  'network_scope': network.scope if network is not None else 'same-host',
                   'host_delay_seconds': args.host_delay, 'checkpoint_reloads': args.checkpoint_reloads,
                   'initial_expected_players': args.initial_expected_players or args.players,
                   'runtime': {p: hashlib.sha256((runtime / p).read_bytes()).hexdigest() for p in ('ddraw.dll', 'codcoop_core.dll')},
@@ -395,6 +412,7 @@ def main(argv=None, *, scenario=None, allowed_error_markers=()):
     handles = []
     display_process = None
     relay_process = None
+    wine_instances = []
     env = os.environ.copy()
     env.update(WINEPREFIX=str(output / 'prefix'), WINEDEBUG='-all', CODCOOP_QA='1', CODCOOP_QA_NO_STEAM='1',
                WINEDLLOVERRIDES='ddraw=n,b;mscoree=;mshtml=', LIBGL_ALWAYS_SOFTWARE='1',
@@ -428,10 +446,15 @@ def main(argv=None, *, scenario=None, allowed_error_markers=()):
         display = os.read(read_fd, 64).decode().strip(); os.close(read_fd)
         env['DISPLAY'] = ':' + display
         boot_log = open(output / 'wineboot.log', 'wb'); handles.append(boot_log)
-        prefix_ready = output / 'prefix/.codcoop-qa-prefix-ready'
-        if not prefix_ready.exists():
-            subprocess.run(['wineboot', '--init'], env=env, stdout=boot_log, stderr=boot_log, check=True, timeout=max(90, args.timeout))
-            prefix_ready.write_text('wineboot --init completed successfully\n')
+        for n in range(args.players if network is not None else 1):
+            prefix = network.player_prefix(n) if network is not None else []
+            player_env = dict(env, WINEPREFIX=str(output / ('prefix' if n == 0 else f'prefix{n}')))
+            wine_instances.append((prefix, player_env))
+            prefix_ready = Path(player_env['WINEPREFIX']) / '.codcoop-qa-prefix-ready'
+            if not prefix_ready.exists():
+                subprocess.run(prefix + ['wineboot', '--init'], env=player_env, stdout=boot_log,
+                               stderr=boot_log, check=True, timeout=max(90, args.timeout))
+                prefix_ready.write_text('wineboot --init completed successfully\n')
         exe = 'CoDSP.exe' if args.variant == 'cod1' else 'CoDUOSP.exe'
         fs_game = {'cod1': '', 'uo': '', 'sp_improved': 'sp_improved', 'united_fronts': 'UnitedFronts'}[args.variant]
         order = [1, 0] if args.host_delay and args.players == 2 else list(range(args.players))
@@ -453,16 +476,18 @@ def main(argv=None, *, scenario=None, allowed_error_markers=()):
                 cmd += ['+coophost', str(args.port)]
             elif args.steam_api:
                 cmd += ['+coopjoin', 'steam:%d' % args.steam_host_id]
+            elif network is not None:
+                cmd += ['+coopjoin', '%s:%d' % network.target]
             else:
                 cmd += ['+coopjoin', '127.0.0.1:' + str(join_port)]
-            player_env = env
+            prefix, player_env = wine_instances[n if network is not None else 0]
             if args.steam_api:
-                player_env = env.copy()
+                player_env = player_env.copy()
                 player_env.pop('CODCOOP_QA_NO_STEAM', None)
                 player_env['FAKESTEAM_ID'] = str(args.steam_host_id + n)
                 player_env['FAKESTEAM_NAME'] = 'QA%d' % n
                 player_env['FAKESTEAM_DIR'] = zpath(output / 'fakesteam')
-            processes.append(subprocess.Popen(cmd, env=player_env, cwd=folder, stdout=log, stderr=log))
+            processes.append(subprocess.Popen(prefix + cmd, env=player_env, cwd=folder, stdout=log, stderr=log))
             wait_for(lambda: read_state(folder), processes, args.timeout, 'core initialization for slot %d' % n)
             # Engine UI calls, no desktop mouse injection and no direct world-state teleport.
             start = 'coopuiclick 320 240\ncoopqastart'
@@ -601,8 +626,12 @@ def main(argv=None, *, scenario=None, allowed_error_markers=()):
                     results['checks'].append('checkpoint %d remote %d moved %.1f units via %s' %
                                             (iteration + 1, slot, distance, action))
         # Unallocated endpoints must not be able to inject engine snapshots.
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-            sock.sendto(b'\x01\x00\x00\x00' + b'fake engine packet', ('127.0.0.1', args.port))
+        packet = b'\x01\x00\x00\x00' + b'fake engine packet'
+        if network is not None:
+            network.send_from_unallocated_socket(packet)
+        else:
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+                sock.sendto(packet, ('127.0.0.1', args.port))
         baseline = read_state(folders[0])
         deadline = time.monotonic() + args.duration
         while time.monotonic() < deadline:
@@ -648,11 +677,12 @@ def main(argv=None, *, scenario=None, allowed_error_markers=()):
                 except subprocess.TimeoutExpired:
                     process.kill(); process.wait()
         # Prefix is owned exclusively by this harness; never kill the user's server.
-        subprocess.run(['wineserver', '-k'], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        try:
-            subprocess.run(['wineserver', '-w'], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10)
-        except subprocess.TimeoutExpired:
-            pass
+        for prefix, player_env in wine_instances:
+            subprocess.run(prefix + ['wineserver', '-k'], env=player_env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            try:
+                subprocess.run(prefix + ['wineserver', '-w'], env=player_env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10)
+            except subprocess.TimeoutExpired:
+                pass
         if display_process is not None:
             display_process.terminate(); display_process.wait(timeout=5)
         for handle in handles: handle.close()

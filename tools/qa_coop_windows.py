@@ -111,6 +111,7 @@ def main(argv=None):
 
     provenance = {
         'platform': 'native-windows',
+        'network_scope': 'same-host',
         'source': str(source), 'variant': args.variant, 'map': args.map, 'players': args.players,
         'runner_sha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
         'coverage': 'native Windows connection/liveness/movement smoke only; no campaign completion claim',
