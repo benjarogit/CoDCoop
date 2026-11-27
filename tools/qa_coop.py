@@ -436,14 +436,22 @@ def main(argv=None, *, scenario=None, allowed_error_markers=(), network=None):
                 try: return json.loads(info_file.read_text())
                 except (OSError, ValueError): return None
             join_port = wait_for(relay_ready, [relay_process], 15, 'Co-op Anything UDP relay')['listen']
-        # Ask Xvfb for a free display instead of stealing a fixed display number.
+        # Abstract X11 sockets are private to a network namespace, but the
+        # filesystem sockets used by the isolated players are shared. Give each
+        # live network run a distinct display across all namespaces.
+        display_command = ['Xvfb']
+        if network is not None:
+            display_command.append(f':{10000 + os.getpid()}')
         read_fd, write_fd = os.pipe()
         log = open(output / 'xvfb.log', 'wb'); handles.append(log)
-        display_process = subprocess.Popen(['Xvfb', '-displayfd', str(write_fd), '-screen', '0', '1600x1000x24', '-nolisten', 'tcp'], pass_fds=(write_fd,), stdout=log, stderr=log)
+        display_command += ['-displayfd', str(write_fd), '-screen', '0', '1600x1000x24', '-nolisten', 'tcp']
+        display_process = subprocess.Popen(display_command, pass_fds=(write_fd,), stdout=log, stderr=log)
         os.close(write_fd)
         if not select.select([read_fd], [], [], 10)[0]:
             raise RuntimeError('Xvfb did not allocate a display')
         display = os.read(read_fd, 64).decode().strip(); os.close(read_fd)
+        if not display:
+            raise RuntimeError('Xvfb exited before opening a display')
         env['DISPLAY'] = ':' + display
         boot_log = open(output / 'wineboot.log', 'wb'); handles.append(boot_log)
         for n in range(args.players if network is not None else 1):
@@ -637,8 +645,9 @@ def main(argv=None, *, scenario=None, allowed_error_markers=(), network=None):
         while time.monotonic() < deadline:
             if relay_process and relay_process.poll() is not None:
                 raise RuntimeError('network impairment relay exited during observation')
-            for process in processes:
-                if process.poll() is not None: raise RuntimeError('game exited during observation')
+            for index, process in enumerate(processes):
+                if process.poll() is not None:
+                    raise RuntimeError(f'game process {index} exited during observation (exit {process.returncode})')
             time.sleep(0.5)
         final = connected()
         if not final: raise RuntimeError('a joiner was lost during observation')
