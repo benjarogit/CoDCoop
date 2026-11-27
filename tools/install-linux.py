@@ -1971,7 +1971,7 @@ def suite_main(argv=None):
     if args.check:
         return run_suite_validator('check', game)
     if not args.suite_source:
-        parser.error('--suite-source is required until a complete 0.6 release is published; 0.5.4 is not a complete suite')
+        parser.error('--suite-source is required when running setup outside the AppImage')
     overlay = args.suite_source.expanduser().resolve()
     if overlay == game or overlay.is_relative_to(game) or not (overlay / 'coop/variants.json').is_file():
         parser.error('--suite-source must be a separate 0.6 payload containing coop/variants.json')
@@ -1984,7 +1984,12 @@ def suite_main(argv=None):
         parser.error('invalid FOV or player name')
     if args.repair and args.configure:
         parser.error('--repair preserves settings; do not combine it with --configure')
-    say('CoDCoop 0.6 development setup: full suite, English/German, original + UO + SP Improved + United Fronts + YAP.')
+    try:
+        version = json.loads((overlay / 'coop/variants.json').read_text()).get('suite_version', '')
+    except (OSError, ValueError, AttributeError):
+        version = ''
+    version_label = ' ' + version if isinstance(version, str) and re.fullmatch(r'[0-9A-Za-z.-]{1,40}', version) else ''
+    say(f'CoDCoop{version_label} setup: full suite, English/German, original + UO + SP Improved + United Fronts + YAP.')
     say('Target: %s\nOverlay: %s\nGame language: %s' % (game, overlay, args.language))
     say('Base/extras downloads, when required: 1,036,938,510 / 922,302,300 bytes. German: 657,419,767 bytes.')
     try:

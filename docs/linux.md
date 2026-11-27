@@ -36,7 +36,7 @@ downloads the matching AppImage, verifies its pinned SHA-256 and starts the
 terminal installer inside it.
 
 ```sh
-curl -fsSLo install-codcoop.sh https://raw.githubusercontent.com/benjarogit/CoDCoop/v0.6.2/tools/install.sh && sh ./install-codcoop.sh
+curl -fsSLo install-codcoop.sh https://raw.githubusercontent.com/benjarogit/CoDCoop/v0.6.3/tools/install.sh && sh ./install-codcoop.sh
 ```
 
 The script uses a detected game folder when exactly one is found. If there are

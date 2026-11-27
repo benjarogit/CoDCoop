@@ -36,7 +36,7 @@ Lade das Skript aus einem Terminal herunter und starte es. Es benötigt
 die darin enthaltene Installation im Terminal.
 
 ```sh
-curl -fsSLo install-codcoop.sh https://raw.githubusercontent.com/benjarogit/CoDCoop/v0.6.2/tools/install.sh && sh ./install-codcoop.sh
+curl -fsSLo install-codcoop.sh https://raw.githubusercontent.com/benjarogit/CoDCoop/v0.6.3/tools/install.sh && sh ./install-codcoop.sh
 ```
 
 Wenn das Setup genau eine Installation findet, übernimmt es deren Pfad.
